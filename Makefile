@@ -1,7 +1,8 @@
 CC      		= gcc
-CFLAGS  		= -Wall -g
+CFLAGS  		= -Wall -g -fno-strict-aliasing
 LDFLAGS 		= -l ev
 PROFILE_CFLAGS 	= $(CFLAGS) -pg
+OPTFLAGS        = $(CFLAGS) -O3
 
 FILES = bjoern
 
@@ -10,3 +11,6 @@ all:
 
 profile:
 	$(CC) $(PROFILE_CFLAGS) $(LDFLAGS) -o bjoern bjoern.c
+
+optfull:
+	$(CC) $(OPTFLAGS) $(LDFLAGS) -o bjoern bjoern.c
