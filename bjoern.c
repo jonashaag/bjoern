@@ -144,8 +144,6 @@ on_input_accepted(struct ev_loop* loop, struct ev_io* input_stream, const int re
 
     ev_io_init(&client->ev_read, on_client_connected, client->fd, EV_READ);
     ev_io_start(loop, &client->ev_read);
-
-    sleep(1);
 }
 
 
