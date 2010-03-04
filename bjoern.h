@@ -47,3 +47,9 @@ struct Client {
     char* body;
     size_t input_position;
 };
+
+static inline void reset_client(struct Client* client) {
+    client->header = NULL;
+    client->body = NULL;
+    client->input_position = 0;
+}

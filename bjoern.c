@@ -2,16 +2,18 @@
 
 #define GET_CLIENT_FROM_EV_IO(EV_IO_S, EV_IO_F) (struct Client*) (((char*)EV_IO_S) - offsetof(struct Client, EV_IO_F))
 
-#define RESET_CLIENT(client) \
-    client->input_position = 0; \
-    client->header = NULL; \
-    client->body   = NULL;
-
+#define COMBINE_STATEMENTS(code) do {code;} while(0)
+#define error(...) fprintf(stderr, "ERROR: " __VA_ARGS__ )
+#define die(exit_code, ...) COMBINE_STATEMENTS(error( __VA_ARGS__ ); exit(exit_code))
+#ifdef DEBUG
+#define debug(...) fprintf(stderr, "DEBUG: " __VA_ARGS__ )
+#else
+#define debug(...)
+#endif
 
 static char* hostname;
 static int port;
 static int sockfd;
-
 
 int
 set_nonblock(int fd) {
@@ -136,7 +138,7 @@ on_input_accepted(struct ev_loop* loop, struct ev_io* input_stream, const int re
     struct Client* client = malloc(sizeof(struct Client));
     if(client == NULL)
         return;
-    RESET_CLIENT(client);
+    reset_client(client);
 
     client->fd = client_fd;
 
@@ -152,14 +154,13 @@ static bool bjoern_init() {
     struct addrinfo* servinfo;
     struct addrinfo* p;
     int rv;
-    //int* yes;
     char strport[7];
     int* throwaway;
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE; // use my IP
+    hints.ai_flags = AI_PASSIVE;
 
     snprintf(strport, sizeof (strport), "%d", port);
 
@@ -196,7 +197,7 @@ static bool bjoern_init() {
 
 
 static void on_SIGINT_received(struct ev_loop *loop, ev_signal *w, int revents) {
-    fprintf(stderr, "bye. :)\n");
+
     ev_unloop(loop, EVUNLOOP_ALL);
 }
 
@@ -222,10 +223,8 @@ int
 main(int argc, char** argv) {
     hostname = "0.0.0.0";
     port = 8080;
-    if(!bjoern_init()) {
-        fprintf(stderr, "Could initialize bjoern\n");
-        return 1;
-    }
+    if(!bjoern_init())
+        die(1, "Could initialize bjoern\n");
     bjoern_loop_new();
     return 0;
 }
