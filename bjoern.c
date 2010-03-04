@@ -49,20 +49,9 @@ close_connection(struct Client *client) {
 }
 
 
-static void
-client_write(struct Client* client, const char* output, size_t output_length) {
-    int sent_output;
-
-    while(output_length) {
-        sent_output = (int)send(client->fd, output, output_length, 0);
-        if(sent_output <= 0) {
-            if(errno != EAGAIN)
-                return;
-        } else {
-            output += sent_output;
-            output_length -= sent_output;
-        }
-    }
+static void inline
+client_write(struct Client* client, const char* output, const size_t output_length) {
+    send(client->fd, output, output_length, 0);
 }
 
 static void
@@ -145,9 +134,9 @@ on_input_accepted(struct ev_loop* loop, struct ev_io* input_stream, const int re
         return;
 
     struct Client* client = malloc(sizeof(struct Client));
-    RESET_CLIENT(client);
     if(client == NULL)
         return;
+    RESET_CLIENT(client);
 
     client->fd = client_fd;
 
@@ -208,10 +197,21 @@ static bool bjoern_init() {
 }
 
 
+static void on_SIGINT_received(struct ev_loop *loop, ev_signal *w, int revents) {
+    fprintf(stderr, "bye. :)\n");
+    ev_unloop(loop, EVUNLOOP_ALL);
+}
+
+
 static void
 bjoern_loop_new() {
     ev_io accept_listener;
+    ev_signal SIGINT_listener;
+
     struct ev_loop* loop = ev_default_loop(0);
+
+    ev_signal_init(&SIGINT_listener, &on_SIGINT_received, SIGINT);
+    ev_signal_start(loop, &SIGINT_listener);
 
     ev_io_init(&accept_listener, &on_input_accepted, sockfd, EV_READ);
     ev_io_start(loop, &accept_listener);
@@ -224,8 +224,10 @@ int
 main(int argc, char** argv) {
     hostname = "0.0.0.0";
     port = 8080;
-    if(!bjoern_init())
+    if(!bjoern_init()) {
+        fprintf(stderr, "Could initialize bjoern\n");
         return 1;
+    }
     bjoern_loop_new();
     return 0;
 }

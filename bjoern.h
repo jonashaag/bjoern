@@ -16,8 +16,9 @@
 #define BJOERN_VERSION "0.1"
 #define BJOERN_DESCRIPTION "the ultra lightweight and screamingly fast Python WSGI server written in C"
 #define SERVER_IDENTITY BJOERN_NAME BJOERN_VERSION " -- " BJOERN_DESCRIPTION
-#define DUMMY_RESPONSE ("HTTP/1.1 200 Alles Ok\r\nServer: " SERVER_IDENTITY \
-                        "\r\n\r\nHello World from bjoern " BJOERN_VERSION "!")
+#define DUMMY_RESPONSE ("HTTP/1.1 200 Alles Ok\r\nServer: " SERVER_IDENTITY "\r\n" \
+                        "Connection: close\r\nContent-Length: 28" \
+                        "\r\n\r\nHello World from bjoern " BJOERN_VERSION "!\r\n")
 
 
 /* default and user configuration */
