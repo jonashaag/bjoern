@@ -3,10 +3,10 @@
 #define GET_CLIENT_FROM_EV_IO(EV_IO_S, EV_IO_F) (struct Client*) (((char*)EV_IO_S) - offsetof(struct Client, EV_IO_F))
 
 #define COMBINE_STATEMENTS(code) do {code;} while(0)
-#define error(...) fprintf(stderr, "ERROR: " __VA_ARGS__ )
+#define error(...) fprintf(stderr, "ERROR: " __VA_ARGS__ "\n")
 #define die(exit_code, ...) COMBINE_STATEMENTS(error( __VA_ARGS__ ); exit(exit_code))
 #ifdef DEBUG
-#define debug(...) fprintf(stderr, "DEBUG: " __VA_ARGS__ )
+#define debug(...) fprintf(stderr, "DEBUG: " __VA_ARGS__ "\n")
 #else
 #define debug(...)
 #endif
@@ -61,7 +61,7 @@ start_write(struct ev_loop* loop, struct ev_io* input_stream, const int revents)
     struct Client* client = GET_CLIENT_FROM_EV_IO(input_stream, ev_write);
     if(!(revents & EV_WRITE))
         return;
-    client_write(client, DUMMY_RESPONSE, strlen(DUMMY_RESPONSE));
+    client_write(client, DUMMY_RESPONSE, strlen(DUMMY_RESPONSE));j
     ev_io_stop(loop, input_stream);
     close_connection(client);
 }
