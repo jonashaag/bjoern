@@ -1,6 +1,6 @@
 CC      		= gcc
 CFLAGS  		= -Wall -g -fno-strict-aliasing
-LDFLAGS 		= -l ev
+LDFLAGS 		= -l ev -pthread
 PROFILE_CFLAGS 	= $(CFLAGS) -pg
 OPTFLAGS        = $(CFLAGS) -O3
 

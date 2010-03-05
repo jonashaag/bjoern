@@ -8,6 +8,9 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <fcntl.h>
+#include <assert.h>
+
+#include <pthread.h>
 #include <ev.h>
 
 
@@ -39,17 +42,23 @@ typedef enum {
 } bool;
 
 struct Client {
+    struct ev_loop* loop;
     ev_io ev_write;
     ev_io ev_read;
-    int fd;
 
+    int fd;
+    long int id;
+
+    struct Request*  request;
+    struct Response* response;
+};
+
+struct Request {
     char* header;
     char* body;
     size_t input_position;
 };
 
-static inline void reset_client(struct Client* client) {
-    client->header = NULL;
-    client->body = NULL;
-    client->input_position = 0;
-}
+struct Response {
+    char* message;
+};
