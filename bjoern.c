@@ -45,19 +45,27 @@ get_client_fd(struct ev_io* input_stream) {
 }
 
 
-static void
-close_connection(struct Client *client) {
-    debug("Closing connection to client %ld.", client->id);
-    if(client->request) {
-        free(client->request->header);
-        free(client->request);
-    }
-    if(client->response) {
-        free(client->response->message);
-        free(client->response);
-    }
+static struct Client*
+Client_new() {
+    struct Client* client = malloc(sizeof(struct Client));
+    return client;
+}
 
-    free(client->loop);
+static void
+Client_free(struct Client* client) {
+    debug("free()ing Client %d...", (int)client);
+    if(!client) return;
+
+    if(client->request_header_orig) free(client->request_header_orig);
+
+    if(client->response) free(client->response);
+}
+
+
+static void
+close_connection(struct Client* client) {
+    close(client->fd);
+    Client_free(client);
 }
 
 
@@ -91,56 +99,57 @@ on_client_connected(struct ev_loop* loop, struct ev_io* input_stream, const int 
         return; // something went terribly wrong.
 
     struct Client* client = GET_CLIENT_FROM_EV_LOOP(loop);
-    debug("Client %ld connected.", client->id);
+    debug("Client %ld connected. (fd is %d)", client->id, input_stream->fd);
 
     size_t input_length = 0;
     char input_buffer[HTTP_REQUEST_BUFFER_LENGTH] = "";
     bool read_finished = false;
 
-    input_length = recv(client->fd, &input_buffer, HTTP_REQUEST_BUFFER_LENGTH, 0);
-    if(input_length < 0) {
+    input_length = recv(input_stream->fd, &input_buffer, HTTP_REQUEST_BUFFER_LENGTH, 0);
+    debug("Got %d bytes input: %s", input_length, input_buffer);
+    if((int)input_length < 0) {
+        debug("Error receiving input, errno is %d", errno);
         ev_io_stop(loop, input_stream);
         close_connection(client);
         return;
     }
-    else if(input_length == 0) {
+    else if((int)input_length == 0) {
         read_finished = true;
     }
     else {
-        client->request = malloc(sizeof(struct Request));
-        if(!client->request) return;
-        client->request->header = realloc(client->request->header, (client->request->input_position + input_length + 1)*sizeof(char));
-        memcpy(client->request->header + client->request->input_position, &input_buffer, input_length);
-        client->request->input_position += input_length;
-        client->request->header[client->request->input_position] = '\0';
+        client->request_header = realloc(client->request_header, (client->request_seek + input_length + 1)*sizeof(char));
+        client->request_header_orig = client->request_header;
+        memcpy(client->request_header + client->request_seek, &input_buffer, input_length);
+        client->request_seek += input_length;
+        client->request_header[client->request_seek] = '\0';
 
 
         bool uses_carriage_returns = true;
-        if(!(client->request->body = strstr(client->request->header, "\r\n\r\n"))) {
-            client->request->body = strstr(client->request->header, "\n\n");
-            if(!client->request->body)
+        if(!(client->request_body = strstr(client->request_header, "\r\n\r\n"))) {
+             client->request_body = strstr(client->request_header, "\n\n");
+            if(!client->request_body)
                 return;
             uses_carriage_returns = false;
         }
 
-        int header_length = client->request->body - client->request->header;
-        client->request->header[header_length] = '\0';
+        int header_length = client->request_body - client->request_header;
+        client->request_header[header_length] = '\0';
 
-        char *content_lenght = strstr(client->request->header, "Content-Length: ");
+        char* content_lenght = strstr(client->request_header, "Content-Length: ");
         if (!content_lenght) {
             read_finished = true;
         } else {
             int body_length = strtol(content_lenght + /* Content-Length: */16, NULL, 10);
-            if ((int)client->request->input_position == body_length + (uses_carriage_returns ? 4:2) + header_length +1) {
+            if ((int)client->request_seek == body_length + (uses_carriage_returns ? 4:2) + header_length +1) {
                  read_finished = true;
-                 client->request->body += (uses_carriage_returns ? 4:2); // to skip the \r\n\r\n
+                 client->request_body += (uses_carriage_returns ? 4:2); // to skip the \r\n\r\n
             }
         }
     }
 
     if(read_finished) {
         ev_io_stop(loop, input_stream);
-        if(strlen(client->request->header)) {
+        if(strlen(client->request_header)) {
             ev_io_init(&client->ev_write, &start_write, client->fd, EV_WRITE);
             ev_io_start(loop, &client->ev_write);
         } else {
@@ -153,19 +162,22 @@ on_client_connected(struct ev_loop* loop, struct ev_io* input_stream, const int 
 
 static void
 bjoern_thread_run(struct Client* client) {
+    debug("New thread with fd=%d", client->fd);
     client->loop = ev_loop_new(EVFLAG_NOENV);
     ev_io_init(&client->ev_read, &on_client_connected, client->fd, EV_READ);
+    ev_io_start(client->loop, &client->ev_read);
     ev_loop(client->loop, EVLOOP_NONBLOCK);
 }
 
 
 static void
 on_input_accepted(struct ev_loop* loop, struct ev_io* input_stream, const int revents) {
+    debug("Incoming fd: %d", input_stream->fd);
     int client_fd = get_client_fd(input_stream);
     if(client_fd < 0)
         return;
 
-    struct Client* client = malloc(sizeof(struct Client));
+    struct Client* client = Client_new();
     if(client == NULL)
         return;
 

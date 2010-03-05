@@ -49,16 +49,9 @@ struct Client {
     int fd;
     long int id;
 
-    struct Request*  request;
-    struct Response* response;
-};
-
-struct Request {
-    char* header;
-    char* body;
-    size_t input_position;
-};
-
-struct Response {
-    char* message;
+    char*  request_header;
+    char*  request_header_orig;
+    char*  request_body;
+    size_t request_seek;
+    char*  response;
 };
