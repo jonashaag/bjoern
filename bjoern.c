@@ -1,6 +1,8 @@
 #include "bjoern.h"
 
-#define GET_CLIENT_FROM_EV_LOOP(evloop) ((struct Client*) (((char*)evloop) - offsetof(struct Client, loop)))
+#define GET_CLIENT_FROM_EV_READ(evread_) ((struct Client*) (((char*)evread_) - offsetof(struct Client, ev_read)))
+#define GET_CLIENT_FROM_EV_WRITE(evwrite_) ((struct Client*) (((char*)evwrite_) - offsetof(struct Client, ev_write)))
+#define nalloc(x) calloc(1, x)
 #define COMBINE_STATEMENTS(code) do {code;} while(0)
 #define error(fmt, ...) fprintf(stderr, "ERROR: " fmt "\n", ## __VA_ARGS__)
 #define die(exit_code, ...) COMBINE_STATEMENTS(error( __VA_ARGS__ ); exit(exit_code))
@@ -33,12 +35,12 @@ set_nonblock(int fd) {
 
 
 static inline int
-get_client_fd(struct ev_io* input_stream) {
+get_client_fd(struct ev_io* evread) {
     struct sockaddr_in client_address;
     socklen_t client_address_length = sizeof(client_address);
 
     return accept(
-        input_stream->fd,
+        evread->fd,
         (struct sockaddr*)&client_address,
         &client_address_length
     );
@@ -47,13 +49,13 @@ get_client_fd(struct ev_io* input_stream) {
 
 static struct Client*
 Client_new() {
-    struct Client* client = malloc(sizeof(struct Client));
+    struct Client* client = nalloc(sizeof(struct Client));
     return client;
 }
 
 static void
 Client_free(struct Client* client) {
-    debug("free()ing Client %d...", (int)client);
+    debug("freeing Client %d...", (int)client);
     if(!client) return;
 
     if(client->request_header_orig) free(client->request_header_orig);
@@ -76,8 +78,9 @@ client_write(struct Client* client, const char* output, const size_t output_leng
 }
 
 static void
-start_write(struct ev_loop* loop, struct ev_io* input_stream, const int revents) {
-    struct Client* client = GET_CLIENT_FROM_EV_LOOP(loop);
+start_write(struct ev_loop* loop, struct ev_io* evwrite, const int revents) {
+    debug_line();
+    struct Client* client = GET_CLIENT_FROM_EV_WRITE(evwrite);
 
     debug_line();
 
@@ -88,32 +91,33 @@ start_write(struct ev_loop* loop, struct ev_io* input_stream, const int revents)
     client_write(client, DUMMY_RESPONSE, strlen(DUMMY_RESPONSE)-10);
     sleep(2);
     client_write(client, "1234567890", 10);
-    ev_io_stop(loop, input_stream);
+    ev_io_stop(loop, evwrite);
     close_connection(client);
 }
 
 
 static void
-on_client_connected(struct ev_loop* loop, struct ev_io* input_stream, const int revents) {
+on_client_connected(struct ev_loop* loop, struct ev_io* evread, const int revents) {
     if(!(revents & EV_READ))
         return; // something went terribly wrong.
 
-    struct Client* client = GET_CLIENT_FROM_EV_LOOP(loop);
-    debug("Client %ld connected. (fd is %d)", client->id, input_stream->fd);
+    struct Client* client = GET_CLIENT_FROM_EV_READ(evread);
+    debug("Client %ld connected. (fd is %d)", client->id, evread->fd);
 
     size_t input_length = 0;
     char input_buffer[HTTP_REQUEST_BUFFER_LENGTH] = "";
     bool read_finished = false;
 
-    input_length = recv(input_stream->fd, &input_buffer, HTTP_REQUEST_BUFFER_LENGTH, 0);
+    input_length = recv(evread->fd, &input_buffer, HTTP_REQUEST_BUFFER_LENGTH, 0);
     debug("Got %d bytes input: %s", input_length, input_buffer);
     if((int)input_length < 0) {
         debug("Error receiving input, errno is %d", errno);
-        ev_io_stop(loop, input_stream);
+        ev_io_stop(loop, evread);
         close_connection(client);
         return;
+        die(42, "Woa, wtf");
     }
-    else if((int)input_length == 0) {
+    if((int)input_length == 0) {
         read_finished = true;
     }
     else {
@@ -148,10 +152,11 @@ on_client_connected(struct ev_loop* loop, struct ev_io* input_stream, const int 
     }
 
     if(read_finished) {
-        ev_io_stop(loop, input_stream);
+        ev_io_stop(loop, evread);
         if(strlen(client->request_header)) {
             ev_io_init(&client->ev_write, &start_write, client->fd, EV_WRITE);
-            ev_io_start(loop, &client->ev_write);
+            ev_io_start(client->evloop, &client->ev_write);
+            ev_loop(client->evloop, EVLOOP_NONBLOCK);
         } else {
             // empty request. throw this away.
             close_connection(client);
@@ -163,17 +168,17 @@ on_client_connected(struct ev_loop* loop, struct ev_io* input_stream, const int 
 static void
 bjoern_thread_run(struct Client* client) {
     debug("New thread with fd=%d", client->fd);
-    client->loop = ev_loop_new(EVFLAG_NOENV);
+    client->evloop = ev_loop_new(EVFLAG_NOENV);
     ev_io_init(&client->ev_read, &on_client_connected, client->fd, EV_READ);
-    ev_io_start(client->loop, &client->ev_read);
-    ev_loop(client->loop, EVLOOP_NONBLOCK);
+    ev_io_start(client->evloop, &client->ev_read);
+    ev_loop(client->evloop, EVLOOP_NONBLOCK);
 }
 
 
 static void
-on_input_accepted(struct ev_loop* loop, struct ev_io* input_stream, const int revents) {
-    debug("Incoming fd: %d", input_stream->fd);
-    int client_fd = get_client_fd(input_stream);
+on_input_accepted(struct ev_loop* loop, struct ev_io* evread, const int revents) {
+    debug("Incoming fd: %d", evread->fd);
+    int client_fd = get_client_fd(evread);
     if(client_fd < 0)
         return;
 
@@ -265,6 +270,8 @@ main(int argc, char** argv) {
         die(1, "Could initialize bjoern\n");
     else
         debug("Listening on %s:%d", hostname, port);
+
+    debug("My PID is %d", getpid());
 
 
     /* Run the default watch/bind/listen loop */

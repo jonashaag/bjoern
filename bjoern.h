@@ -42,7 +42,7 @@ typedef enum {
 } bool;
 
 struct Client {
-    struct ev_loop* loop;
+    struct ev_loop* evloop;
     ev_io ev_write;
     ev_io ev_read;
 
