@@ -14,3 +14,6 @@ profile:
 
 optfull:
 	$(CC) $(OPTFLAGS) $(LDFLAGS) -o bjoern bjoern.c
+
+run: all
+	./bjoern
