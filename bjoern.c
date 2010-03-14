@@ -88,7 +88,7 @@ static void on_sock_read(EV_LOOP mainloop, ev_io* read_watcher_, int revents)
 
             int proclaimed_body_length = http_get_content_length(transaction->request);
             if(proclaimed_body_length && transaction->read_seek >= (request_header_length + proclaimed_body_length)) {
-                /* We have the wohle body, stop reading. */
+                /* We have the whole body, stop reading. */
                 goto read_finished;
             }
             else
