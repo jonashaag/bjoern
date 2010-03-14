@@ -1,1 +1,1 @@
-#define DEBUG
+#define DEBUG_ON
