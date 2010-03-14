@@ -149,7 +149,7 @@ static int init_socket()
     int sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     if(socket < 0) return -1;
 
-    union _sockaddres {
+    union _sockaddress {
         struct sockaddr    sockaddress;
         struct sockaddr_in sockaddress_in;
     } server_address;
