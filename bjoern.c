@@ -42,7 +42,6 @@ static void while_sock_canwrite(EV_LOOP mainloop, ev_io* write_watcher_, int rev
     DEBUG("Write end.");
 }
 
-
 /*
     TODO: Make sure this function is very, very fast as it is called many times.
 */
