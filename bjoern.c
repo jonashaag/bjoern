@@ -10,7 +10,7 @@
 #else
 #define DEBUG(...)
 #endif
-#define ERROR(s, ...)       perror(s"\n", ## __VA_ARGS__ ); fflush(stderr)
+#define ERROR(s, ...)       fprintf(stderr, s"\n", ## __VA_ARGS__ ); fflush(stderr)
 
 
 static struct Transaction* Transaction_new()
