@@ -20,6 +20,12 @@
 #define READ_BUFFER_SIZE 4096
 #define MAX_LISTEN_QUEUE_LENGTH 1024
 
+#define EXIT_CODE_SOCKET_FAILED -1
+#define EXIT_CODE_BIND_FAILED   -2
+#define EXIT_CODE_LISTEN_FAILED -3
+
+static int sockfd;
+
 /* a simple boolean type */
 typedef enum {
     false = 0,

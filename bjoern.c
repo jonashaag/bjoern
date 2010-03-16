@@ -10,7 +10,7 @@
 #else
 #define DEBUG(...)
 #endif
-#define ERROR(s, ...)       fprintf(stderr, s"\n", ## __VA_ARGS__ ); fflush(stderr)
+#define ERROR(s, ...)       perror(s"\n", ## __VA_ARGS__ ); fflush(stderr)
 
 
 static struct Transaction* Transaction_new()
@@ -137,17 +137,26 @@ static void on_sock_accept(EV_LOOP mainloop, ev_io* accept_watcher, int revents)
     ev_io_start(mainloop, &transaction->read_watcher);
 }
 
+
+static void bjoern_exit(const int exit_code)
+{
+    close(sockfd);
+    exit(exit_code);
+}
+
+
 static void on_sigint_received(EV_LOOP mainloop, ev_signal *signal, int revents)
 {
-    DEBUG("Received SIGINT, shutting down. Goodbye!");
+    printf("Received SIGINT, shutting down. Goodbye!\n");
     ev_unloop(mainloop, EVUNLOOP_ALL);
+    bjoern_exit(1);
 }
 
 
 static int init_socket()
 {
-    int sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if(socket < 0) return -1;
+    sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if(socket < 0) return EXIT_CODE_SOCKET_FAILED;
 
     union _sockaddress {
         struct sockaddr    sockaddress;
@@ -158,35 +167,35 @@ static int init_socket()
     inet_aton("0.0.0.0", &server_address.sockaddress_in.sin_addr);
     server_address.sockaddress_in.sin_port = htons(8080);
 
+    /* Set SO_REUSEADDR to make the IP address we used available for reuse. */
+    int optval = true;
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+
     int st;
     st = bind(sockfd, &server_address.sockaddress, sizeof(server_address));
-    if(st < 0) return -2;
+    if(st < 0) return EXIT_CODE_BIND_FAILED;
 
     st = listen(sockfd, MAX_LISTEN_QUEUE_LENGTH);
-    if(st < 0) return -3;
+    if(st < 0) return EXIT_CODE_LISTEN_FAILED;
 
     return sockfd;
 }
 
-static void handle_socket_error(int error_num)
+static void handle_socket_error(const int error_num)
 {
+    printf("Could not start bjoern: ");
     switch(error_num) {
-        case -1:
-            ERROR("Could not create socket().");
-            break;
-        case -2:
-            ERROR("Could not bind().");
-            break;
-        case -3:
-            ERROR("Could not listen().");
-            break;
-    }
-    exit(1);
+        case EXIT_CODE_SOCKET_FAILED: printf("socket"); break;
+        case EXIT_CODE_BIND_FAILED:   printf("bind");   break;
+        case EXIT_CODE_LISTEN_FAILED: printf("listen"); break;
+    };
+    perror(" failed: ");
+    bjoern_exit(error_num);
 }
 
 int main(int argcount, char** args)
 {
-    int sockfd = init_socket();
+    sockfd = init_socket();
     if(sockfd < 0) handle_socket_error(sockfd);
 
     EV_LOOP     mainloop;
