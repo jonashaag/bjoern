@@ -1,51 +1,139 @@
-#include <string.h>
+#define PyString(s)             PyString_FromString(s)
+#define PyStringWithLen(s, l)   PyString_FromStringAndSize(s, l)
 
-int http_get_content_length(char* http_request)
+#define HTTP_MAX_HEADER_NAME_LENGTH 30
+/* Longest header name I found was "Proxy-Authentication-Info" (25 chars) */
+
+static int http_on_start_parsing(PARSER* parser)
 {
-    void* throwaway = NULL;
-
-    char* content_length_position = strstr(http_request, "Content-Length: ");
-    if(!content_length_position) return 0;
-
-    return strtol(content_length_position + 16 /* strlen("Content-Length: ") */,
-                  throwaway, 10);
-}
-
-
-
-/* Returns the position *after* the first \r\n\r\n in `c` or 0.
- * Original author: Felix von Leitner, http://ptrace.fefe.de/boyermoore.c.txt
- */
-const char* find_header_end(const char* c, size_t l) {
-    size_t i;
-    for (i=0; i+1<l; i+=2) {
-        if (c[i+1]=='\n') {
-            if (c[i]=='\n') return c+i+2;
-            else if (c[i]=='\r' && i+3<l && c[i+2]=='\r' && c[i+3]=='\n')
-                return c+i+4;
-            --i;
-        } else if (c[i+1]=='\r') {
-            if (i+4<l && c[i+2]=='\n' && c[i+3]=='\r' && c[i+4]=='\n')
-                return c+i+5;
-            --i;
-        }
-    }
+    ((BJPARSER*)parser)->header_name_start   = NULL;
+    ((BJPARSER*)parser)->header_name_length  = 0;
+    ((BJPARSER*)parser)->header_value_start  = NULL;
+    ((BJPARSER*)parser)->header_value_length = 0;
     return 0;
 }
 
-int http_split_body(char* http_request, const size_t request_length, const char* target_body)
+static int http_on_end_parsing(PARSER* parser)
 {
-    target_body = find_header_end(http_request, request_length);
-    if(!target_body)
+    return 0;
+}
+
+static int http_set_path(PARSER* parser,
+                         const char* path_start,
+                         size_t path_length)
+{
+    PyObject* py_tmp = PyStringWithLen(path_start, path_length);
+    Py_INCREF(py_tmp);
+    TRANSACTION_FROM_PARSER(parser)->request_path = py_tmp;
+    return 0;
+}
+
+static int http_set_query(PARSER* parser,
+                          const char* query_start,
+                          size_t query_length)
+{
+    PyObject* py_tmp = PyStringWithLen(query_start, query_length);
+    Py_INCREF(py_tmp);
+    TRANSACTION_FROM_PARSER(parser)->request_query = py_tmp;
+    return 0;
+}
+
+static int http_set_url(PARSER* parser,
+                        const char* url_start,
+                        size_t url_length)
+{
+    PyObject* py_tmp = PyStringWithLen(url_start, url_length);
+    Py_INCREF(py_tmp);
+    TRANSACTION_FROM_PARSER(parser)->request_url = py_tmp;
+    return 0;
+}
+
+static int http_set_fragment(PARSER* parser,
+                             const char* fragment_start,
+                             size_t fragment_length)
+{
+    PyObject* py_tmp = PyStringWithLen(fragment_start, fragment_length);
+    Py_INCREF(py_tmp);
+    TRANSACTION_FROM_PARSER(parser)->request_url_fragment = py_tmp;
+    return 0;
+}
+
+
+static int http_set_header(PARSER* parser,
+                           const char* header_start,
+                           size_t header_length)
+{
+    TRANSACTION* transaction = TRANSACTION_FROM_PARSER(parser);
+
+    if(((BJPARSER*)parser)->header_value_start) {
+        DEBUG("CPY for %d", transaction->num);
+        /* We have a name/value pair to store, so do so. */
+        PyObject* py_tmp1 = PyStringWithLen(
+            ((BJPARSER*)parser)->header_name_start,
+            ((BJPARSER*)parser)->header_name_length
+        );
+        PyObject* py_tmp2 = PyStringWithLen(
+            ((BJPARSER*)parser)->header_value_start,
+            ((BJPARSER*)parser)->header_value_length
+        );
+        Py_INCREF(py_tmp1);
+        Py_INCREF(py_tmp2);
+
+
+        PyDict_SetItem(transaction->request_headers, py_tmp1, py_tmp2);
+        goto start_new_header;
+    }
+    if(((BJPARSER*)parser)->header_name_start) {
+        /*  We already have a pointer to the header, so update the length. */
+        /* TODO: Documentation */
+        ((BJPARSER*)parser)->header_name_length =  (header_start - ((BJPARSER*)parser)->header_name_start)
+                                     + header_length;
         return 0;
+    }
+    else {
+        goto start_new_header;
+    }
 
-    int body_length = http_request + request_length - target_body;
+/* Start a new header. */
+start_new_header:
+    ((BJPARSER*)parser)->header_name_start = header_start;
+    ((BJPARSER*)parser)->header_name_length = header_length;
 
-    /* Override the '\r\n\r\n' with '   \0'. */
-    http_request[(int)body_length+0] = ' ';
-    http_request[(int)body_length+1] = ' ';
-    http_request[(int)body_length+2] = ' ';
-    http_request[(int)body_length+3] = '\0';
+    DEBUG("Length: %d on %d", header_length, transaction->num);
 
-    return body_length;
+    return 0;
+}
+
+static int http_set_header_value(PARSER* parser,
+                                 const char* value_start,
+                                 size_t value_length)
+{
+    if(((BJPARSER*)parser)->header_value_start) {
+        /* We already have a value pointer, so update the length. */
+        ((BJPARSER*)parser)->header_value_length =
+            (value_start - ((BJPARSER*)parser)->header_value_start) + value_length;
+    }
+    else {
+        /* Start new value. */
+        ((BJPARSER*)parser)->header_value_start = value_start;
+        ((BJPARSER*)parser)->header_value_length = value_length;
+    }
+
+    return 0;
+}
+
+
+static int http_on_headers_complete(PARSER* parser)
+{
+    return 0;
+}
+
+static int http_set_body(PARSER* parser,
+                         const char* body,
+                         size_t body_length)
+{
+    PyObject* py_tmp = PyStringWithLen(body, body_length);
+    Py_INCREF(py_tmp);
+    TRANSACTION_FROM_PARSER(parser)->request_body = py_tmp;
+    return 0;
 }

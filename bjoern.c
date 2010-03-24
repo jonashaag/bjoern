@@ -1,27 +1,59 @@
 #include "bjoern.h"
 #include "http.c"
 
-#define NULLALLOC(size)     calloc(1, size);
+#define FORWARD_CURSOR(p,c) p += c
+#define ENSURE(ret, cond)   if(!(cond)) return ret
+#define VENSURE(X)          ENSURE(, X)
+#define NENSURE(X)          ENSURE(NULL, X)
 #define MAX(a, b)           ((a) > (b) ? (a) : (b))
-#define OFFSETOF(member, ptr, type) ((type*) (((char*)ptr) - offsetof(type, member))) /* TODO: Rename. */
+#define OFFSETOF(m, ptr, t) ((t*) (((char*)ptr) - offsetof(t, m))) /* TODO: Rename. */
 
-#ifdef DEBUG_ON
-#define DEBUG(s, ...)       fprintf(stdout, s"\n", ## __VA_ARGS__ ); fflush(stdout)
-#else
-#define DEBUG(...)
-#endif
-#define ERROR(s, ...)       fprintf(stderr, s"\n", ## __VA_ARGS__ ); fflush(stderr)
+#define HAVE_FLAG(X, flag)  (X & flag)
+#define Have_FLAGS(X, a, b) (X & a & b)
+#define SET_FLAG(X, flag)   (X |= flag)
+#define UNSET_FLAG(x, flag) (X &~ flag)
+
+/* TODO: Use global parser if possible */
 
 
-static struct Transaction* Transaction_new()
+static struct http_parser_settings
+  parser_settings = {
+    http_on_start_parsing,      /* http_cb      on_message_begin; */
+    http_set_path,              /* http_data_cb on_path; */
+    http_set_query,             /* http_data_cb on_query_string; */
+    http_set_url,               /* http_data_cb on_url; */
+    http_set_fragment,          /* http_data_cb on_fragment; */
+    http_set_header,            /* http_data_cb on_header_field; */
+    http_set_header_value,      /* http_data_cb on_header_value; */
+    http_on_headers_complete,   /* http_cb      on_headers_complete; */
+    http_set_body,              /* http_data_cb on_body; */
+    http_on_end_parsing,        /* http_cb      on_message_complete; */
+};
+
+static int NUMS = 1;
+
+static TRANSACTION* Transaction_new()
 {
-    return (struct Transaction*)NULLALLOC(sizeof(struct Transaction));
+    TRANSACTION* transaction = malloc(sizeof(TRANSACTION));
+
+    /* Initialize the http parser. */
+    NENSURE(transaction->request_parser = malloc(sizeof(BJPARSER)));
+    http_parser_init((PARSER*)transaction->request_parser, HTTP_REQUEST);
+
+    /* Initialize the Python headers dictionary. */
+    NENSURE(transaction->request_headers = PyDict_New());
+    Py_INCREF(transaction->request_headers);
+
+    transaction->num = NUMS++;
+
+    return transaction;
 }
 
-static void Transaction_free(struct Transaction* transaction)
+static void Transaction_free(TRANSACTION* transaction)
 {
-    free(transaction->request);
-    free(transaction->response);
+    /* TODO: Free PyObjects here? */
+    //free(transaction->response);
+    free(transaction->request_parser);
     free(transaction);
 }
 
@@ -30,7 +62,7 @@ static void while_sock_canwrite(EV_LOOP mainloop, ev_io* write_watcher_, int rev
 {
     DEBUG("Write start.");
 
-    struct Transaction* transaction = OFFSETOF(write_watcher, write_watcher_, struct Transaction);
+    TRANSACTION* transaction = OFFSETOF(write_watcher, write_watcher_, TRANSACTION);
 
     #define MSG "HTTP/1.1 200 Alles ok"
     write(transaction->client_fd, MSG, strlen(MSG));
@@ -39,7 +71,7 @@ static void while_sock_canwrite(EV_LOOP mainloop, ev_io* write_watcher_, int rev
     close(transaction->client_fd);
     Transaction_free(transaction);
 
-    DEBUG("Write end.");
+    DEBUG("Write end.\n\n");
 }
 
 /*
@@ -48,17 +80,15 @@ static void while_sock_canwrite(EV_LOOP mainloop, ev_io* write_watcher_, int rev
 static void on_sock_read(EV_LOOP mainloop, ev_io* read_watcher_, int revents)
 {
     /* Check whether we can still read. */
-    if(!(revents & EV_READ))
-        return;
+    VENSURE(revents & EV_READ);
 
-    struct Transaction* transaction = OFFSETOF(read_watcher, read_watcher_, struct Transaction);
+    TRANSACTION* transaction = OFFSETOF(read_watcher, read_watcher_, TRANSACTION);
 
     /* Read the whole body. */
     char    read_buffer[READ_BUFFER_SIZE] = {0};
     size_t  bytes_read;
+    size_t  bytes_parsed;
     bytes_read = read(transaction->client_fd, read_buffer, READ_BUFFER_SIZE);
-
-    DEBUG("READ: %d", (int)bytes_read);
 
     if(bytes_read < 0)
         /* An error happened. TODO: Limit retries? */
@@ -66,42 +96,17 @@ static void on_sock_read(EV_LOOP mainloop, ev_io* read_watcher_, int revents)
 
     if(bytes_read == 0) goto read_finished;
     else {
-        DEBUG("Read %d bytes from client %d.", bytes_read, transaction->client_fd);
-        transaction->request = realloc(transaction->request,
-                                       (transaction->read_seek + bytes_read + 1) * sizeof(char));
-        memcpy(transaction->request + transaction->read_seek, read_buffer, bytes_read);
-        transaction->read_seek += bytes_read;
-        transaction->request[transaction->read_seek] = '\0';
+        bytes_parsed = http_parser_execute(
+            (PARSER*)transaction->request_parser,
+            parser_settings,
+            read_buffer,
+            bytes_read
+        );
 
-
-        /* TODO: THIS.SECTION.NEEDS.A.COMPLETE.REWRITE. */
-        int body_length = http_split_body(transaction->request,
-                                          transaction->read_seek,
-                                          transaction->request_body);
-
-        DEBUG("Body length is %d", body_length);
-        if(body_length) {
-            /* We have a body, so there's a chance that we have a
-               'Content-Length' header. Go search it. */
-            int request_header_length = transaction->request_body - transaction->request;
-
-            int proclaimed_body_length = http_get_content_length(transaction->request);
-            if(proclaimed_body_length && transaction->read_seek >= (request_header_length + proclaimed_body_length)) {
-                /* We have the whole body, stop reading. */
-                goto read_finished;
-            }
-            else
-                /* We don't have the whole body yet, don't stop reading. */
-                return;
-
-        }
-        else
-            /* We haven't got any body, so stop reading here. (See Footnote 0) */
-            goto read_finished;
+        DEBUG("Parsed %d bytes of %d", (int)bytes_read, (int)bytes_parsed);
     }
 
 read_finished:
-    DEBUG("Read finished! Body is \n%s", transaction->request);
     /* Stop the read loop, we're done reading. */
     ev_io_stop(mainloop, &transaction->read_watcher);
 
@@ -113,7 +118,7 @@ read_finished:
 
 static void on_sock_accept(EV_LOOP mainloop, ev_io* accept_watcher, int revents)
 {
-    struct Transaction* transaction = Transaction_new();
+    TRANSACTION* transaction = Transaction_new();
 
     /* Accept the socket connection. */
     struct sockaddr_in client_address;
@@ -148,7 +153,7 @@ static void on_sigint_received(EV_LOOP mainloop, ev_signal *signal, int revents)
 {
     printf("Received SIGINT, shutting down. Goodbye!\n");
     ev_unloop(mainloop, EVUNLOOP_ALL);
-    bjoern_exit(1);
+    bjoern_exit(0);
 }
 
 
@@ -215,14 +220,3 @@ int main(int argcount, char** args)
 
     return 0;
 }
-
-
-/*
-    -----------
-     Footnotes
-    -----------
-
-    0.  Actually it's possible that the header wasn't completely sent after one
-        `read`, but that should be so uncommon that we can ignore that case.
-
-*/

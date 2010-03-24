@@ -1,24 +1,44 @@
 CC      		= gcc
-CFLAGS  		= -Wall -g -fno-strict-aliasing
 CFLAGS_NODEBUG  = -Wall -fno-strict-aliasing
-LDFLAGS 		= -l ev
+CFLAGS  		= $(CFLAGS_NODEBUG) -g -DEBUG
+CFLAGS_WARNALL  = $(CFLAGS) -Wextra
+INCLUDE_DIRS    = -I /usr/include/python2.6/
+LDFLAGS 		= $(INCLUDE_DIRS) -l ev -I http-parser -l python2.6
 PROFILE_CFLAGS 	= $(CFLAGS) -pg
 OPTFLAGS        = $(CFLAGS_NODEBUG) -O3
 
-FILES = bjoern.c
+FILES			= bjoern.c
+FILES_NODEBUG   = $(FILES) http-parser/http_parser.o
+FILES_DEBUG		= $(FILES) http-parser/http_parser_debug.o
 
 all:
-	$(CC) $(CFLAGS) $(LDFLAGS) -o bjoern $(FILES)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o bjoern $(FILES_DEBUG)
+
+prep:
+	$(CC) -E bjoern.c | ${PAGER}
+
+warn-all:
+	$(CC) $(CFLAGS_WARNALL) $(LDFLAGS) -o bjoern $(FILES_DEBUG)
 
 profile:
-	$(CC) $(PROFILE_CFLAGS) $(LDFLAGS) -o bjoern $(FILES)
+	$(CC) $(PROFILE_CFLAGS) $(LDFLAGS) -o bjoern $(FILES_NODEBUG)
 
 optfull:
-	$(CC) $(OPTFLAGS) $(LDFLAGS) -o bjoern $(FILES)
+	$(CC) $(CFLAGS_NODEBUG) $(OPTFLAGS) $(LDFLAGS) -o bjoern $(FILES_NODEBUG)
 	strip bjoern
+
 
 run: all
 	./bjoern
 
-prep:
-	$(CC) -E bjoern.c
+valgrind: all
+	valgrind ./bjoern
+
+callgrind: all clean-callgrind
+	valgrind --tool=callgrind ./bjoern
+
+clean-callgrind:
+	rm -f callgrind*
+
+gprof: profile
+	gprof ./bjoern
