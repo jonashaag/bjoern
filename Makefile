@@ -1,14 +1,14 @@
-CC      		= gcc
-CFLAGS_NODEBUG  = -Wall -fno-strict-aliasing
-CFLAGS  		= $(CFLAGS_NODEBUG) -g -DEBUG
-CFLAGS_WARNALL  = $(CFLAGS) -Wextra
-INCLUDE_DIRS    = -I /usr/include/python2.6/
+CC				= gcc
+CFLAGS_NODEBUG	= -Wall -fno-strict-aliasing
+CFLAGS			= $(CFLAGS_NODEBUG) -g -DEBUG
+CFLAGS_WARNALL	= $(CFLAGS) -Wextra
+INCLUDE_DIRS 	= -I /usr/include/python2.6/
 LDFLAGS 		= $(INCLUDE_DIRS) -l ev -I http-parser -l python2.6
 PROFILE_CFLAGS 	= $(CFLAGS) -pg
-OPTFLAGS        = $(CFLAGS_NODEBUG) -O3
+OPTFLAGS		= $(CFLAGS_NODEBUG) -O3
 
 FILES			= bjoern.c
-FILES_NODEBUG   = $(FILES) http-parser/http_parser.o
+FILES_NODEBUG	= $(FILES) http-parser/http_parser.o
 FILES_DEBUG		= $(FILES) http-parser/http_parser_debug.o
 
 all:
