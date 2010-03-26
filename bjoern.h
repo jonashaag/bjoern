@@ -20,16 +20,8 @@
 #include <arpa/inet.h>
 
 #include "config.h"
+#include "shortcuts.h"
 
-
-#ifdef DEBUG_ON
-  #define DEBUG(s, ...)     fprintf(stdout, s"\n", ## __VA_ARGS__ ); fflush(stdout)
-#else
-  #define DEBUG(...)
-#endif
-#define ERROR(s, ...)       fprintf(stderr, s"\n", ## __VA_ARGS__ ); fflush(stderr)
-
-#define EV_LOOP struct ev_loop*
 #define READ_BUFFER_SIZE 4096
 #define MAX_LISTEN_QUEUE_LENGTH 1024
 
@@ -47,12 +39,8 @@ typedef enum {
 } bool;
 
 
-#define TRANSACTION struct Transaction
-#define PARSER   struct http_parser
-#define BJPARSER struct bj_http_parser
-
 struct bj_http_parser {
-    PARSER*       httpparser;
+    PARSER*       http_parser;
     TRANSACTION*  transaction;
 
     /* Temporary variables: */
@@ -63,7 +51,6 @@ struct bj_http_parser {
 };
 
 
-#define TRANSACTION_FROM_PARSER(parser) ((TRANSACTION*)parser->data)
 TRANSACTION {
     int client_fd;
     int num;

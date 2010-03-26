@@ -1,18 +1,6 @@
 #include "bjoern.h"
 #include "http.c"
 
-#define FORWARD_CURSOR(p,c) p += c
-#define ENSURE(ret, cond)   if(!(cond)) return ret
-#define VENSURE(X)          ENSURE(, X)
-#define NENSURE(X)          ENSURE(NULL, X)
-#define MAX(a, b)           ((a) > (b) ? (a) : (b))
-#define OFFSETOF(m, ptr, t) ((t*) (((char*)ptr) - offsetof(t, m))) /* TODO: Rename. */
-
-#define HAVE_FLAG(X, flag)  (X & flag)
-#define Have_FLAGS(X, a, b) (X & a & b)
-#define SET_FLAG(X, flag)   (X |= flag)
-#define UNSET_FLAG(x, flag) (X &~ flag)
-
 /* TODO: Use global parser if possible */
 
 

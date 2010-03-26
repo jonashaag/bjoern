@@ -1,8 +1,7 @@
-#define PyString(s)             PyString_FromString(s)
-#define PyStringWithLen(s, l)   PyString_FromStringAndSize(s, l)
-
 #define HTTP_MAX_HEADER_NAME_LENGTH 30
 /* Longest header name I found was "Proxy-Authentication-Info" (25 chars) */
+
+#define GET_TRANSACTION TRANSACTION_FROM_PARSER(parser)
 
 static int http_on_start_parsing(PARSER* parser)
 {
@@ -24,7 +23,7 @@ static int http_set_path(PARSER* parser,
 {
     PyObject* py_tmp = PyStringWithLen(path_start, path_length);
     Py_INCREF(py_tmp);
-    TRANSACTION_FROM_PARSER(parser)->request_path = py_tmp;
+    GET_TRANSACTION->request_path = py_tmp;
     return 0;
 }
 
@@ -34,7 +33,7 @@ static int http_set_query(PARSER* parser,
 {
     PyObject* py_tmp = PyStringWithLen(query_start, query_length);
     Py_INCREF(py_tmp);
-    TRANSACTION_FROM_PARSER(parser)->request_query = py_tmp;
+    GET_TRANSACTION->request_query = py_tmp;
     return 0;
 }
 
@@ -44,7 +43,7 @@ static int http_set_url(PARSER* parser,
 {
     PyObject* py_tmp = PyStringWithLen(url_start, url_length);
     Py_INCREF(py_tmp);
-    TRANSACTION_FROM_PARSER(parser)->request_url = py_tmp;
+    GET_TRANSACTION->request_url = py_tmp;
     return 0;
 }
 
@@ -54,7 +53,7 @@ static int http_set_fragment(PARSER* parser,
 {
     PyObject* py_tmp = PyStringWithLen(fragment_start, fragment_length);
     Py_INCREF(py_tmp);
-    TRANSACTION_FROM_PARSER(parser)->request_url_fragment = py_tmp;
+    GET_TRANSACTION->request_url_fragment = py_tmp;
     return 0;
 }
 
@@ -63,7 +62,7 @@ static int http_set_header(PARSER* parser,
                            const char* header_start,
                            size_t header_length)
 {
-    TRANSACTION* transaction = TRANSACTION_FROM_PARSER(parser);
+    TRANSACTION* transaction = GET_TRANSACTION;
 
     if(((BJPARSER*)parser)->header_value_start) {
         DEBUG("CPY for %d", transaction->num);
@@ -134,6 +133,6 @@ static int http_set_body(PARSER* parser,
 {
     PyObject* py_tmp = PyStringWithLen(body, body_length);
     Py_INCREF(py_tmp);
-    TRANSACTION_FROM_PARSER(parser)->request_body = py_tmp;
+    GET_TRANSACTION->request_body = py_tmp;
     return 0;
 }
