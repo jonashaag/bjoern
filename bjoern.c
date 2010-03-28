@@ -3,7 +3,6 @@
 
 /* TODO: Use global parser if possible */
 
-
 static struct http_parser_settings
   parser_settings = {
     http_on_start_parsing,      /* http_cb      on_message_begin; */
@@ -22,17 +21,23 @@ static int NUMS = 1;
 
 static TRANSACTION* Transaction_new()
 {
-    TRANSACTION* transaction = malloc(sizeof(TRANSACTION));
+    TRANSACTION* transaction = ALLOC(sizeof(TRANSACTION));
 
-    /* Initialize the http parser. */
-    NENSURE(transaction->request_parser = malloc(sizeof(BJPARSER)));
+    /* Allocate and initialize the http parser. */
+    transaction->request_parser = ALLOC(sizeof(BJPARSER));
+    if(!transaction->request_parser) return NULL;
+    transaction->request_parser->transaction = transaction;
+
     http_parser_init((PARSER*)transaction->request_parser, HTTP_REQUEST);
 
     /* Initialize the Python headers dictionary. */
-    NENSURE(transaction->request_headers = PyDict_New());
+    transaction->request_headers = PyDict_New();
+    if(!transaction->request_headers) return NULL;
     Py_INCREF(transaction->request_headers);
 
     transaction->num = NUMS++;
+
+    DEBUG("New transaction %d.", transaction->num);
 
     return transaction;
 }
@@ -68,13 +73,14 @@ static void while_sock_canwrite(EV_LOOP mainloop, ev_io* write_watcher_, int rev
 static void on_sock_read(EV_LOOP mainloop, ev_io* read_watcher_, int revents)
 {
     /* Check whether we can still read. */
-    VENSURE(revents & EV_READ);
+    if(!(revents & EV_READ))
+        return;
 
     TRANSACTION* transaction = OFFSETOF(read_watcher, read_watcher_, TRANSACTION);
 
     /* Read the whole body. */
     char    read_buffer[READ_BUFFER_SIZE] = {0};
-    size_t  bytes_read;
+    ssize_t bytes_read;
     size_t  bytes_parsed;
     bytes_read = read(transaction->client_fd, read_buffer, READ_BUFFER_SIZE);
 
@@ -91,12 +97,23 @@ static void on_sock_read(EV_LOOP mainloop, ev_io* read_watcher_, int revents)
             bytes_read
         );
 
-        DEBUG("Parsed %d bytes of %d", (int)bytes_read, (int)bytes_parsed);
+        DEBUG("Parsed %d bytes of %d", (int)bytes_parsed, (int)bytes_read);
     }
 
 read_finished:
     /* Stop the read loop, we're done reading. */
     ev_io_stop(mainloop, &transaction->read_watcher);
+
+    /* Call the Python callback function. */
+    PyObject_CallObject(request_callback, Py_BuildValue(
+        "(ssssOs)",
+        transaction->request_url,
+        transaction->request_query,
+        transaction->request_url_fragment,
+        transaction->request_path,
+        transaction->request_headers,
+        transaction->request_body
+    ));
 
     /* Run the write-watch loop that notifies us when we can write to the socket. */
     ev_io_init(&transaction->write_watcher, &while_sock_canwrite, transaction->client_fd, EV_WRITE);
@@ -122,7 +139,8 @@ static void on_sock_accept(EV_LOOP mainloop, ev_io* accept_watcher, int revents)
     DEBUG("Accepted client on %d.", transaction->client_fd);
 
     /* Set the file descriptor non-blocking. */
-    fcntl(transaction->client_fd, F_SETFL, MAX(fcntl(transaction->client_fd, F_GETFL, 0), 0) | O_NONBLOCK);
+    fcntl(transaction->client_fd, F_SETFL,
+          MAX(fcntl(transaction->client_fd, F_GETFL, 0), 0) | O_NONBLOCK);
 
     /* Run the read-watch loop. */
     ev_io_init(&transaction->read_watcher, &on_sock_read, transaction->client_fd, EV_READ);
@@ -130,25 +148,12 @@ static void on_sock_accept(EV_LOOP mainloop, ev_io* accept_watcher, int revents)
 }
 
 
-static void bjoern_exit(const int exit_code)
-{
-    close(sockfd);
-    exit(exit_code);
-}
-
-
-static void on_sigint_received(EV_LOOP mainloop, ev_signal *signal, int revents)
-{
-    printf("Received SIGINT, shutting down. Goodbye!\n");
-    ev_unloop(mainloop, EVUNLOOP_ALL);
-    bjoern_exit(0);
-}
-
-
-static int init_socket()
+static int init_socket(const char* hostaddress, const int port)
 {
     sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if(socket < 0) return EXIT_CODE_SOCKET_FAILED;
+    if(sockfd < 0) return SOCKET_FAILED;
+
+    DEBUG("sockfd is %d", sockfd);
 
     union _sockaddress {
         struct sockaddr    sockaddress;
@@ -156,8 +161,8 @@ static int init_socket()
     } server_address;
 
     server_address.sockaddress_in.sin_family = PF_INET;
-    inet_aton("0.0.0.0", &server_address.sockaddress_in.sin_addr);
-    server_address.sockaddress_in.sin_port = htons(8080);
+    inet_aton(hostaddress, &server_address.sockaddress_in.sin_addr);
+    server_address.sockaddress_in.sin_port = htons(port);
 
     /* Set SO_REUSEADDR to make the IP address we used available for reuse. */
     int optval = true;
@@ -165,46 +170,68 @@ static int init_socket()
 
     int st;
     st = bind(sockfd, &server_address.sockaddress, sizeof(server_address));
-    if(st < 0) return EXIT_CODE_BIND_FAILED;
+    if(st < 0) return BIND_FAILED;
 
     st = listen(sockfd, MAX_LISTEN_QUEUE_LENGTH);
-    if(st < 0) return EXIT_CODE_LISTEN_FAILED;
+    if(st < 0) return LISTEN_FAILED;
 
     return sockfd;
 }
 
-static void handle_socket_error(const int error_num)
+
+static void on_sigint_received(EV_LOOP mainloop, ev_signal *signal, int revents)
 {
-    printf("Could not start bjoern: ");
-    switch(error_num) {
-        case EXIT_CODE_SOCKET_FAILED: printf("socket"); break;
-        case EXIT_CODE_BIND_FAILED:   printf("bind");   break;
-        case EXIT_CODE_LISTEN_FAILED: printf("listen"); break;
-    };
-    perror(" failed: ");
-    bjoern_exit(error_num);
+    printf("\b\bReceived SIGINT, shutting down. Goodbye!\n");
+    ev_unloop(mainloop, EVUNLOOP_ALL);
 }
 
-int main(int argcount, char** args)
+
+static void* run_ev_loop()
 {
-    sockfd = init_socket();
-    if(sockfd < 0) handle_socket_error(sockfd);
+    ev_loop(mainloop, 0);
+    return NULL;
+}
 
-    EV_LOOP     mainloop;
-    ev_signal   sigint_watcher;
-    ev_io       accept_watcher;
+PyObject* PyB_Run(PyObject* self, PyObject* args)
+{
+    const char* hostaddress;
+    const int   port;
 
-    mainloop = ev_default_loop(0);
+    Py_XDECREF(request_callback);
+    if(!PyArg_ParseTuple(args, "siO", &hostaddress, &port, &request_callback))
+        return NULL;
+
+    Py_INCREF(request_callback);
+
+    sockfd = init_socket(hostaddress, port);
+    if(sockfd < 0) return PyB_Err(PyExc_RuntimeError, socket_error_format(sockfd));
+
+    mainloop = ev_loop_new(0);
 
     /* Run the SIGINT-watch loop. */
+    ev_signal sigint_watcher;
     ev_signal_init(&sigint_watcher, &on_sigint_received, SIGINT);
     ev_signal_start(mainloop, &sigint_watcher);
 
+
     /* Run the accept-watch loop. */
-    ev_io_init(&accept_watcher, &on_sock_accept, sockfd, EV_READ);
+    ev_io accept_watcher;
+    ev_io_init(&accept_watcher, on_sock_accept, sockfd, EV_READ);
     ev_io_start(mainloop, &accept_watcher);
 
-    ev_loop(mainloop, 0);
+    run_ev_loop();
 
-    return 0;
+    Py_RETURN_NONE;
+}
+
+
+
+static PyMethodDef Bjoern_FunctionTable[] = {
+    {"run", PyB_Run, METH_VARARGS, "Run bjoern. :-)"},
+    {NULL,  NULL, 0, NULL}
+};
+
+PyMODINIT_FUNC initbjoern()
+{
+    Py_InitModule("bjoern", Bjoern_FunctionTable);
 }

@@ -1,7 +1,7 @@
 #define HTTP_MAX_HEADER_NAME_LENGTH 30
 /* Longest header name I found was "Proxy-Authentication-Info" (25 chars) */
 
-#define GET_TRANSACTION TRANSACTION_FROM_PARSER(parser)
+#define GET_TRANSACTION ((BJPARSER*)parser)->transaction
 
 static int http_on_start_parsing(PARSER* parser)
 {
@@ -65,7 +65,6 @@ static int http_set_header(PARSER* parser,
     TRANSACTION* transaction = GET_TRANSACTION;
 
     if(((BJPARSER*)parser)->header_value_start) {
-        DEBUG("CPY for %d", transaction->num);
         /* We have a name/value pair to store, so do so. */
         PyObject* py_tmp1 = PyStringWithLen(
             ((BJPARSER*)parser)->header_name_start,
@@ -78,15 +77,14 @@ static int http_set_header(PARSER* parser,
         Py_INCREF(py_tmp1);
         Py_INCREF(py_tmp2);
 
-
         PyDict_SetItem(transaction->request_headers, py_tmp1, py_tmp2);
         goto start_new_header;
     }
     if(((BJPARSER*)parser)->header_name_start) {
         /*  We already have a pointer to the header, so update the length. */
         /* TODO: Documentation */
-        ((BJPARSER*)parser)->header_name_length =  (header_start - ((BJPARSER*)parser)->header_name_start)
-                                     + header_length;
+        ((BJPARSER*)parser)->header_name_length = \
+            (header_start - ((BJPARSER*)parser)->header_name_start) + header_length;
         return 0;
     }
     else {
@@ -95,10 +93,10 @@ static int http_set_header(PARSER* parser,
 
 /* Start a new header. */
 start_new_header:
+    ((BJPARSER*)parser)->header_value_start = NULL;
+    ((BJPARSER*)parser)->header_value_length = 0;
     ((BJPARSER*)parser)->header_name_start = header_start;
     ((BJPARSER*)parser)->header_name_length = header_length;
-
-    DEBUG("Length: %d on %d", header_length, transaction->num);
 
     return 0;
 }

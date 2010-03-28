@@ -4,6 +4,7 @@
 #include <Python.h>
 #include <ev.h>
 #include <http_parser.h>
+#include <pthread.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,7 +13,6 @@
 
 #include <fcntl.h>
 #include <errno.h>
-#include <signal.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -25,12 +25,28 @@
 #define READ_BUFFER_SIZE 4096
 #define MAX_LISTEN_QUEUE_LENGTH 1024
 
-#define EXIT_CODE_SOCKET_FAILED -1
-#define EXIT_CODE_BIND_FAILED   -2
-#define EXIT_CODE_LISTEN_FAILED -3
+#define SOCKET_FAILED -1
+#define BIND_FAILED   -2
+#define LISTEN_FAILED -3
+
+static char* socket_error_format(const int errnum) {
+    switch(errnum) {
+        case SOCKET_FAILED:
+            return "socket() failed";
+        case BIND_FAILED:
+            return "bind() failed";
+        case LISTEN_FAILED:
+            return "listen() failed";
+        default:
+            /* Mustn't happen */
+            assert(0);
+    }
+}
 
 
-static int sockfd;
+static int          sockfd;
+static EV_LOOP      mainloop;
+static PyObject*    request_callback;
 
 /* a simple boolean type */
 typedef enum {
@@ -40,7 +56,7 @@ typedef enum {
 
 
 struct bj_http_parser {
-    PARSER*       http_parser;
+    PARSER        http_parser;
     TRANSACTION*  transaction;
 
     /* Temporary variables: */
@@ -60,7 +76,6 @@ TRANSACTION {
     /* Todo: put request_* into a seperate data structure. */
     BJPARSER*   request_parser;
 
-    PyObject*   request_status_code;
     PyObject*   request_url;
     PyObject*   request_query;
     PyObject*   request_url_fragment;
