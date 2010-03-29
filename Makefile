@@ -6,7 +6,8 @@ CFLAGS_WARNALL  = $(CFLAGS) -Wextra
 INCLUDE_DIRS    = -I /usr/include/python2.6/
 LDFLAGS         = $(INCLUDE_DIRS) -l ev -I http-parser -l python2.6 -lpthread
 PROFILE_CFLAGS  = $(CFLAGS) -pg
-OPTFLAGS        = $(CFLAGS_NODEBUG) -O3
+OPTDEBUG_FLAGS  = $(CFLAGS_NODEBUGP) -O3
+OPT_FLAGS       = $(CFLAGS_NODEBUG) -O3
 
 OUTFILES		= bjoern.so
 FILES           = bjoern.c
@@ -29,11 +30,17 @@ profile:
 	$(CC) $(PROFILE_CFLAGS) $(LDFLAGS) -o $(OUTFILES) $(FILES_NODEBUG)
 
 opt:
-	$(CC) $(CFLAGS_NODEBUG) $(OPTFLAGS) $(LDFLAGS) -o $(OUTFILES) $(FILES_NODEBUG)
+	$(CC) $(OPTFLAGS) $(LDFLAGS) -o $(OUTFILES) $(FILES_NODEBUG)
 	strip $(OUTFILES)
 
+optdebug:
+	$(CC) $(OPTDEBUG_FLAGS) $(LDFLAGS) -o $(OUTFILES) $(FILES_DEBUG)
 
-run: all
+
+run: nodebugprints
+	python test.py
+
+runwithdebug: all
 	python test.py
 
 gdb: all
@@ -43,6 +50,9 @@ valgrind: nodebugprints
 	valgrind python test.py
 
 callgrind: nodebugprints clean-callgrind
+	valgrind --tool=callgrind python test.py
+
+callgrind-opt: optdebug clean-callgrind
 	valgrind --tool=callgrind python test.py
 
 clean-callgrind:

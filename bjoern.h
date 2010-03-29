@@ -22,7 +22,8 @@
 #include "config.h"
 #include "shortcuts.h"
 
-#define READ_BUFFER_SIZE 4096
+#define READ_BUFFER_SIZE        4096
+#define WRITE_SIZE              50*4096
 #define MAX_LISTEN_QUEUE_LENGTH 1024
 
 #define SOCKET_FAILED -1
@@ -87,7 +88,7 @@ TRANSACTION {
     /* Write stuff: */
     ev_io       write_watcher;
     size_t      write_seek;
-    char*       response;
+    const char* response;
 };
 
 static TRANSACTION* Transaction_new();

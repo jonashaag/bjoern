@@ -57,14 +57,29 @@ static void while_sock_canwrite(EV_LOOP mainloop, ev_io* write_watcher_, int rev
 
     TRANSACTION* transaction = OFFSETOF(write_watcher, write_watcher_, TRANSACTION);
 
-    #define MSG "HTTP/1.1 200 Alles ok"
-    write(transaction->client_fd, MSG, strlen(MSG));
+    write(transaction->client_fd, transaction->response, WRITE_SIZE);
 
     ev_io_stop(mainloop, &transaction->write_watcher);
     close(transaction->client_fd);
     Transaction_free(transaction);
 
     DEBUG("Write end.\n\n");
+}
+
+static void callme(TRANSACTION* transaction)
+{
+    /* Call the Python callback function. */
+    PyObject* response = PyObject_CallObject(request_callback, Py_BuildValue(
+        "(ssssOs)",
+        transaction->request_url,
+        transaction->request_query,
+        transaction->request_url_fragment,
+        transaction->request_path,
+        transaction->request_headers,
+        transaction->request_body
+    ));
+
+    transaction->response = (const char*)PyString_AsString(response);
 }
 
 /*
@@ -79,7 +94,7 @@ static void on_sock_read(EV_LOOP mainloop, ev_io* read_watcher_, int revents)
     TRANSACTION* transaction = OFFSETOF(read_watcher, read_watcher_, TRANSACTION);
 
     /* Read the whole body. */
-    char    read_buffer[READ_BUFFER_SIZE] = {0};
+    char    read_buffer[READ_BUFFER_SIZE];
     ssize_t bytes_read;
     size_t  bytes_parsed;
     bytes_read = read(transaction->client_fd, read_buffer, READ_BUFFER_SIZE);
@@ -104,16 +119,7 @@ read_finished:
     /* Stop the read loop, we're done reading. */
     ev_io_stop(mainloop, &transaction->read_watcher);
 
-    /* Call the Python callback function. */
-    PyObject_CallObject(request_callback, Py_BuildValue(
-        "(ssssOs)",
-        transaction->request_url,
-        transaction->request_query,
-        transaction->request_url_fragment,
-        transaction->request_path,
-        transaction->request_headers,
-        transaction->request_body
-    ));
+    callme(transaction);
 
     /* Run the write-watch loop that notifies us when we can write to the socket. */
     ev_io_init(&transaction->write_watcher, &while_sock_canwrite, transaction->client_fd, EV_WRITE);

@@ -5,8 +5,7 @@ import procname
 procname.setprocname('bjoernpy')
 
 def rq_cb(b_url, b_query, b_fragment, b_path, b_headers, b_body):
-    return
-    print dict((k,v) for k,v in locals().iteritems() if k.startswith('b_'))
+    return "HTTP/1.1 200 Alles ok\r\nContent-Length: 5\r\n\r\nHallo"
 
 
 def run_bjoern():
