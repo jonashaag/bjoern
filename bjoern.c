@@ -6,18 +6,18 @@
 static struct http_parser_settings
   parser_settings = {
     http_on_start_parsing,      /* http_cb      on_message_begin; */
-    http_set_path,              /* http_data_cb on_path; */
-    http_set_query,             /* http_data_cb on_query_string; */
-    http_set_url,               /* http_data_cb on_url; */
-    http_set_fragment,          /* http_data_cb on_fragment; */
-    http_set_header,            /* http_data_cb on_header_field; */
-    http_set_header_value,      /* http_data_cb on_header_value; */
+    http_on_path,               /* http_data_cb on_path; */
+    http_on_query,              /* http_data_cb on_query_string; */
+    http_on_url,                /* http_data_cb on_url; */
+    http_on_fragment,           /* http_data_cb on_fragment; */
+    http_on_header_name,        /* http_data_cb on_header_field; */
+    http_on_header_value,       /* http_data_cb on_header_value; */
     http_on_headers_complete,   /* http_cb      on_headers_complete; */
-    http_set_body,              /* http_data_cb on_body; */
+    http_on_body,               /* http_data_cb on_body; */
     http_on_end_parsing,        /* http_cb      on_message_complete; */
 };
 
-static int NUMS = 1;
+IF_DEBUG(static int NUMS = 1);
 
 static TRANSACTION* Transaction_new()
 {
@@ -31,11 +31,11 @@ static TRANSACTION* Transaction_new()
     http_parser_init((PARSER*)transaction->request_parser, HTTP_REQUEST);
 
     /* Initialize the Python headers dictionary. */
-    transaction->request_headers = PyDict_New();
-    if(!transaction->request_headers) return NULL;
-    Py_INCREF(transaction->request_headers);
+    transaction->wsgi_environ = PyDict_New();
+    if(!transaction->wsgi_environ) return NULL;
+    Py_INCREF(transaction->wsgi_environ);
 
-    transaction->num = NUMS++;
+    IF_DEBUG(transaction->num = NUMS++);
 
     DEBUG("New transaction %d.", transaction->num);
 
@@ -66,21 +66,6 @@ static void while_sock_canwrite(EV_LOOP mainloop, ev_io* write_watcher_, int rev
     DEBUG("Write end.\n\n");
 }
 
-static void callme(TRANSACTION* transaction)
-{
-    /* Call the Python callback function. */
-    PyObject* response = PyObject_CallObject(request_callback, Py_BuildValue(
-        "(ssssOs)",
-        transaction->request_url,
-        transaction->request_query,
-        transaction->request_url_fragment,
-        transaction->request_path,
-        transaction->request_headers,
-        transaction->request_body
-    ));
-
-    transaction->response = (const char*)PyString_AsString(response);
-}
 
 /*
     TODO: Make sure this function is very, very fast as it is called many times.
@@ -119,7 +104,7 @@ read_finished:
     /* Stop the read loop, we're done reading. */
     ev_io_stop(mainloop, &transaction->read_watcher);
 
-    callme(transaction);
+    /* TODO: Call the WSGI application here. */
 
     /* Run the write-watch loop that notifies us when we can write to the socket. */
     ev_io_init(&transaction->write_watcher, &while_sock_canwrite, transaction->client_fd, EV_WRITE);
@@ -241,5 +226,18 @@ static PyMethodDef Bjoern_FunctionTable[] = {
 
 PyMODINIT_FUNC init_bjoern()
 {
+    /* Py_INCREF predefined objects. */
+    #define INIT_PYSTRING(s) PY_STRING_##s = PyString(#s); Py_INCREF(PY_STRING_##s)
+    INIT_PYSTRING(   GET                 );
+    INIT_PYSTRING(   POST                );
+    INIT_PYSTRING(   REQUEST_METHOD      );
+    INIT_PYSTRING(   PATH_INFO           );
+    INIT_PYSTRING(   QUERY_STRING        );
+    INIT_PYSTRING(   HTTP_CONTENT_TYPE   );
+    INIT_PYSTRING(   CONTENT_TYPE        );
+    INIT_PYSTRING(   SERVER_NAME         );
+    INIT_PYSTRING(   SERVER_PORT         );
+    INIT_PYSTRING(   SERVER_PROTOCOL     );
+
     Py_InitModule("_bjoern", Bjoern_FunctionTable);
 }

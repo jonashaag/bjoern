@@ -55,7 +55,6 @@ typedef enum {
     true = 1
 } bool;
 
-
 struct bj_http_parser {
     PARSER        http_parser;
     TRANSACTION*  transaction;
@@ -67,21 +66,26 @@ struct bj_http_parser {
     size_t        header_value_length;
 };
 
+enum http_parser_error {
+    HTTP_PARSER_ERROR_REQUEST_METHOD_NOT_SUPPORTED = 1
+};
+
+
+typedef enum http_method http_method;
 
 TRANSACTION {
+    IF_DEBUG(int num);
+
     int client_fd;
-    int num; /* TODO: throw away. */
 
     ev_io       read_watcher;
     size_t      read_seek;
     /* TODO: put request_* into a seperate data structure. */
     BJPARSER*   request_parser;
 
-    PyObject*   request_url;
-    PyObject*   request_query;
-    PyObject*   request_url_fragment;
-    PyObject*   request_path;
-    PyObject*   request_headers;
+    const char* request_url;
+    http_method request_method;
+    PyObject*   wsgi_environ;
     PyObject*   request_body;
 
 

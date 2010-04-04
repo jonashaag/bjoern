@@ -6,8 +6,8 @@ CFLAGS_WARNALL  = $(CFLAGS) -Wextra
 INCLUDE_DIRS    = -I /usr/include/python2.6/
 LDFLAGS         = $(INCLUDE_DIRS) -l ev -I http-parser -l python2.6
 PROFILE_CFLAGS  = $(CFLAGS) -pg
-OPTDEBUG_FLAGS  = $(CFLAGS_NODEBUGP) -O3
-OPT_FLAGS       = $(CFLAGS_NODEBUG) -O3
+CFLAGS_OPTDEBUG = $(CFLAGS_NODEBUGP) -O3
+CFLAGS_OPT      = $(CFLAGS_NODEBUG) -O3
 
 OUTFILES		= _bjoern.so
 FILES           = bjoern.c
@@ -21,7 +21,7 @@ nodebugprints:
 	$(CC) $(CFLAGS_NODEBUGP) $(LDFLAGS) -o $(OUTFILES) $(FILES_DEBUG)
 
 prep:
-	$(CC) -E bjoern.c | ${PAGER}
+	$(CC) $(LDFLAGS) -E bjoern.c | ${PAGER}
 
 warnall:
 	$(CC) $(CFLAGS_WARNALL) $(LDFLAGS) -o $(OUTFILES) $(FILES_DEBUG)
@@ -30,11 +30,11 @@ profile:
 	$(CC) $(PROFILE_CFLAGS) $(LDFLAGS) -o $(OUTFILES) $(FILES_NODEBUG)
 
 opt:
-	$(CC) $(OPTFLAGS) $(LDFLAGS) -o $(OUTFILES) $(FILES_NODEBUG)
+	$(CC) $(CFLAGS_OPT) $(LDFLAGS) -o $(OUTFILES) $(FILES_NODEBUG)
 	strip $(OUTFILES)
 
 optdebug:
-	$(CC) $(OPTDEBUG_FLAGS) $(LDFLAGS) -o $(OUTFILES) $(FILES_DEBUG)
+	$(CC) $(CFLAGS_OPTDEBUG) $(LDFLAGS) -o $(OUTFILES) $(FILES_DEBUG)
 
 clean:
 	rm -f *.o
