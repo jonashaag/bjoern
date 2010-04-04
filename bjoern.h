@@ -70,11 +70,11 @@ struct bj_http_parser {
 
 TRANSACTION {
     int client_fd;
-    int num;
+    int num; /* TODO: throw away. */
 
     ev_io       read_watcher;
     size_t      read_seek;
-    /* Todo: put request_* into a seperate data structure. */
+    /* TODO: put request_* into a seperate data structure. */
     BJPARSER*   request_parser;
 
     PyObject*   request_url;

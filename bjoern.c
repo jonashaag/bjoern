@@ -237,7 +237,9 @@ static PyMethodDef Bjoern_FunctionTable[] = {
     {NULL,  NULL, 0, NULL}
 };
 
-PyMODINIT_FUNC initbjoern()
+
+
+PyMODINIT_FUNC init_bjoern()
 {
-    Py_InitModule("bjoern", Bjoern_FunctionTable);
+    Py_InitModule("_bjoern", Bjoern_FunctionTable);
 }
