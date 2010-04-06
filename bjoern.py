@@ -1,5 +1,5 @@
 # TODO: If it isn't a too great efford, rewrite this in C.
-from _bjoern import run
+import _bjoern
 
 class WSGIError(Exception):
     pass
@@ -43,3 +43,7 @@ class Response(object):
         else:
             self.response_status  = response_status
             self.response_headers = response_headers
+
+
+def run(wsgi_app, host='0.0.0.0', port=8080, wsgi_layer=Response):
+    _bjoern.run(wsgi_app, host, port, wsgi_layer)

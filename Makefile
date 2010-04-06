@@ -50,6 +50,9 @@ runwithdebug: all
 gdb: all
 	gdb python
 
+cgdb: all
+	cgdb python
+
 valgrind: nodebugprints
 	valgrind python test.py
 

@@ -4,17 +4,17 @@
 #include <Python.h>
 #include <ev.h>
 #include <http_parser.h>
-#include <pthread.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <stddef.h>
-
-#include <fcntl.h>
-#include <errno.h>
 #include <sys/types.h>
+
 #include <sys/socket.h>
+#include <sys/sendfile.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <arpa/inet.h>
@@ -25,6 +25,8 @@
 #define READ_BUFFER_SIZE        4096
 #define WRITE_SIZE              50*4096
 #define MAX_LISTEN_QUEUE_LENGTH 1024
+
+#define HTTP_500_MESSAGE "Internal Server Error :-("
 
 #define SOCKET_FAILED -1
 #define BIND_FAILED   -2
@@ -45,9 +47,11 @@ static char* socket_error_format(const int errnum) {
 }
 
 
+static PyGILState_STATE _GILState;
 static int          sockfd;
 static EV_LOOP      mainloop;
-static PyObject*    request_callback;
+static PyObject*    wsgi_application;
+static PyObject*    wsgi_layer;
 
 /* a simple boolean type */
 typedef enum {
@@ -91,7 +95,8 @@ TRANSACTION {
 
     /* Write stuff: */
     ev_io       write_watcher;
-    size_t      write_seek;
+    PyObject*   response_file;
+    bool        headers_sent;
     const char* response;
 };
 

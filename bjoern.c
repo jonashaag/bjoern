@@ -51,24 +51,80 @@ static void Transaction_free(TRANSACTION* transaction)
 }
 
 
+/*
+    Start *or continue previously started* writing to the socket.
+*/
 static void while_sock_canwrite(EV_LOOP mainloop, ev_io* write_watcher_, int revents)
 {
+    int bytes_sent;
+
     DEBUG("Write start.");
 
     TRANSACTION* transaction = OFFSETOF(write_watcher, write_watcher_, TRANSACTION);
 
-    write(transaction->client_fd, transaction->response, WRITE_SIZE);
+    if(transaction->response_file) {
+        /* We we'll send the contents of a file, use the `sendfile` supercow */
 
+        GIL_LOCK();
+        PyFile_IncUseCount((PyFileObject*)transaction->response_file);
+        GIL_UNLOCK();
+
+        /* sendfile(output_fd[socket], input_fd[file], offset, maxlength) */
+        bytes_sent = (int)sendfile(transaction->client_fd,
+                                   PyFileno(transaction->response_file),
+                                   NULL /* important */, WRITE_SIZE);
+
+        GIL_LOCK();
+        PyFile_DecUseCount((PyFileObject*)transaction->response_file);
+        GIL_UNLOCK();
+    }
+    else {
+        if(!transaction->headers_sent) {
+            /* First time we to send to this client, send HTTP headers. */
+            #define headers "HTTP/1.1 200 Alles Ok\r\n\r\nContent-Type: text/plain\r\nContent-Length: 25\r\n\r\n"
+            write(transaction->client_fd, headers, strlen(headers));
+            transaction->headers_sent = true;
+            return;
+        } else {
+            DEBUG("Len: %d", strlen(transaction->response));
+            /* Start or go on sending the HTTP response. */
+            bytes_sent = (int)write(transaction->client_fd,
+                                    transaction->response,
+                                    WRITE_SIZE);
+        }
+    }
+
+    switch(bytes_sent) {
+        case 0:
+            /* Response finished properly. Done with this request! :-) */
+            goto finish;
+        case -1:
+            /* An error occured. */
+            if(errno == EAGAIN) DO_NOTHING;
+                /* Non-critical error, try again. (Write operation would block
+                   but we set the socket to be nonblocking.)*/
+            else goto error;
+        default:
+            /* we have sent `bytes_sent` bytes but we haven't sent everything
+               yet, so go on sending (do not stop the write event loop). */
+            DEBUG("SENT %d bytes", bytes_sent);
+            return;
+    }
+
+error:
+    DO_NOTHING;
+finish:
+    Py_XDECREF(transaction->response_file);
     ev_io_stop(mainloop, &transaction->write_watcher);
     close(transaction->client_fd);
     Transaction_free(transaction);
-
     DEBUG("Write end.\n\n");
 }
 
 
 /*
     TODO: Make sure this function is very, very fast as it is called many times.
+    TODO: Split. This has about 100 LOC. :'(
 */
 static void on_sock_read(EV_LOOP mainloop, ev_io* read_watcher_, int revents)
 {
@@ -104,11 +160,66 @@ read_finished:
     /* Stop the read loop, we're done reading. */
     ev_io_stop(mainloop, &transaction->read_watcher);
 
-    /* TODO: Call the WSGI application here. */
+    /* Create a new instance of the WSGI layer class. */
+    PyObject* wsgi_layer_instance = PyObject_Call(wsgi_layer,
+        Py_BuildValue("(O)", transaction->wsgi_environ), NULL /* kwargs */);
 
-    /* Run the write-watch loop that notifies us when we can write to the socket. */
-    ev_io_init(&transaction->write_watcher, &while_sock_canwrite, transaction->client_fd, EV_WRITE);
+    if(!wsgi_layer_instance) {
+        if(PyErr_Occurred()) PyErr_Print();
+        return;
+    }
+    Py_INCREF(wsgi_layer_instance);
+
+    /* Call the WSGI application: app(environ, start_response). */
+    PyObject* args = Py_BuildValue("OO", transaction->wsgi_environ,
+                                         PyGetAttr(wsgi_layer_instance, "start_response"));
+    Py_INCREF(args);
+    PyObject* return_value = PyObject_Call(wsgi_application,
+                                           args, NULL /* kwargs */);
+    Py_DECREF(args);
+
+    if(!return_value) {
+        /* Application failed, send Internal Server Error */
+        transaction->response = HTTP_500_MESSAGE;
+        goto send_response;
+    }
+
+    Py_INCREF(return_value);
+
+    if(PyIter_Check(return_value)) goto iterators_currently_not_supported;
+
+    if(PyFile_Check(return_value)) {
+        transaction->response_file = return_value;
+        goto send_response;
+    }
+
+    PyObject* response;
+    if(!PyString_Check(return_value)) {
+        /* WSGI-compliant case, we have a list or tuple --
+           just pick the first item of that (for now) for the response. */
+        response = PySequence_GetItem(return_value, 1);
+        Py_INCREF(response);
+        Py_DECREF(return_value);
+    } else {
+        /* We already have a string. That's ok, take it for the response. */
+        response = return_value;
+    }
+
+    transaction->response = PyString_AsString(response);
+    if(!transaction->response) goto item_wasnt_a_string_throw_typeerror;
+
+send_response:
+    ev_io_init(&transaction->write_watcher, &while_sock_canwrite,
+               transaction->client_fd, EV_WRITE);
     ev_io_start(mainloop, &transaction->write_watcher);
+    return;
+
+iterators_currently_not_supported:
+    PyRaise(NotImplementedError, "Cannot handle iterator return value");
+    return;
+
+item_wasnt_a_string_throw_typeerror:
+    PyRaise(TypeError, "Return value item 1 not of type 'str'");
 }
 
 
@@ -188,14 +299,14 @@ PyObject* PyB_Run(PyObject* self, PyObject* args)
     const char* hostaddress;
     const int   port;
 
-    Py_XDECREF(request_callback);
-    if(!PyArg_ParseTuple(args, "siO", &hostaddress, &port, &request_callback))
+    if(!PyArg_ParseTuple(args, "OsiO",
+                         &wsgi_application, &hostaddress, &port, &wsgi_layer))
         return NULL;
-
-    Py_INCREF(request_callback);
+    Py_INCREF(wsgi_application);
+    Py_INCREF(wsgi_layer);
 
     sockfd = init_socket(hostaddress, port);
-    if(sockfd < 0) return PyB_Err(PyExc_RuntimeError, socket_error_format(sockfd));
+    if(sockfd < 0) return PyErr(PyExc_RuntimeError, socket_error_format(sockfd));
 
     mainloop = ev_loop_new(0);
 

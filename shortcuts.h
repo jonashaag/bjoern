@@ -10,16 +10,22 @@
 #endif
 #define ERROR(s, ...)           fprintf(stderr, s"\n", ## __VA_ARGS__ )
 
-
+#define DO_NOTHING              do{}while(0)
 #define ALLOC(size)             calloc(1, size)
 #define EV_LOOP                 struct ev_loop*
 #define TRANSACTION             struct Transaction
 #define PARSER                  struct http_parser
 #define BJPARSER                struct bj_http_parser
 
+#define PyGetAttr               PyObject_GetAttrString
 #define PyString(s)             PyString_FromString(s)
 #define PyStringWithLen(s, l)   PyString_FromStringAndSize(s, l)
-#define PyB_Err(...)            (void*)PyErr_Format(__VA_ARGS__)
+#define PyRaise(exc, s)         PyErr_SetString(PyExc_##exc, s)
+#define PyErr(...)              (void*)PyErr_Format(__VA_ARGS__)
+#define PyFileno(py_f)          fileno(PyFile_AsFile(py_f))
+
+#define GIL_LOCK()              _GILState = PyGILState_Ensure()
+#define GIL_UNLOCK()            PyGILState_Release(_GILState); _GILState = 0
 
 #define FORWARD_CURSOR(p,c)     p += c
 #define MAX(a, b)               ((a) > (b) ? (a) : (b))
