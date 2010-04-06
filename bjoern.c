@@ -46,7 +46,8 @@ static void Transaction_free(TRANSACTION* transaction)
 {
     free(transaction->request_parser);
     free(transaction);
-    /* The following will not be free-d because the Python GC that for us:
+    /*
+       The following will not be free-d because the Python GC does that for us:
        wsgi_environ
        request_body
        response_file
