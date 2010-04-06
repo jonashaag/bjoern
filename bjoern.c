@@ -44,10 +44,15 @@ static TRANSACTION* Transaction_new()
 
 static void Transaction_free(TRANSACTION* transaction)
 {
-    /* TODO: Free PyObjects here? */
-    //free(transaction->response);
     free(transaction->request_parser);
     free(transaction);
+    /* The following will not be free-d because the Python GC that for us:
+       wsgi_environ
+       request_body
+       response_file
+       response
+    */
+
 }
 
 
@@ -56,23 +61,24 @@ static void Transaction_free(TRANSACTION* transaction)
 */
 static void while_sock_canwrite(EV_LOOP mainloop, ev_io* write_watcher_, int revents)
 {
-    int bytes_sent;
+    size_t bytes_sent;
 
     DEBUG("Write start.");
 
     TRANSACTION* transaction = OFFSETOF(write_watcher, write_watcher_, TRANSACTION);
 
     if(transaction->response_file) {
-        /* We'll send the contents of a file, use the `sendfile` supercow */
+        /* We'll send the contents of a file using the `sendfile` supercow. */
 
         GIL_LOCK();
         PyFile_IncUseCount((PyFileObject*)transaction->response_file);
         GIL_UNLOCK();
 
         /* sendfile(output_fd[socket], input_fd[file], offset, maxlength) */
-        bytes_sent = (int)sendfile(transaction->client_fd,
-                                   PyFileno(transaction->response_file),
-                                   NULL /* important */, WRITE_SIZE);
+        bytes_sent = sendfile(transaction->client_fd,
+                              PyFileno(transaction->response_file),
+                              NULL /* important */,
+                              WRITE_SIZE);
 
         GIL_LOCK();
         PyFile_DecUseCount((PyFileObject*)transaction->response_file);
@@ -81,35 +87,34 @@ static void while_sock_canwrite(EV_LOOP mainloop, ev_io* write_watcher_, int rev
     else {
         if(!transaction->headers_sent) {
             /* First time we to send to this client, send HTTP headers. */
-            #define headers "HTTP/1.1 200 Alles Ok\r\n\r\nContent-Type: text/plain\r\nContent-Length: 25\r\n\r\n"
+            #define headers "HTTP/1.1 200 Alles Ok\r\nContent-Type: text/plain\r\nContent-Length: 559\r\n\r\n"
             write(transaction->client_fd, headers, strlen(headers));
             transaction->headers_sent = true;
             return;
         } else {
-            DEBUG("Len: %d", strlen(transaction->response));
+            DEBUG("Sending body %s that has a length of %d", transaction->response, transaction->response_remaining);
+            if(!transaction->response_remaining) goto finish; // no body
             /* Start or go on sending the HTTP response. */
-            bytes_sent = (int)write(transaction->client_fd,
-                                    transaction->response,
-                                    WRITE_SIZE);
+            bytes_sent = write(transaction->client_fd,
+                               transaction->response,
+                               transaction->response_remaining);
         }
     }
 
-    switch(bytes_sent) {
-        case 0:
-            /* Response finished properly. Done with this request! :-) */
-            goto finish;
-        case -1:
-            /* An error occured. */
-            if(errno == EAGAIN) DO_NOTHING;
-                /* Non-critical error, try again. (Write operation would block
-                   but we set the socket to be nonblocking.)*/
-            else goto error;
-        default:
-            /* we have sent `bytes_sent` bytes but we haven't sent everything
-               yet, so go on sending (do not stop the write event loop). */
-            DEBUG("SENT %d bytes", bytes_sent);
-            return;
+    if(bytes_sent == -1) {
+        /* An error occured. */
+        if(errno == EAGAIN) return;
+            /* Non-critical error, try again. (Write operation would block
+               but we set the socket to be nonblocking.)*/
+        else goto error;
     }
+
+    DEBUG("SENT %d bytes", bytes_sent);
+
+    transaction->response_remaining -= bytes_sent;
+
+    if(transaction->response_remaining == 0) goto finish;
+    else return;
 
 error:
     DO_NOTHING;
@@ -178,48 +183,60 @@ read_finished:
                                            args, NULL /* kwargs */);
     Py_DECREF(args);
 
+
     if(!return_value) {
         /* Application failed, send Internal Server Error */
         transaction->response = HTTP_500_MESSAGE;
-        goto send_response;
+        goto string_response;
     }
 
     Py_INCREF(return_value);
 
-    if(PyIter_Check(return_value)) goto iterators_currently_not_supported;
+    if(PyIter_Check(return_value)) {
+        transaction->response = HTTP_500_MESSAGE;
+        goto string_response;
+    }
 
     if(PyFile_Check(return_value)) {
         transaction->response_file = return_value;
-        goto send_response;
+        /* TODO: Use proper file size for `sendfile`. */
+        goto file_response;
     }
 
-    PyObject* response;
-    if(!PyString_Check(return_value)) {
+    if(PyString_Check(return_value)) {
+        /* We already have a string. That's ok, take it for the response. */
+        transaction->response = PyString_AsString(return_value);
+        goto string_response;
+    }
+
+    if(PySequence_Check(return_value)) {
         /* WSGI-compliant case, we have a list or tuple --
            just pick the first item of that (for now) for the response. */
-        response = PySequence_GetItem(return_value, 1);
-        Py_INCREF(response);
+        PyObject* py_tmp;
+        py_tmp = PySequence_GetItem(return_value, 1);
+        Py_INCREF(py_tmp);
         Py_DECREF(return_value);
-    } else {
-        /* We already have a string. That's ok, take it for the response. */
-        response = return_value;
+        transaction->response = PyString_AsString(py_tmp);
+        goto string_response;
     }
 
-    transaction->response = PyString_AsString(response);
-    if(!transaction->response) goto item_wasnt_a_string_throw_typeerror;
+    /* Not a string, not a file, not a list/tuple/sequence -- TypeError */
+    transaction->response = HTTP_500_MESSAGE;
+    goto string_response;
+
+
+string_response:
+    if(!transaction->response) transaction->response = HTTP_500_MESSAGE;
+    transaction->response_remaining = strlen(transaction->response);
+    goto send_response;
+
+file_response:
+    goto send_response;
 
 send_response:
     ev_io_init(&transaction->write_watcher, &while_sock_canwrite,
                transaction->client_fd, EV_WRITE);
     ev_io_start(mainloop, &transaction->write_watcher);
-    return;
-
-iterators_currently_not_supported:
-    PyRaise(NotImplementedError, "Cannot handle iterator return value");
-    return;
-
-item_wasnt_a_string_throw_typeerror:
-    PyRaise(TypeError, "Return value item 1 not of type 'str'");
 }
 
 

@@ -56,6 +56,9 @@ cgdb: all
 valgrind: nodebugprints
 	valgrind python test.py
 
+memcheck: nodebugprints
+	valgrind --tool=memcheck --leak-check=full python test.py
+
 callgrind: nodebugprints clean-callgrind
 	valgrind --tool=callgrind python test.py
 

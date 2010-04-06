@@ -26,11 +26,11 @@
 #define WRITE_SIZE              50*4096
 #define MAX_LISTEN_QUEUE_LENGTH 1024
 
-#define HTTP_500_MESSAGE "Internal Server Error :-("
-
 #define SOCKET_FAILED -1
 #define BIND_FAILED   -2
 #define LISTEN_FAILED -3
+
+static const char* HTTP_500_MESSAGE = "HTTP 500 Internal Server Error. Try again later.";
 
 static char* socket_error_format(const int errnum) {
     switch(errnum) {
@@ -97,6 +97,7 @@ TRANSACTION {
     ev_io       write_watcher;
     PyObject*   response_file;
     bool        headers_sent;
+    size_t      response_remaining;
     const char* response;
 };
 
