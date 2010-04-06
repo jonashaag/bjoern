@@ -63,7 +63,7 @@ static void while_sock_canwrite(EV_LOOP mainloop, ev_io* write_watcher_, int rev
     TRANSACTION* transaction = OFFSETOF(write_watcher, write_watcher_, TRANSACTION);
 
     if(transaction->response_file) {
-        /* We we'll send the contents of a file, use the `sendfile` supercow */
+        /* We'll send the contents of a file, use the `sendfile` supercow */
 
         GIL_LOCK();
         PyFile_IncUseCount((PyFileObject*)transaction->response_file);
