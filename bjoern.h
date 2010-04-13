@@ -96,12 +96,12 @@ TRANSACTION {
     /* Write stuff: */
     ev_io       write_watcher;
     PyObject*   response_file;
-    bool        headers_sent;
     size_t      response_remaining;
+    char*       response_headers;
     const char* response;
 };
 
 static TRANSACTION* Transaction_new();
-static void Transaction_free(TRANSACTION*);
+#define             Transaction_free(t) free(t->request_parser); free(t)
 
 #endif /* __bjoern_dot_h__ */

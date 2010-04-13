@@ -42,80 +42,79 @@ static TRANSACTION* Transaction_new()
     return transaction;
 }
 
-static void Transaction_free(TRANSACTION* transaction)
-{
-    free(transaction->request_parser);
-    free(transaction);
-    /*
-       The following will not be free-d because the Python GC does that for us:
-       wsgi_environ
-       request_body
-       response_file
-       response
-    */
 
+static inline ssize_t
+bjoern_sendfile(TRANSACTION* transaction)
+{
+    ssize_t bytes_sent;
+
+    GIL_LOCK();
+    PyFile_IncUseCount((PyFileObject*)transaction->response_file);
+    GIL_UNLOCK();
+
+    #define _sendfile \
+        sendfile(transaction->client_fd, PyFileno(transaction->response_file), \
+                 /* offset, *must* be */NULL, /* TODO: Proper file size */ 0)
+    bytes_sent = (_sendfile == 0); // not sure about that
+
+    GIL_LOCK();
+    PyFile_DecUseCount((PyFileObject*)transaction->response_file);
+    GIL_UNLOCK();
+
+    return bytes_sent;
 }
 
+static inline ssize_t
+bjoern_http_response(TRANSACTION* transaction)
+{
+    /* TODO: Maybe it's faster to write HTTP headers and request body at once? */
+    if(transaction->response_headers) {
+        /* First time we to send to this client, send HTTP headers. */
+        write(
+            transaction->client_fd,
+            transaction->response_headers,
+            strlen(transaction->response_headers)
+        );
+        free(transaction->response_headers);
+        transaction->response_headers = NULL;
+        return -2;
+    } else {
+        if(!transaction->response_remaining) return 0;
+        /* Start or go on sending the HTTP response. */
+        return write(
+            transaction->client_fd,
+            transaction->response,
+            transaction->response_remaining
+        );
+    }
+}
 
 /*
     Start *or continue previously started* writing to the socket.
 */
 static void while_sock_canwrite(EV_LOOP mainloop, ev_io* write_watcher_, int revents)
 {
-    size_t bytes_sent;
-
-    DEBUG("Write start.");
-
+    ssize_t bytes_sent;
     TRANSACTION* transaction = OFFSETOF(write_watcher, write_watcher_, TRANSACTION);
 
-    if(transaction->response_file) {
-        /* We'll send the contents of a file using the `sendfile` supercow. */
-
-        GIL_LOCK();
-        PyFile_IncUseCount((PyFileObject*)transaction->response_file);
-        GIL_UNLOCK();
-
-        /* sendfile(output_fd[socket], input_fd[file], offset, maxlength) */
-        bytes_sent = sendfile(transaction->client_fd,
-                              PyFileno(transaction->response_file),
-                              NULL /* important */,
-                              WRITE_SIZE);
-
-        GIL_LOCK();
-        PyFile_DecUseCount((PyFileObject*)transaction->response_file);
-        GIL_UNLOCK();
-    }
-    else {
-        if(!transaction->headers_sent) {
-            /* First time we to send to this client, send HTTP headers. */
-            #define headers "HTTP/1.1 200 Alles Ok\r\nContent-Type: text/plain\r\nContent-Length: 559\r\n\r\n"
-            write(transaction->client_fd, headers, strlen(headers));
-            transaction->headers_sent = true;
+    #define RESPONSE_FUNC (transaction->response_file ? bjoern_sendfile \
+                                                      : bjoern_http_response)
+    switch(bytes_sent = RESPONSE_FUNC(transaction)) {
+        case -1:
+            /* An error occured. */
+            if(errno == EAGAIN)
+                /* Try again next time libev calls this function on EAGAIN. */
+                return;
+            else goto error;
+        case -2:
+            /* HTTP response headers were sent. Do nothing. */
             return;
-        } else {
-            DEBUG("Sending body %s that has a length of %d", transaction->response, transaction->response_remaining);
-            if(!transaction->response_remaining) goto finish; // no body
-            /* Start or go on sending the HTTP response. */
-            bytes_sent = write(transaction->client_fd,
-                               transaction->response,
-                               transaction->response_remaining);
-        }
+        default:
+            /* `bytes_sent` bytes were sent to the client, calculate the
+                remaining bytes and finish on 0. */
+            transaction->response_remaining -= bytes_sent;
+            if(transaction->response_remaining == 0) goto finish;
     }
-
-    if(bytes_sent == -1) {
-        /* An error occured. */
-        if(errno == EAGAIN) return;
-            /* Non-critical error, try again. (Write operation would block
-               but we set the socket to be nonblocking.)*/
-        else goto error;
-    }
-
-    DEBUG("SENT %d bytes", bytes_sent);
-
-    transaction->response_remaining -= bytes_sent;
-
-    if(transaction->response_remaining == 0) goto finish;
-    else return;
 
 error:
     DO_NOTHING;

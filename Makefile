@@ -21,7 +21,13 @@ nodebugprints:
 	$(CC) $(CFLAGS_NODEBUGP) $(LDFLAGS) -o $(OUTFILES) $(FILES_DEBUG)
 
 prep:
-	$(CC) $(LDFLAGS) -E bjoern.c | ${PAGER}
+	$(CC) $(LDFLAGS) $(CFLAGS) -E bjoern.c | ${PAGER}
+
+assembler:
+	$(CC) $(LDFLAGS) $(CFLAGS_NODEBUGP) -S bjoern.c
+
+assembleropt:
+	$(CC) $(LDFLAGS) $(CFLAGS_OPTDEBUG) -S bjoern.c
 
 warnall:
 	$(CC) $(CFLAGS_WARNALL) $(LDFLAGS) -o $(OUTFILES) $(FILES_DEBUG)
