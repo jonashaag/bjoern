@@ -5,8 +5,8 @@ def _gen(environ):
         yield "{key} = {value}".format(key=key.ljust(30), value=value)
 
 def wsgi_app(environ, start_response):
-    return ''
-    start_response(200, {'Content-type' : 'text/plain'})
-    return '\n'.join(_gen(environ))
+    start_response(200, {'Content-type' : 'text/html'})
+    s = '\n'.join(_gen(environ))
+    return s
 
 bjoern.run(wsgi_app)

@@ -9,6 +9,9 @@ static PyObject* PY_STRING_CONTENT_TYPE;
 static PyObject* PY_STRING_SERVER_NAME;
 static PyObject* PY_STRING_SERVER_PORT;
 static PyObject* PY_STRING_SERVER_PROTOCOL;
+static PyObject* PY_STRING_Content_Type;    /* "Content-Type" */
+static PyObject* PY_STRING_Content_Length;  /* "Content-Length" */
+static PyObject* PY_STRING_DEFAULT_RESPONSE_CONTENT_TYPE; /* DEFAULT_RESPONSE_CONTENT_TYPE */
 
 
 /* Longest header name I found was "Proxy-Authentication-Info" (25 chars) */

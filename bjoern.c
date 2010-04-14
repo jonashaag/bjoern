@@ -36,7 +36,6 @@ static TRANSACTION* Transaction_new()
     Py_INCREF(transaction->wsgi_environ);
 
     IF_DEBUG(transaction->num = NUMS++);
-
     DEBUG("New transaction %d.", transaction->num);
 
     return transaction;
@@ -52,10 +51,11 @@ bjoern_sendfile(TRANSACTION* transaction)
     PyFile_IncUseCount((PyFileObject*)transaction->response_file);
     GIL_UNLOCK();
 
-    #define _sendfile \
+    #define SENDFILE \
         sendfile(transaction->client_fd, PyFileno(transaction->response_file), \
                  /* offset, *must* be */NULL, /* TODO: Proper file size */ 0)
-    bytes_sent = (_sendfile == 0); // not sure about that
+    bytes_sent = (SENDFILE == 0); // not sure about that
+    #undef SENDFILE
 
     GIL_LOCK();
     PyFile_DecUseCount((PyFileObject*)transaction->response_file);
@@ -68,16 +68,58 @@ static inline ssize_t
 bjoern_http_response(TRANSACTION* transaction)
 {
     /* TODO: Maybe it's faster to write HTTP headers and request body at once? */
-    if(transaction->response_headers) {
+    if(!transaction->headers_sent) {
         /* First time we to send to this client, send HTTP headers. */
-        write(
-            transaction->client_fd,
-            transaction->response_headers,
-            strlen(transaction->response_headers)
-        );
-        free(transaction->response_headers);
-        transaction->response_headers = NULL;
+        char        header_buffer[MAX_HEADER_SIZE];
+        char*       buffer_position = header_buffer;
+        char*       orig_buffer_position = buffer_position;
+        PyObject*   current_key;
+        PyObject*   current_value;
+        Py_ssize_t  dict_position = 0;
+
+        /* Make sure a Content-Type header is set: */
+        if(!PyDict_Contains(transaction->response_headers, PY_STRING_Content_Type))
+        {
+            PyDict_SetItem(
+                transaction->response_headers,
+                PY_STRING_Content_Type,
+                PY_STRING_DEFAULT_RESPONSE_CONTENT_TYPE
+            );
+        }
+
+        /* Make sure a Content-Length header is set: */
+        if(!PyDict_Contains(transaction->response_headers, PY_STRING_Content_Length)) {
+            PyObject* py_content_length = _PyInt_Format(
+                (PyIntObject*)PyInt_FromSize_t(transaction->response_remaining),
+                /* base */10, /* newstyle? */0
+            );
+            Py_INCREF(py_content_length);
+            PyDict_SetItem(
+                transaction->response_headers,
+                PY_STRING_Content_Length,
+                py_content_length
+            );
+            Py_DECREF(py_content_length);
+        }
+
+        #define VALUE buffer_position += (int)strcpy(buffer_position, ": ")
+        #define NEXT_HEADER buffer_position += (int)strcpy(buffer_position, "\r\n")
+        while(PyDict_Next(transaction->response_headers, &dict_position,
+                          &current_key, &current_value))
+        {
+            /* FIXME: Design failure, `strcpy` returns *destination* rather than the amount of bytes copied. */
+            buffer_position += (int)strcpy(buffer_position, PyString_AsString(current_key));
+            VALUE;
+            buffer_position += (int)strcpy(buffer_position, PyString_AsString(current_value));
+            NEXT_HEADER;
+        }
+        #undef VALUE
+        #undef NEXT_HEADER
+
+        write(transaction->client_fd, header_buffer,
+              buffer_position - orig_buffer_position);
         return -2;
+
     } else {
         if(!transaction->response_remaining) return 0;
         /* Start or go on sending the HTTP response. */
@@ -108,6 +150,7 @@ static void while_sock_canwrite(EV_LOOP mainloop, ev_io* write_watcher_, int rev
             else goto error;
         case -2:
             /* HTTP response headers were sent. Do nothing. */
+            transaction->headers_sent = true;
             return;
         default:
             /* `bytes_sent` bytes were sent to the client, calculate the
@@ -115,6 +158,7 @@ static void while_sock_canwrite(EV_LOOP mainloop, ev_io* write_watcher_, int rev
             transaction->response_remaining -= bytes_sent;
             if(transaction->response_remaining == 0) goto finish;
     }
+    #undef RESPONSE_FUNC
 
 error:
     DO_NOTHING;
@@ -123,7 +167,6 @@ finish:
     ev_io_stop(mainloop, &transaction->write_watcher);
     close(transaction->client_fd);
     Transaction_free(transaction);
-    DEBUG("Write end.\n\n");
 }
 
 
@@ -228,12 +271,14 @@ read_finished:
 string_response:
     if(!transaction->response) transaction->response = HTTP_500_MESSAGE;
     transaction->response_remaining = strlen(transaction->response);
+    transaction->response_headers = PyGetAttr(wsgi_layer_instance, "response_headers");
     goto send_response;
 
 file_response:
     goto send_response;
 
 send_response:
+    Py_XDECREF(wsgi_layer_instance);
     ev_io_init(&transaction->write_watcher, &while_sock_canwrite,
                transaction->client_fd, EV_WRITE);
     ev_io_start(mainloop, &transaction->write_watcher);
@@ -366,6 +411,12 @@ PyMODINIT_FUNC init_bjoern()
     INIT_PYSTRING(   SERVER_NAME         );
     INIT_PYSTRING(   SERVER_PORT         );
     INIT_PYSTRING(   SERVER_PROTOCOL     );
+    PY_STRING_Content_Type = PyString("Content-Type");
+    Py_INCREF(PY_STRING_Content_Type);
+    PY_STRING_Content_Length = PyString("Content-Length");
+    Py_INCREF(PY_STRING_Content_Length);
+    PY_STRING_DEFAULT_RESPONSE_CONTENT_TYPE = PyString(DEFAULT_RESPONSE_CONTENT_TYPE);
+    Py_INCREF(PY_STRING_DEFAULT_RESPONSE_CONTENT_TYPE);
 
     Py_InitModule("_bjoern", Bjoern_FunctionTable);
 }

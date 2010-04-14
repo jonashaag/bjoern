@@ -24,7 +24,9 @@
 
 #define READ_BUFFER_SIZE        4096
 #define WRITE_SIZE              50*4096
+#define MAX_HEADER_SIZE         1<<13 /* Average value looking at other server's code */
 #define MAX_LISTEN_QUEUE_LENGTH 1024
+#define DEFAULT_RESPONSE_CONTENT_TYPE "text/plain"
 
 #define SOCKET_FAILED -1
 #define BIND_FAILED   -2
@@ -95,9 +97,10 @@ TRANSACTION {
 
     /* Write stuff: */
     ev_io       write_watcher;
-    PyObject*   response_file;
     size_t      response_remaining;
-    char*       response_headers;
+    PyObject*   response_file;
+    PyObject*   response_headers;
+    bool        headers_sent;
     const char* response;
 };
 
