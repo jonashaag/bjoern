@@ -102,19 +102,15 @@ bjoern_http_response(TRANSACTION* transaction)
             Py_DECREF(py_content_length);
         }
 
-        #define VALUE buffer_position += (int)strcpy(buffer_position, ": ")
-        #define NEXT_HEADER buffer_position += (int)strcpy(buffer_position, "\r\n")
         while(PyDict_Next(transaction->response_headers, &dict_position,
                           &current_key, &current_value))
         {
-            /* FIXME: Design failure, `strcpy` returns *destination* rather than the amount of bytes copied. */
-            buffer_position += (int)strcpy(buffer_position, PyString_AsString(current_key));
-            VALUE;
-            buffer_position += (int)strcpy(buffer_position, PyString_AsString(current_value));
-            NEXT_HEADER;
+            bj_strcpy(&buffer_position, PyString_AsString(current_key));
+            bj_strcpy(&buffer_position, ": ");
+            bj_strcpy(&buffer_position, PyString_AsString(current_value));
+            bj_strcpy(&buffer_position, "\r\n");
         }
-        #undef VALUE
-        #undef NEXT_HEADER
+        bj_strcpy(&buffer_position, "\r\n");
 
         write(transaction->client_fd, header_buffer,
               buffer_position - orig_buffer_position);
@@ -163,7 +159,6 @@ static void while_sock_canwrite(EV_LOOP mainloop, ev_io* write_watcher_, int rev
 error:
     DO_NOTHING;
 finish:
-    Py_XDECREF(transaction->response_file);
     ev_io_stop(mainloop, &transaction->write_watcher);
     close(transaction->client_fd);
     Transaction_free(transaction);

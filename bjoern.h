@@ -21,6 +21,7 @@
 
 #include "config.h"
 #include "shortcuts.h"
+#include "utils.c"
 
 #define READ_BUFFER_SIZE        4096
 #define WRITE_SIZE              50*4096
@@ -105,6 +106,11 @@ TRANSACTION {
 };
 
 static TRANSACTION* Transaction_new();
-#define             Transaction_free(t) free(t->request_parser); free(t)
+#define Transaction_free(t) Py_DECREF(t->wsgi_environ); \
+                            Py_DECREF(t->request_body); \
+                            Py_XDECREF(t->response_headers); \
+                            Py_XDECREF(t->response_file); \
+                            free(t->request_parser); \
+                            free(t)
 
 #endif /* __bjoern_dot_h__ */
