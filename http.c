@@ -122,8 +122,8 @@ static inline void store_current_header(BJPARSER* parser)
     header_name[3] = 'P';
     header_name[4] = '_';
 
-    memcpy(&header_name[5], parser->header_name_start, parser->header_name_length);
-    /* TODO: Uppercase and s/-/_/. */
+    bj_http_to_wsgi_header(&header_name[5], parser->header_name_start,
+                                            parser->header_name_length);
 
     PyObject* py_header_value = PyStringWithLen(parser->header_value_start,
                                                 parser->header_value_length);

@@ -17,7 +17,7 @@ static struct http_parser_settings
     http_on_end_parsing,        /* http_cb      on_message_complete; */
 };
 
-IF_DEBUG(static int NUMS = 1);
+IF_DEBUG(static int NUMS = 1;)
 
 static TRANSACTION* Transaction_new()
 {
@@ -250,9 +250,7 @@ read_finished:
     if(PySequence_Check(return_value)) {
         /* WSGI-compliant case, we have a list or tuple --
            just pick the first item of that (for now) for the response. */
-        PyObject* py_tmp;
-        py_tmp = PySequence_GetItem(return_value, 1);
-        Py_INCREF(py_tmp);
+        PyObject* py_tmp = PySequence_GetItem(return_value, 0);
         Py_DECREF(return_value);
         transaction->response = PyString_AsString(py_tmp);
         goto string_response;

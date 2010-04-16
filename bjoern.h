@@ -76,7 +76,7 @@ enum http_parser_error {
 typedef enum http_method http_method;
 
 TRANSACTION {
-    IF_DEBUG(int num);
+    IF_DEBUG(int num;)
 
     int client_fd;
 
