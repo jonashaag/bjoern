@@ -5,6 +5,7 @@
 #include <ev.h>
 #include <http_parser.h>
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -55,12 +56,6 @@ static int          sockfd;
 static EV_LOOP      mainloop;
 static PyObject*    wsgi_application;
 static PyObject*    wsgi_layer;
-
-/* a simple boolean type */
-typedef enum {
-    false = 0,
-    true = 1
-} bool;
 
 struct bj_http_parser {
     PARSER        http_parser;

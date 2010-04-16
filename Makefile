@@ -1,5 +1,5 @@
 CC              = gcc
-CFLAGS_NODEBUG  = -Wall -fno-strict-aliasing -shared
+CFLAGS_NODEBUG  = -std=c99 -pedantic -Wall -fno-strict-aliasing -shared
 CFLAGS_NODEBUGP = $(CFLAGS_NODEBUG) -g
 CFLAGS          = $(CFLAGS_NODEBUGP) -D DEBUG
 CFLAGS_WARNALL  = $(CFLAGS) -Wextra
