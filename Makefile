@@ -5,9 +5,9 @@ CFLAGS          = $(CFLAGS_NODEBUGP) -D DEBUG
 CFLAGS_WARNALL  = $(CFLAGS) -Wextra
 INCLUDE_DIRS    = -I /usr/include/python2.6/
 LDFLAGS         = $(INCLUDE_DIRS) -l ev -I http-parser -l python2.6
-PROFILE_CFLAGS  = $(CFLAGS) -pg
 CFLAGS_OPTDEBUG = $(CFLAGS_NODEBUGP) -O3
 CFLAGS_OPT      = $(CFLAGS_NODEBUG) -O3
+CLFAGS_OPTSMALL = $(CFLAGS_NODEBUG) -Os
 
 OUTFILES		= _bjoern.so
 FILES           = bjoern.c
@@ -32,15 +32,16 @@ assembleropt:
 warnall:
 	$(CC) $(CFLAGS_WARNALL) $(LDFLAGS) -o $(OUTFILES) $(FILES_DEBUG)
 
-profile:
-	$(CC) $(PROFILE_CFLAGS) $(LDFLAGS) -o $(OUTFILES) $(FILES_NODEBUG)
-
 opt:
 	$(CC) $(CFLAGS_OPT) $(LDFLAGS) -o $(OUTFILES) $(FILES_NODEBUG)
 	strip $(OUTFILES)
 
 optdebug:
 	$(CC) $(CFLAGS_OPTDEBUG) $(LDFLAGS) -o $(OUTFILES) $(FILES_DEBUG)
+	strip $(OUTFILES)
+
+optsmall:
+	$(CC) $(CFLAGS_OPTSMALL) $(LDFLAGS) -o $(OUTFILES) $(FILES_NODEBUG)
 
 clean:
 	rm -f *.o
