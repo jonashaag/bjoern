@@ -6,6 +6,22 @@
 static inline void
 bj_strcpy(char** destination, const char* source)
 {
-    destination--;
-    while (( *(*destination)++ = *source++ ));
+    while (( **destination = *source )) {
+        source++;
+        (*destination)++;
+    };
+}
+
+static inline void
+bj_http_to_wsgi_header(char* destination, const char* source, size_t length)
+{
+    int i;
+    for(i=0; i<length; ++i)
+    {
+        if(source[i] == '-')
+            *destination++ = '_';
+        else
+            *destination++ = toupper(source[i]);
+    }
+    *destination++ = '\0';
 }
