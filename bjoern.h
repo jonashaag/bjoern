@@ -93,7 +93,6 @@ TRANSACTION {
     const char* request_url;
     http_method request_method;
     PyObject*   wsgi_environ;
-    PyObject*   request_body;
 
 
     /* Write stuff: */
@@ -107,7 +106,6 @@ TRANSACTION {
 
 static TRANSACTION* Transaction_new();
 #define Transaction_free(t) Py_DECREF(t->wsgi_environ); \
-                            Py_DECREF(t->request_body); \
                             Py_XDECREF(t->response_headers); \
                             Py_XDECREF(t->response_file); \
                             free(t->request_parser); \

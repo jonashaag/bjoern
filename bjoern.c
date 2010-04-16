@@ -267,6 +267,7 @@ string_response:
     if(!transaction->response) transaction->response = HTTP_500_MESSAGE;
     transaction->response_remaining = strlen(transaction->response);
     transaction->response_headers = PyGetAttr(wsgi_layer_instance, "response_headers");
+    Py_INCREF(transaction->response_headers);
     goto send_response;
 
 file_response:
