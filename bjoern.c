@@ -1,5 +1,5 @@
 #include "bjoern.h"
-#include "http.c"
+#include "parsing.c"
 
 static PyMethodDef Bjoern_FunctionTable[] = {
     {"run", Bjoern_Run, METH_VARARGS, "Run bjoern. :-)"},
