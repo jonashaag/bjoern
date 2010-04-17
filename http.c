@@ -13,12 +13,7 @@ static PyObject* PY_STRING_Content_Type;    /* "Content-Type" */
 static PyObject* PY_STRING_Content_Length;  /* "Content-Length" */
 static PyObject* PY_STRING_DEFAULT_RESPONSE_CONTENT_TYPE; /* DEFAULT_RESPONSE_CONTENT_TYPE */
 
-
-/* Longest header name I found was "Proxy-Authentication-Info" (25 chars) */
-#define HTTP_MAX_HEADER_NAME_LENGTH 30
-
 #define GET_TRANSACTION ((BJPARSER*)parser)->transaction
-
 
 /*
     Initialize the http parser.
@@ -122,8 +117,8 @@ static inline void store_current_header(BJPARSER* parser)
     header_name[3] = 'P';
     header_name[4] = '_';
 
-    bj_http_to_wsgi_header(&header_name[5], parser->header_name_start,
-                                            parser->header_name_length);
+    bjoern_http_to_wsgi_header(&header_name[5], parser->header_name_start,
+                                                parser->header_name_length);
 
     PyObject* py_header_value = PyStringWithLen(parser->header_value_start,
                                                 parser->header_value_length);
@@ -192,3 +187,18 @@ static int http_on_fragment(PARSER* parser, const char* fragment_start, size_t f
 
 static  int http_on_url(PARSER* parser, const char* url_start, size_t url_length) { return 0; }
 static int http_on_headers_complete(PARSER* parser) { return 0; }
+
+
+static struct http_parser_settings
+  parser_settings = {
+    http_on_start_parsing,      /* http_cb      on_message_begin; */
+    http_on_path,               /* http_data_cb on_path; */
+    http_on_query,              /* http_data_cb on_query_string; */
+    http_on_url,                /* http_data_cb on_url; */
+    http_on_fragment,           /* http_data_cb on_fragment; */
+    http_on_header_name,        /* http_data_cb on_header_field; */
+    http_on_header_value,       /* http_data_cb on_header_value; */
+    http_on_headers_complete,   /* http_cb      on_headers_complete; */
+    http_on_body,               /* http_data_cb on_body; */
+    http_on_end_parsing,        /* http_cb      on_message_complete; */
+};

@@ -24,19 +24,15 @@
 #include "shortcuts.h"
 #include "utils.c"
 
-#define READ_BUFFER_SIZE        4096
-#define WRITE_SIZE              50*4096
-#define MAX_HEADER_SIZE         1<<13 /* Average value looking at other server's code */
-#define MAX_LISTEN_QUEUE_LENGTH 1024
-#define DEFAULT_RESPONSE_CONTENT_TYPE "text/plain"
 
-#define SOCKET_FAILED -1
-#define BIND_FAILED   -2
-#define LISTEN_FAILED -3
 
-static const char* HTTP_500_MESSAGE = "HTTP 500 Internal Server Error. Try again later.";
+typedef enum {
+    SOCKET_FAILED = -1,
+    BIND_FAILED   = -2,
+    LISTEN_FAILED = -3
+} bjoern_network_error;
 
-static char* socket_error_format(const int errnum) {
+static char* socket_error_format(const bjoern_network_error errnum) {
     switch(errnum) {
         case SOCKET_FAILED:
             return "socket() failed";
@@ -57,6 +53,7 @@ static EV_LOOP      mainloop;
 static PyObject*    wsgi_application;
 static PyObject*    wsgi_layer;
 
+
 struct bj_http_parser {
     PARSER        http_parser;
     TRANSACTION*  transaction;
@@ -68,16 +65,11 @@ struct bj_http_parser {
     size_t        header_value_length;
 };
 
-enum http_parser_error {
-    HTTP_PARSER_ERROR_REQUEST_METHOD_NOT_SUPPORTED = 1
-};
-
-
+enum http_parser_error { HTTP_PARSER_ERROR_REQUEST_METHOD_NOT_SUPPORTED = 1 };
 typedef enum http_method http_method;
 
-TRANSACTION {
-    IF_DEBUG(int num;)
 
+TRANSACTION {
     int client_fd;
 
     ev_io       read_watcher;
@@ -94,6 +86,7 @@ TRANSACTION {
     ev_io       write_watcher;
     size_t      response_remaining;
     PyObject*   response_file;
+    PyObject*   response_status;
     PyObject*   response_headers;
     bool        headers_sent;
     const char* response;
@@ -102,8 +95,23 @@ TRANSACTION {
 static TRANSACTION* Transaction_new();
 #define Transaction_free(t) Py_DECREF(t->wsgi_environ); \
                             Py_XDECREF(t->response_headers); \
+                            Py_XDECREF(t->response_status); \
                             Py_XDECREF(t->response_file); \
                             free(t->request_parser); \
                             free(t)
+
+
+#define ev_io_callback  void
+#define ev_signal_callback  void
+
+static int              init_socket         (const char* addr, const int port);
+static ev_io_callback   on_sock_accept      (EV_LOOP, ev_io* watcher, const int revents);
+static ev_io_callback   on_sock_read        (EV_LOOP, ev_io* watcher, const int revents);
+static ev_io_callback   while_sock_canwrite (EV_LOOP, ev_io* watcher, const int revents);
+static ssize_t          bjoern_http_response(TRANSACTION*);
+static void             bjoern_send_headers (TRANSACTION*);
+static ssize_t          bjoern_sendfile     (TRANSACTION*);
+
+static ev_signal_callback on_sigint_received(EV_LOOP, ev_signal* watcher, const int revents);
 
 #endif /* __bjoern_dot_h__ */

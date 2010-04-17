@@ -3,22 +3,6 @@
 
 /* TODO: Use global parser if possible */
 
-static struct http_parser_settings
-  parser_settings = {
-    http_on_start_parsing,      /* http_cb      on_message_begin; */
-    http_on_path,               /* http_data_cb on_path; */
-    http_on_query,              /* http_data_cb on_query_string; */
-    http_on_url,                /* http_data_cb on_url; */
-    http_on_fragment,           /* http_data_cb on_fragment; */
-    http_on_header_name,        /* http_data_cb on_header_field; */
-    http_on_header_value,       /* http_data_cb on_header_value; */
-    http_on_headers_complete,   /* http_cb      on_headers_complete; */
-    http_on_body,               /* http_data_cb on_body; */
-    http_on_end_parsing,        /* http_cb      on_message_complete; */
-};
-
-IF_DEBUG(static int NUMS = 1;)
-
 static TRANSACTION* Transaction_new()
 {
     TRANSACTION* transaction = ALLOC(sizeof(TRANSACTION));
@@ -35,14 +19,11 @@ static TRANSACTION* Transaction_new()
     if(!transaction->wsgi_environ) return NULL;
     Py_INCREF(transaction->wsgi_environ);
 
-    IF_DEBUG(transaction->num = NUMS++);
-    DEBUG("New transaction %d.", transaction->num);
-
     return transaction;
 }
 
 
-static inline ssize_t
+static ssize_t
 bjoern_sendfile(TRANSACTION* transaction)
 {
     ssize_t bytes_sent;
@@ -64,58 +45,68 @@ bjoern_sendfile(TRANSACTION* transaction)
     return bytes_sent;
 }
 
-static inline ssize_t
+static void
+bjoern_send_headers(TRANSACTION* transaction)
+{
+    char        header_buffer[MAX_HEADER_SIZE];
+    char*       buffer_position = header_buffer;
+    char*       orig_buffer_position = buffer_position;
+    PyObject*   current_key;
+    PyObject*   current_value;
+    Py_ssize_t  dict_position = 0;
+
+    /* Copy the HTTP status message into the buffer: */
+    bjoern_strcpy(&buffer_position, "HTTP/1.1 ");
+    bjoern_strcpy(&buffer_position, PyString_AsString(transaction->response_status));
+    bjoern_strcpy(&buffer_position, "\r\n");
+
+    /* Make sure a Content-Type header is set: */
+    if(!PyDict_Contains(transaction->response_headers, PY_STRING_Content_Type))
+    {
+        PyDict_SetItem(
+            transaction->response_headers,
+            PY_STRING_Content_Type,
+            PY_STRING_DEFAULT_RESPONSE_CONTENT_TYPE
+        );
+    }
+
+    /* Make sure a Content-Length header is set: */
+    if(!PyDict_Contains(transaction->response_headers, PY_STRING_Content_Length)) {
+        PyObject* py_content_length = _PyInt_Format(
+            (PyIntObject*)PyInt_FromSize_t(transaction->response_remaining),
+            /* base */10, /* newstyle? */0
+        );
+        Py_INCREF(py_content_length);
+        PyDict_SetItem(
+            transaction->response_headers,
+            PY_STRING_Content_Length,
+            py_content_length
+        );
+        Py_DECREF(py_content_length);
+    }
+
+    while(PyDict_Next(transaction->response_headers, &dict_position,
+                      &current_key, &current_value))
+    {
+        bjoern_strcpy(&buffer_position, PyString_AsString(current_key));
+        bjoern_strcpy(&buffer_position, ": ");
+        bjoern_strcpy(&buffer_position, PyString_AsString(current_value));
+        bjoern_strcpy(&buffer_position, "\r\n");
+    }
+    bjoern_strcpy(&buffer_position, "\r\n");
+
+    write(transaction->client_fd, header_buffer,
+          buffer_position - orig_buffer_position);
+}
+
+static ssize_t
 bjoern_http_response(TRANSACTION* transaction)
 {
     /* TODO: Maybe it's faster to write HTTP headers and request body at once? */
     if(!transaction->headers_sent) {
-        /* First time we to send to this client, send HTTP headers. */
-        char        header_buffer[MAX_HEADER_SIZE];
-        char*       buffer_position = header_buffer;
-        char*       orig_buffer_position = buffer_position;
-        PyObject*   current_key;
-        PyObject*   current_value;
-        Py_ssize_t  dict_position = 0;
-
-        /* Make sure a Content-Type header is set: */
-        if(!PyDict_Contains(transaction->response_headers, PY_STRING_Content_Type))
-        {
-            PyDict_SetItem(
-                transaction->response_headers,
-                PY_STRING_Content_Type,
-                PY_STRING_DEFAULT_RESPONSE_CONTENT_TYPE
-            );
-        }
-
-        /* Make sure a Content-Length header is set: */
-        if(!PyDict_Contains(transaction->response_headers, PY_STRING_Content_Length)) {
-            PyObject* py_content_length = _PyInt_Format(
-                (PyIntObject*)PyInt_FromSize_t(transaction->response_remaining),
-                /* base */10, /* newstyle? */0
-            );
-            Py_INCREF(py_content_length);
-            PyDict_SetItem(
-                transaction->response_headers,
-                PY_STRING_Content_Length,
-                py_content_length
-            );
-            Py_DECREF(py_content_length);
-        }
-
-        while(PyDict_Next(transaction->response_headers, &dict_position,
-                          &current_key, &current_value))
-        {
-            bj_strcpy(&buffer_position, PyString_AsString(current_key));
-            bj_strcpy(&buffer_position, ": ");
-            bj_strcpy(&buffer_position, PyString_AsString(current_value));
-            bj_strcpy(&buffer_position, "\r\n");
-        }
-        bj_strcpy(&buffer_position, "\r\n");
-
-        write(transaction->client_fd, header_buffer,
-              buffer_position - orig_buffer_position);
+        /* First time we write to this client, send HTTP headers. */
+        bjoern_send_headers(transaction);
         return -2;
-
     } else {
         if(!transaction->response_remaining) return 0;
         /* Start or go on sending the HTTP response. */
@@ -130,7 +121,8 @@ bjoern_http_response(TRANSACTION* transaction)
 /*
     Start *or continue previously started* writing to the socket.
 */
-static void while_sock_canwrite(EV_LOOP mainloop, ev_io* write_watcher_, int revents)
+static ev_io_callback
+while_sock_canwrite(EV_LOOP mainloop, ev_io* write_watcher_, int revents)
 {
     ssize_t bytes_sent;
     TRANSACTION* transaction = OFFSETOF(write_watcher, write_watcher_, TRANSACTION);
@@ -169,7 +161,8 @@ finish:
     TODO: Make sure this function is very, very fast as it is called many times.
     TODO: Split. This has about 100 LOC. :'(
 */
-static void on_sock_read(EV_LOOP mainloop, ev_io* read_watcher_, int revents)
+static ev_io_callback
+on_sock_read(EV_LOOP mainloop, ev_io* read_watcher_, int revents)
 {
     /* Check whether we can still read. */
     if(!(revents & EV_READ))
@@ -265,7 +258,9 @@ string_response:
     if(!transaction->response) transaction->response = HTTP_500_MESSAGE;
     transaction->response_remaining = strlen(transaction->response);
     transaction->response_headers = PyGetAttr(wsgi_layer_instance, "response_headers");
+    transaction->response_status = PyGetAttr(wsgi_layer_instance, "response_status");
     Py_INCREF(transaction->response_headers);
+    Py_INCREF(transaction->response_status);
     goto send_response;
 
 file_response:
@@ -279,7 +274,8 @@ send_response:
 }
 
 
-static void on_sock_accept(EV_LOOP mainloop, ev_io* accept_watcher, int revents)
+static ev_io_callback
+on_sock_accept(EV_LOOP mainloop, ev_io* accept_watcher, int revents)
 {
     TRANSACTION* transaction = Transaction_new();
 
@@ -306,7 +302,8 @@ static void on_sock_accept(EV_LOOP mainloop, ev_io* accept_watcher, int revents)
 }
 
 
-static int init_socket(const char* hostaddress, const int port)
+static int
+init_socket(const char* hostaddress, const int port)
 {
     sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     if(sockfd < 0) return SOCKET_FAILED;
@@ -337,20 +334,15 @@ static int init_socket(const char* hostaddress, const int port)
 }
 
 
-static void on_sigint_received(EV_LOOP mainloop, ev_signal *signal, int revents)
+static ev_signal_callback
+on_sigint_received(EV_LOOP mainloop, ev_signal *signal, int revents)
 {
     printf("\b\bReceived SIGINT, shutting down. Goodbye!\n");
     ev_unloop(mainloop, EVUNLOOP_ALL);
 }
 
 
-static void* run_ev_loop()
-{
-    ev_loop(mainloop, 0);
-    return NULL;
-}
-
-PyObject* PyB_Run(PyObject* self, PyObject* args)
+PyObject* Bjoern_Run(PyObject* self, PyObject* args)
 {
     const char* hostaddress;
     const int   port;
@@ -377,7 +369,7 @@ PyObject* PyB_Run(PyObject* self, PyObject* args)
     ev_io_init(&accept_watcher, on_sock_accept, sockfd, EV_READ);
     ev_io_start(mainloop, &accept_watcher);
 
-    run_ev_loop();
+    ev_loop(mainloop, 0);
 
     Py_RETURN_NONE;
 }
@@ -385,11 +377,9 @@ PyObject* PyB_Run(PyObject* self, PyObject* args)
 
 
 static PyMethodDef Bjoern_FunctionTable[] = {
-    {"run", PyB_Run, METH_VARARGS, "Run bjoern. :-)"},
+    {"run", Bjoern_Run, METH_VARARGS, "Run bjoern. :-)"},
     {NULL,  NULL, 0, NULL}
 };
-
-
 
 PyMODINIT_FUNC init_bjoern()
 {

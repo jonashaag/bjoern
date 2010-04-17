@@ -1,10 +1,10 @@
 /*
-    bj_strcpy:
+    bjoern_strcpy:
     like `strcpy`, but updates the `destination` by the number of bytes copied.
     (thus, `destination` is a char pointer pointer / a pointer to a char array.)
 */
 static inline void
-bj_strcpy(char** destination, const char* source)
+bjoern_strcpy(char** destination, const char* source)
 {
     while (( **destination = *source )) {
         source++;
@@ -13,7 +13,7 @@ bj_strcpy(char** destination, const char* source)
 }
 
 static inline void
-bj_http_to_wsgi_header(char* destination, const char* source, size_t length)
+bjoern_http_to_wsgi_header(char* destination, const char* source, size_t length)
 {
     int i;
     for(i=0; i<length; ++i)
