@@ -1,18 +1,3 @@
-/* Some predefined, often-required objects. */
-static PyObject* PY_STRING_GET;
-static PyObject* PY_STRING_POST;
-static PyObject* PY_STRING_REQUEST_METHOD;
-static PyObject* PY_STRING_PATH_INFO;
-static PyObject* PY_STRING_QUERY_STRING;
-static PyObject* PY_STRING_HTTP_CONTENT_TYPE;
-static PyObject* PY_STRING_CONTENT_TYPE;
-static PyObject* PY_STRING_SERVER_NAME;
-static PyObject* PY_STRING_SERVER_PORT;
-static PyObject* PY_STRING_SERVER_PROTOCOL;
-static PyObject* PY_STRING_Content_Type;    /* "Content-Type" */
-static PyObject* PY_STRING_Content_Length;  /* "Content-Length" */
-static PyObject* PY_STRING_DEFAULT_RESPONSE_CONTENT_TYPE; /* DEFAULT_RESPONSE_CONTENT_TYPE */
-
 #define GET_TRANSACTION ((BJPARSER*)parser)->transaction
 
 /*
@@ -74,6 +59,9 @@ static int http_on_path(PARSER* parser,
                         const char* path_start,
                         size_t path_length)
 {
+    /* ROUTING HERE, then decide which handler to use */
+    GET_TRANSACTION->request_handler = WSGI_APPLICATION_HANDLER;
+
     PyObject* py_tmp = PyStringWithLen(path_start, path_length);
     Py_INCREF(py_tmp);
 

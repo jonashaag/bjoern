@@ -20,10 +20,11 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
-#include "config.h"
 #include "shortcuts.h"
 #include "utils.c"
+#include "strings.c"
 
+#include "config.h"
 
 
 typedef enum {
@@ -68,6 +69,9 @@ struct bj_http_parser {
 enum http_parser_error { HTTP_PARSER_ERROR_REQUEST_METHOD_NOT_SUPPORTED = 1 };
 typedef enum http_method http_method;
 
+typedef enum {
+    WSGI_APPLICATION_HANDLER = 1
+} request_handler;
 
 TRANSACTION {
     int client_fd;
@@ -81,7 +85,6 @@ TRANSACTION {
     http_method request_method;
     PyObject*   wsgi_environ;
 
-
     /* Write stuff: */
     ev_io       write_watcher;
     size_t      response_remaining;
@@ -90,6 +93,7 @@ TRANSACTION {
     PyObject*   response_headers;
     bool        headers_sent;
     const char* response;
+    request_handler request_handler;
 };
 
 static TRANSACTION* Transaction_new();
@@ -104,14 +108,16 @@ static TRANSACTION* Transaction_new();
 #define ev_io_callback  void
 #define ev_signal_callback  void
 
+static PyObject*        Bjoern_Run          (PyObject* self, PyObject* args);
 static int              init_socket         (const char* addr, const int port);
+static ev_signal_callback on_sigint_received(EV_LOOP, ev_signal* watcher, const int revents);
 static ev_io_callback   on_sock_accept      (EV_LOOP, ev_io* watcher, const int revents);
 static ev_io_callback   on_sock_read        (EV_LOOP, ev_io* watcher, const int revents);
+
 static ev_io_callback   while_sock_canwrite (EV_LOOP, ev_io* watcher, const int revents);
 static ssize_t          bjoern_http_response(TRANSACTION*);
 static void             bjoern_send_headers (TRANSACTION*);
 static ssize_t          bjoern_sendfile     (TRANSACTION*);
-
-static ev_signal_callback on_sigint_received(EV_LOOP, ev_signal* watcher, const int revents);
+static bool             wsgi_request_handler(TRANSACTION*);
 
 #endif /* __bjoern_dot_h__ */
