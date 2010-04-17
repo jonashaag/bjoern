@@ -3,16 +3,22 @@ CFLAGS_NODEBUG  = -std=c99 -pedantic -Wall -fno-strict-aliasing -shared
 CFLAGS_NODEBUGP = $(CFLAGS_NODEBUG) -g
 CFLAGS          = $(CFLAGS_NODEBUGP) -D DEBUG
 CFLAGS_WARNALL  = $(CFLAGS) -Wextra
-INCLUDE_DIRS    = -I /usr/include/python2.6/
+INCLUDE_DIRS    = -I src                     	\
+				  -I /usr/include/python2.6/	\
+				  -I include 					\
+				  -I include/http-parser
 LDFLAGS         = $(INCLUDE_DIRS) -l ev -I http-parser -l python2.6
 CFLAGS_OPTDEBUG = $(CFLAGS_NODEBUGP) -O3
 CFLAGS_OPT      = $(CFLAGS_NODEBUG) -O3
 CLFAGS_OPTSMALL = $(CFLAGS_NODEBUG) -Os
 
 OUTFILES		= _bjoern.so
-FILES           = bjoern.c
-FILES_NODEBUG   = $(FILES) http-parser/http_parser.o
-FILES_DEBUG     = $(FILES) http-parser/http_parser_debug.o
+FILES           = src/bjoern.c
+FILES_NODEBUG   = $(FILES) include/http-parser/http_parser.o
+FILES_DEBUG     = $(FILES) include/http-parser/http_parser_debug.o
+
+TEST            = python tests
+
 
 all: clean
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $(OUTFILES) $(FILES_DEBUG)
@@ -49,10 +55,10 @@ clean:
 
 
 run: nodebugprints
-	python test.py
+	$(TEST)
 
 runwithdebug: all
-	python test.py
+	$(TEST)
 
 gdb: all
 	gdb python
@@ -61,16 +67,16 @@ cgdb: all
 	cgdb python
 
 valgrind: nodebugprints
-	valgrind python test.py
+	valgrind $(TEST)
 
 memcheck: nodebugprints
-	valgrind --tool=memcheck --leak-check=full python test.py
+	valgrind --tool=memcheck --leak-check=full $(TEST)
 
 callgrind: nodebugprints clean-callgrind
-	valgrind --tool=callgrind python test.py
+	valgrind --tool=callgrind $(TEST)
 
 callgrind-opt: optdebug clean-callgrind
-	valgrind --tool=callgrind python test.py
+	valgrind --tool=callgrind $(TEST)
 
 clean-callgrind:
 	rm -f callgrind*

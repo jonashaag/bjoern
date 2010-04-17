@@ -10,4 +10,5 @@ def wsgi_app(environ, start_response):
     s = '\n'.join(_gen(environ))
     return s
 
+print "Starting up server..."
 bjoern.run(wsgi_app)
