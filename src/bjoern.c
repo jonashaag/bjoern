@@ -27,7 +27,7 @@ PyObject* Bjoern_Run(PyObject* self, PyObject* args)
     Py_INCREF(wsgi_layer);
 
     sockfd = init_socket(hostaddress, port);
-    if(sockfd < 0) return PyErr(PyExc_RuntimeError, socket_error_format(sockfd));
+    if(sockfd < 0) return PyErr(PyExc_RuntimeError, SOCKET_ERROR_MESSAGES[-sockfd]);
 
     mainloop = ev_loop_new(0);
 

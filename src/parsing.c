@@ -190,3 +190,5 @@ static struct http_parser_settings
     http_on_body,               /* http_data_cb on_body; */
     http_on_end_parsing,        /* http_cb      on_message_complete; */
 };
+
+#undef GET_TRANSACTION

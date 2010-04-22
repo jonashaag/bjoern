@@ -21,6 +21,7 @@
 #include <arpa/inet.h>
 
 #include "shortcuts.h"
+#include "parsing.h"
 #include "utils.c"
 #include "strings.c"
 
@@ -28,50 +29,26 @@
 
 
 typedef enum {
+    WSGI_APPLICATION_HANDLER = 1
+} request_handler;
+
+typedef enum {
     SOCKET_FAILED = -1,
     BIND_FAILED   = -2,
     LISTEN_FAILED = -3
 } bjoern_network_error;
 
-static char* socket_error_format(const bjoern_network_error errnum) {
-    switch(errnum) {
-        case SOCKET_FAILED:
-            return "socket() failed";
-        case BIND_FAILED:
-            return "bind() failed";
-        case LISTEN_FAILED:
-            return "listen() failed";
-        default:
-            /* Mustn't happen */
-            assert(0);
-    }
-}
-
+static const char* SOCKET_ERROR_MESSAGES[] = {
+    "socket() failed",
+    "bind() failed",
+    "listen() failed"
+};
 
 static PyGILState_STATE _GILState;
 static int          sockfd;
 static EV_LOOP      mainloop;
 static PyObject*    wsgi_application;
 static PyObject*    wsgi_layer;
-
-
-struct bj_http_parser {
-    PARSER        http_parser;
-    TRANSACTION*  transaction;
-
-    /* Temporary variables: */
-    const char*   header_name_start;
-    size_t        header_name_length;
-    const char*   header_value_start;
-    size_t        header_value_length;
-};
-
-enum http_parser_error { HTTP_PARSER_ERROR_REQUEST_METHOD_NOT_SUPPORTED = 1 };
-typedef enum http_method http_method;
-
-typedef enum {
-    WSGI_APPLICATION_HANDLER = 1
-} request_handler;
 
 TRANSACTION {
     int client_fd;

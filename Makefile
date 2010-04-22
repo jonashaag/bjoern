@@ -3,7 +3,9 @@ CFLAGS_NODEBUG  = -std=c99 -pedantic -Wall -fno-strict-aliasing -shared
 CFLAGS_NODEBUGP = $(CFLAGS_NODEBUG) -g
 CFLAGS          = $(CFLAGS_NODEBUGP) -D DEBUG
 CFLAGS_WARNALL  = $(CFLAGS) -Wextra
-INCLUDE_DIRS    = -I src                     	\
+INCLUDE_DIRS    = -I .							\
+				  -I src                     	\
+				  -I src/headers 				\
 				  -I /usr/include/python2.6/	\
 				  -I include 					\
 				  -I include/http-parser
