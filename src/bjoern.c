@@ -1,5 +1,8 @@
 #include "bjoern.h"
 #include "parsing.c"
+#ifdef WANT_ROUTING
+  #include "routing.c"
+#endif
 
 static PyMethodDef Bjoern_FunctionTable[] = {
     {"run", Bjoern_Run, METH_VARARGS, "Run bjoern. :-)"},
@@ -9,9 +12,14 @@ static PyMethodDef Bjoern_FunctionTable[] = {
 PyMODINIT_FUNC init_bjoern()
 {
     #define INIT_PYSTRINGS
-    #include "strings.c"
+    #include "strings.h"
     #undef  INIT_PYSTRINGS
+
     Py_InitModule("_bjoern", Bjoern_FunctionTable);
+
+#ifdef WANT_ROUTING
+    import_re_module();
+#endif
 }
 
 
@@ -93,14 +101,20 @@ static Transaction* Transaction_new()
 
     /* Allocate and initialize the http parser. */
     transaction->request_parser = ALLOC(sizeof(bjoern_http_parser));
-    if(!transaction->request_parser) return NULL;
+    if(!transaction->request_parser) {
+        free(transaction);
+        return NULL;
+    }
     transaction->request_parser->transaction = transaction;
 
     http_parser_init((http_parser*)transaction->request_parser, HTTP_REQUEST);
 
     /* Initialize the Python headers dictionary. */
     transaction->wsgi_environ = PyDict_New();
-    if(!transaction->wsgi_environ) return NULL;
+    if(!transaction->wsgi_environ) {
+        Transaction_free(transaction);
+        return NULL;
+    }
     Py_INCREF(transaction->wsgi_environ);
 
     return transaction;

@@ -1,6 +1,8 @@
+FEATURES    	= -D WANT_ROUTING -D WANT_CACHING
+
 CC              = gcc
 CFLAGS_NODEBUG  = -std=c99 -pedantic -Wall -fno-strict-aliasing -shared
-CFLAGS_NODEBUGP = $(CFLAGS_NODEBUG) -g
+CFLAGS_NODEBUGP = $(CFLAGS_NODEBUG) -g $(FEATURES)
 CFLAGS          = $(CFLAGS_NODEBUGP) -D DEBUG
 CFLAGS_WARNALL  = $(CFLAGS) -Wextra
 INCLUDE_DIRS    = -I .							\

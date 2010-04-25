@@ -22,7 +22,7 @@ struct _Transaction {
 };
 
 static Transaction* Transaction_new();
-#define Transaction_free(t) Py_DECREF(t->wsgi_environ); \
+#define Transaction_free(t) Py_XDECREF(t->wsgi_environ); \
                             Py_XDECREF(t->response_headers); \
                             Py_XDECREF(t->response_status); \
                             Py_XDECREF(t->response_file); \

@@ -17,11 +17,17 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
+#include "shortcuts.h"
+#include "strings.h"
+#include "utils.c"
+
 
 typedef struct ev_loop
         EV_LOOP;
 typedef struct _Transaction
         Transaction;
+typedef struct _Route
+        Route;
 typedef struct _bjoern_http_parser
         bjoern_http_parser;
 typedef enum http_method
@@ -36,11 +42,11 @@ typedef enum {
 } request_handler;
 
 
-#include "shortcuts.h"
 #include "transaction.h"
 #include "parsing.h"
-#include "utils.c"
-#include "strings.c"
+#ifdef WANT_ROUTING
+  #include "routing.h"
+#endif
 
 #include "config.h"
 
