@@ -12,10 +12,6 @@
 
 #define DO_NOTHING              do{}while(0)
 #define ALLOC(size)             calloc(1, size)
-#define EV_LOOP                 struct ev_loop*
-#define TRANSACTION             struct Transaction
-#define PARSER                  struct http_parser
-#define BJPARSER                struct bj_http_parser
 
 #define PyGetAttr               PyObject_GetAttrString
 #define PyString(s)             PyString_FromString(s)

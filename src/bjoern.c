@@ -87,16 +87,16 @@ on_sigint_received(EV_LOOP mainloop, ev_signal *signal, int revents)
 }
 
 
-static TRANSACTION* Transaction_new()
+static Transaction* Transaction_new()
 {
-    TRANSACTION* transaction = ALLOC(sizeof(TRANSACTION));
+    Transaction* transaction = ALLOC(sizeof(Transaction));
 
     /* Allocate and initialize the http parser. */
-    transaction->request_parser = ALLOC(sizeof(BJPARSER));
+    transaction->request_parser = ALLOC(sizeof(bjoern_http_parser));
     if(!transaction->request_parser) return NULL;
     transaction->request_parser->transaction = transaction;
 
-    http_parser_init((PARSER*)transaction->request_parser, HTTP_REQUEST);
+    http_parser_init((http_parser*)transaction->request_parser, HTTP_REQUEST);
 
     /* Initialize the Python headers dictionary. */
     transaction->wsgi_environ = PyDict_New();
@@ -109,7 +109,7 @@ static TRANSACTION* Transaction_new()
 static ev_io_callback
 on_sock_accept(EV_LOOP mainloop, ev_io* accept_watcher, int revents)
 {
-    TRANSACTION* transaction = Transaction_new();
+    Transaction* transaction = Transaction_new();
 
     /* Accept the socket connection. */
     struct sockaddr_in client_address;
@@ -149,7 +149,7 @@ on_sock_read(EV_LOOP mainloop, ev_io* read_watcher_, int revents)
     ssize_t bytes_read;
     size_t  bytes_parsed;
 
-    TRANSACTION* transaction = OFFSETOF(read_watcher, read_watcher_, TRANSACTION);
+    Transaction* transaction = OFFSETOF(read_watcher, read_watcher_, Transaction);
 
     /* Read from the client: */
     bytes_read = read(transaction->client_fd, read_buffer, READ_BUFFER_SIZE);
@@ -160,7 +160,7 @@ on_sock_read(EV_LOOP mainloop, ev_io* read_watcher_, int revents)
                             this function. TODO: Limit retries? */
         default:
             bytes_parsed = http_parser_execute(
-                (PARSER*)transaction->request_parser,
+                (http_parser*)transaction->request_parser,
                 parser_settings,
                 read_buffer,
                 bytes_read
@@ -190,7 +190,7 @@ start_write:
     Interact with the Python WSGI app.
 */
 static bool
-wsgi_request_handler(TRANSACTION* transaction)
+wsgi_request_handler(Transaction* transaction)
 {
     PyObject* py_tmp;
     PyObject* wsgi_object;
@@ -283,7 +283,7 @@ static ev_io_callback
 while_sock_canwrite(EV_LOOP mainloop, ev_io* write_watcher_, int revents)
 {
     ssize_t bytes_sent;
-    TRANSACTION* transaction = OFFSETOF(write_watcher, write_watcher_, TRANSACTION);
+    Transaction* transaction = OFFSETOF(write_watcher, write_watcher_, Transaction);
 
     #define RESPONSE_FUNC (transaction->response_file ? bjoern_sendfile \
                                                       : bjoern_http_response)
@@ -316,7 +316,7 @@ finish:
 }
 
 static ssize_t
-bjoern_http_response(TRANSACTION* transaction)
+bjoern_http_response(Transaction* transaction)
 {
     /* TODO: Maybe it's faster to write HTTP headers and request body at once? */
     if(!transaction->headers_sent) {
@@ -336,7 +336,7 @@ bjoern_http_response(TRANSACTION* transaction)
 }
 
 static void
-bjoern_send_headers(TRANSACTION* transaction)
+bjoern_send_headers(Transaction* transaction)
 {
     char        header_buffer[MAX_HEADER_SIZE];
     char*       buffer_position = header_buffer;
@@ -391,7 +391,7 @@ bjoern_send_headers(TRANSACTION* transaction)
 
 
 static ssize_t
-bjoern_sendfile(TRANSACTION* transaction)
+bjoern_sendfile(Transaction* transaction)
 {
     ssize_t bytes_sent;
 

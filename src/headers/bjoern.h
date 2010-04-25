@@ -20,13 +20,12 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
-#include "shortcuts.h"
-#include "parsing.h"
-#include "utils.c"
-#include "strings.c"
 
-#include "config.h"
-
+typedef struct ev_loop* EV_LOOP;
+typedef enum http_method
+        http_method;
+typedef struct _bjoern_http_parser
+        bjoern_http_parser;
 
 typedef enum {
     WSGI_APPLICATION_HANDLER = 1
@@ -46,17 +45,17 @@ static const char* SOCKET_ERROR_MESSAGES[] = {
 
 static PyGILState_STATE _GILState;
 static int          sockfd;
-static EV_LOOP      mainloop;
+static EV_LOOP     mainloop;
 static PyObject*    wsgi_application;
 static PyObject*    wsgi_layer;
 
-TRANSACTION {
+typedef struct _Transaction {
     int client_fd;
 
     ev_io       read_watcher;
     size_t      read_seek;
     /* TODO: put request_* into a seperate data structure. */
-    BJPARSER*   request_parser;
+    bjoern_http_parser* request_parser;
 
     const char* request_url;
     http_method request_method;
@@ -71,9 +70,9 @@ TRANSACTION {
     bool        headers_sent;
     const char* response;
     request_handler request_handler;
-};
+} Transaction;
 
-static TRANSACTION* Transaction_new();
+static Transaction* Transaction_new();
 #define Transaction_free(t) Py_DECREF(t->wsgi_environ); \
                             Py_XDECREF(t->response_headers); \
                             Py_XDECREF(t->response_status); \
@@ -92,9 +91,18 @@ static ev_io_callback   on_sock_accept      (EV_LOOP, ev_io* watcher, const int 
 static ev_io_callback   on_sock_read        (EV_LOOP, ev_io* watcher, const int revents);
 
 static ev_io_callback   while_sock_canwrite (EV_LOOP, ev_io* watcher, const int revents);
-static ssize_t          bjoern_http_response(TRANSACTION*);
-static void             bjoern_send_headers (TRANSACTION*);
-static ssize_t          bjoern_sendfile     (TRANSACTION*);
-static bool             wsgi_request_handler(TRANSACTION*);
+static ssize_t          bjoern_http_response(Transaction*);
+static void             bjoern_send_headers (Transaction*);
+static ssize_t          bjoern_sendfile     (Transaction*);
+static bool             wsgi_request_handler(Transaction*);
+
+
+#include "shortcuts.h"
+#include "parsing.h"
+#include "utils.c"
+#include "strings.c"
+
+#include "config.h"
+
 
 #endif /* __bjoern_dot_h__ */
