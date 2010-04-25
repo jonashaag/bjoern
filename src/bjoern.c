@@ -80,7 +80,7 @@ init_socket(const char* hostaddress, const int port)
 
 
 static ev_signal_callback
-on_sigint_received(EV_LOOP mainloop, ev_signal *signal, int revents)
+on_sigint_received(EV_LOOP* mainloop, ev_signal *signal, int revents)
 {
     printf("\b\bReceived SIGINT, shutting down. Goodbye!\n");
     ev_unloop(mainloop, EVUNLOOP_ALL);
@@ -107,7 +107,7 @@ static Transaction* Transaction_new()
 }
 
 static ev_io_callback
-on_sock_accept(EV_LOOP mainloop, ev_io* accept_watcher, int revents)
+on_sock_accept(EV_LOOP* mainloop, ev_io* accept_watcher, int revents)
 {
     Transaction* transaction = Transaction_new();
 
@@ -139,7 +139,7 @@ on_sock_accept(EV_LOOP mainloop, ev_io* accept_watcher, int revents)
     TODO: Make sure this function is very, very fast as it is called many times.
 */
 static ev_io_callback
-on_sock_read(EV_LOOP mainloop, ev_io* read_watcher_, int revents)
+on_sock_read(EV_LOOP* mainloop, ev_io* read_watcher_, int revents)
 {
     /* Check whether we can still read. */
     if(!(revents & EV_READ))
@@ -280,7 +280,7 @@ cleanup:
     Start (or continue) writing to the socket.
 */
 static ev_io_callback
-while_sock_canwrite(EV_LOOP mainloop, ev_io* write_watcher_, int revents)
+while_sock_canwrite(EV_LOOP* mainloop, ev_io* write_watcher_, int revents)
 {
     ssize_t bytes_sent;
     Transaction* transaction = OFFSETOF(write_watcher, write_watcher_, Transaction);

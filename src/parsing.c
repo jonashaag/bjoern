@@ -29,7 +29,7 @@ static int http_on_end_parsing(http_parser* parser)
             break;
         default:
             /* Currently, only POST and GET is supported. Fail here. */
-            return HTTP_http_parser_ERROR_REQUEST_METHOD_NOT_SUPPORTED;
+            return REQUEST_METHOD_NOT_SUPPORTED;
     }
 
     PyDict_SetItem(

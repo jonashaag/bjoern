@@ -8,5 +8,3 @@ struct _bjoern_http_parser {
     const char*     header_value_start;
     size_t          header_value_length;
 };
-
-enum http_parser_error { HTTP_http_parser_ERROR_REQUEST_METHOD_NOT_SUPPORTED = 1 };
