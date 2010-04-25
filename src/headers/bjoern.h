@@ -1,6 +1,3 @@
-#ifndef __bjoern_dot_h__
-#define __bjoern_dot_h__
-
 #include <Python.h>
 #include <ev.h>
 #include <http_parser.h>
@@ -81,5 +78,3 @@ static ssize_t          bjoern_http_response(Transaction*);
 static void             bjoern_send_headers (Transaction*);
 static ssize_t          bjoern_sendfile     (Transaction*);
 static bool             wsgi_request_handler(Transaction*);
-
-#endif /* __bjoern_dot_h__ */
