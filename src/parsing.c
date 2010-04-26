@@ -3,19 +3,22 @@
 /*
     Initialize the http parser.
 */
-static int http_on_start_parsing(http_parser* parser)
+static int
+http_on_start_parsing(http_parser* parser)
 {
     ((bjoern_http_parser*)parser)->header_name_start   = NULL;
     ((bjoern_http_parser*)parser)->header_name_length  = 0;
     ((bjoern_http_parser*)parser)->header_value_start  = NULL;
     ((bjoern_http_parser*)parser)->header_value_length = 0;
-    return 0;
+
+    return PARSER_OK;
 }
 
 /*
     Parsing is done, populate some WSGI `environ` keys and so on.
 */
-static int http_on_end_parsing(http_parser* parser)
+static int
+http_on_end_parsing(http_parser* parser)
 {
     /* Set the REQUEST_METHOD: */
     PyObject* py_request_method;
@@ -29,7 +32,7 @@ static int http_on_end_parsing(http_parser* parser)
             break;
         default:
             /* Currently, only POST and GET is supported. Fail here. */
-            return REQUEST_METHOD_NOT_SUPPORTED;
+            return HTTP_NOT_IMPLEMENTED;
     }
 
     PyDict_SetItem(
@@ -47,7 +50,7 @@ static int http_on_end_parsing(http_parser* parser)
     }
 
     /* TODO: Set SERVER_NAME and SERVER_PORT. */
-    return 0;
+    return PARSER_OK;
 }
 
 /*
@@ -55,32 +58,55 @@ static int http_on_end_parsing(http_parser* parser)
 
     TODO: Implement when routing is implemented.
 */
-static int http_on_path(http_parser* parser,
-                        const char* path_start,
-                        size_t path_length)
+static int
+http_on_path(http_parser* parser, const char* path_start, size_t path_length)
 {
-    /* ROUTING HERE, then decide which handler to use */
-    GET_TRANSACTION->request_handler = WSGI_APPLICATION_HANDLER;
+    Transaction* transaction = GET_TRANSACTION;
 
-    PyObject* py_tmp = PyStringWithLen(path_start, path_length);
-    Py_INCREF(py_tmp);
+#ifdef WANT_CACHING
+    if(CACHE_HAS(path_start, path_length)) {
+        transaction->request_handler = CACHE_HANDLER;
+        transaction->request_handler_data1 = (void*)path_start;
+        transaction->request_handler_data2 = (void*)path_length;
+        /* Stop parsing here, we don't need any more information: */
+        return RESPONSE_IS_CACHED;
+    }
+#endif
 
-    PyDict_SetItem(GET_TRANSACTION->wsgi_environ, PY_STRING_PATH_INFO, py_tmp);
-    return 0;
+    PyObject* py_path = PyStringWithLen(path_start, path_length);
+    if(py_path == NULL)
+        return HTTP_INTERNAL_SERVER_ERROR;
+
+    Py_INCREF(py_path);
+
+#ifdef WANT_ROUTING
+    Route* route = get_route_for_url(py_path);
+    if(route == NULL) {
+        Py_DECREF(py_path);
+        /* TODO: 404 fallback callback? */
+        return HTTP_NOT_FOUND;
+    }
+    transaction->request_handler_data1 = route;
+#endif
+
+    transaction->request_handler = WSGI_APPLICATION_HANDLER;
+    PyDict_SetItem(GET_TRANSACTION->wsgi_environ, PY_STRING_PATH_INFO, py_path);
+
+    return PARSER_OK;
 }
 
 /*
     Set the QUERY_STRING.
 */
-static int http_on_query(http_parser* parser,
-                         const char* query_start,
-                         size_t query_length)
+static int
+http_on_query(http_parser* parser, const char* query_start, size_t query_length)
 {
     PyObject* py_tmp = PyStringWithLen(query_start, query_length);
     Py_INCREF(py_tmp);
 
     PyDict_SetItem(GET_TRANSACTION->wsgi_environ, PY_STRING_QUERY_STRING, py_tmp);
-    return 0;
+
+    return PARSER_OK;
 }
 
 
@@ -117,9 +143,8 @@ static inline void store_current_header(bjoern_http_parser* parser)
 }
 
 
-static int http_on_header_name(http_parser* parser,
-                               const char* header_start,
-                               size_t header_length)
+static int
+http_on_header_name(http_parser* parser, const char* header_start, size_t header_length)
 {
     bjoern_http_parser* bj_parser = (bjoern_http_parser*)parser;
     if(bj_parser->header_value_start) {
@@ -132,7 +157,7 @@ static int http_on_header_name(http_parser* parser,
         /* TODO: Documentation */
         bj_parser->header_name_length = \
             (header_start - bj_parser->header_name_start) + header_length;
-        return 0;
+        return PARSER_OK;
     }
     else {
         goto start_new_header;
@@ -145,12 +170,11 @@ start_new_header:
     ((bjoern_http_parser*)parser)->header_value_start  = NULL;
     ((bjoern_http_parser*)parser)->header_value_length = 0;
 
-    return 0;
+    return PARSER_OK;
 }
 
-static int http_on_header_value(http_parser* parser,
-                                const char* value_start,
-                                size_t value_length)
+static int
+http_on_header_value(http_parser* parser, const char* value_start, size_t value_length)
 {
     bjoern_http_parser* bj_parser = (bjoern_http_parser*)parser;
     if(bj_parser->header_value_start) {
@@ -164,19 +188,36 @@ static int http_on_header_value(http_parser* parser,
         bj_parser->header_value_length = value_length;
     }
 
-    return 0;
+    return PARSER_OK;
 }
 
 
 
 /* TODO: Implement with StringIO or something like that. */
-static int http_on_body(http_parser* parser, const char* body, size_t body_length) { return 0; }
+static int
+http_on_body(http_parser* parser, const char* body, size_t body_length)
+{
+    return 0;
+}
 
 /* TODO: Decide what to do with this one. */
-static int http_on_fragment(http_parser* parser, const char* fragment_start, size_t fragment_length) { return 0; }
+static int
+http_on_fragment(http_parser* parser, const char* fragment_start, size_t fragment_length)
+{
+    return 0;
+}
 
-static  int http_on_url(http_parser* parser, const char* url_start, size_t url_length) { return 0; }
-static int http_on_headers_complete(http_parser* parser) { return 0; }
+static int
+http_on_url(http_parser* parser, const char* url_start, size_t url_length)
+{
+    return 0;
+}
+
+static int
+http_on_headers_complete(http_parser* parser)
+{
+    return 0;
+}
 
 
 static struct http_parser_settings

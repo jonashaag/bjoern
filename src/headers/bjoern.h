@@ -34,11 +34,8 @@ typedef enum http_method
         http_method;
 
 typedef enum {
-    REQUEST_METHOD_NOT_SUPPORTED = 1
-} http_parser_error;
-
-typedef enum {
-    WSGI_APPLICATION_HANDLER = 1
+    WSGI_APPLICATION_HANDLER = 1,
+    CACHE_HANDLER            = 2
 } request_handler;
 
 
@@ -46,6 +43,9 @@ typedef enum {
 #include "parsing.h"
 #ifdef WANT_ROUTING
   #include "routing.h"
+#endif
+#ifdef WANT_CACHING
+  #include "cache.h"
 #endif
 
 #include "config.h"
@@ -66,8 +66,11 @@ static const char* SOCKET_ERROR_MESSAGES[] = {
 static PyGILState_STATE _GILState;
 static int          sockfd;
 static EV_LOOP*     mainloop;
-static PyObject*    wsgi_application;
 static PyObject*    wsgi_layer;
+#ifndef WANT_ROUTING
+  /* No routing, use one application for every request */
+  static PyObject*    wsgi_application;
+#endif
 
 
 #define ev_io_callback  void
@@ -83,4 +86,5 @@ static ev_io_callback   while_sock_canwrite (EV_LOOP*, ev_io* watcher, const int
 static ssize_t          bjoern_http_response(Transaction*);
 static void             bjoern_send_headers (Transaction*);
 static ssize_t          bjoern_sendfile     (Transaction*);
-static bool             wsgi_request_handler(Transaction*);
+static void             wsgi_request_handler(Transaction*);
+static void             cache_request_handler(Transaction*);

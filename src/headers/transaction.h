@@ -5,10 +5,14 @@ struct _Transaction {
     size_t      read_seek;
     /* TODO: put request_* into a seperate data structure. */
     bjoern_http_parser* request_parser;
-
-    const char* request_url;
     http_method request_method;
+
+    /* WSGI handler: */
     PyObject*   wsgi_environ;
+
+    request_handler request_handler;
+    void*           request_handler_data1;
+    void*           request_handler_data2;
 
     /* Write stuff: */
     ev_io       write_watcher;
@@ -18,7 +22,6 @@ struct _Transaction {
     PyObject*   response_headers;
     bool        headers_sent;
     const char* response;
-    request_handler request_handler;
 };
 
 static Transaction* Transaction_new();

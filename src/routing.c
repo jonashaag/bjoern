@@ -1,3 +1,10 @@
+static inline void
+init_routing()
+{
+    first_route = NULL;
+    last_route  = NULL;
+}
+
 static void
 import_re_module()
 {
@@ -9,7 +16,7 @@ import_re_module()
 static PyRegex*
 re_compile(PyObject* pattern)
 {
-    PyObject* args = Py_BuildValue("(s)", pattern);
+    PyObject* args = PyTuple_Pack(/* size */ 1, pattern);
     Py_INCREF(args);
 
     PyRegex* regex = PyObject_Call(_re_compile, args, /* kwargs */ NULL);
@@ -17,6 +24,25 @@ re_compile(PyObject* pattern)
         return NULL;
     Py_INCREF(regex);
     return regex;
+}
+
+PyObject* Bjoern_Route_Add(PyObject* self, PyObject* args)
+{
+    PyObject* pattern;
+    PyObject* callback;
+
+    if(!PyArg_ParseTuple(args, "SO", &pattern, &callback))
+        return NULL;
+
+    Py_INCREF(pattern);
+    Py_INCREF(callback);
+
+    Route* new_route = Route_new(pattern, callback, last_route);
+    if(first_route == NULL)
+        first_route = new_route;
+    last_route = new_route;
+
+    Py_RETURN_NONE;
 }
 
 

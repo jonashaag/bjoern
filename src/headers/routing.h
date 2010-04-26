@@ -15,7 +15,10 @@ static Route* Route_new(PyObject* pattern, PyObject* wsgi_callback, Route* next)
                           free(route)
 
 Route* first_route;
+Route* last_route;
 static PyObject* _re_compile;
 
+static PyObject* Bjoern_Route_Add(PyObject* self, PyObject* args);
 static Route* get_route_for_url(PyObject* url);
+static void init_routing();
 static void import_re_module();

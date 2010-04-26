@@ -6,6 +6,9 @@
 
 static PyMethodDef Bjoern_FunctionTable[] = {
     {"run", Bjoern_Run, METH_VARARGS, "Run bjoern. :-)"},
+#ifdef WANT_ROUTING
+    {"add_route", Bjoern_Route_Add, METH_VARARGS, "Add a URL route. :-)"},
+#endif
     {NULL,  NULL, 0, NULL}
 };
 
@@ -19,6 +22,7 @@ PyMODINIT_FUNC init_bjoern()
 
 #ifdef WANT_ROUTING
     import_re_module();
+    init_routing();
 #endif
 }
 
@@ -28,10 +32,16 @@ PyObject* Bjoern_Run(PyObject* self, PyObject* args)
     const char* hostaddress;
     const int   port;
 
+#ifdef WANT_ROUTING
+    if(!PyArg_ParseTuple(args, "siO", &hostaddress, &port, &wsgi_layer))
+        return NULL;
+#else
     if(!PyArg_ParseTuple(args, "OsiO",
                          &wsgi_application, &hostaddress, &port, &wsgi_layer))
         return NULL;
     Py_INCREF(wsgi_application);
+#endif
+
     Py_INCREF(wsgi_layer);
 
     sockfd = init_socket(hostaddress, port);
@@ -187,6 +197,8 @@ read_finished:
     ev_io_stop(mainloop, &transaction->read_watcher);
 
     switch(transaction->request_handler) {
+        case CACHE_HANDLER:
+            assert(0);
         case WSGI_APPLICATION_HANDLER:
             wsgi_request_handler(transaction);
             goto start_write;
@@ -200,43 +212,54 @@ start_write:
     ev_io_start(mainloop, &transaction->write_watcher);
 }
 
+
 /*
     Interact with the Python WSGI app.
 */
-static bool
+static void
 wsgi_request_handler(Transaction* transaction)
 {
-    PyObject* py_tmp;
+    PyObject* args;
     PyObject* wsgi_object;
 
-    /* Create a new instance of the WSGI layer class. */
-    py_tmp = Py_BuildValue("(O)", transaction->wsgi_environ);
-    if(py_tmp == NULL)
-        return false;
-    Py_INCREF(py_tmp);
+#ifdef WANT_ROUTING
+    Route* route = (Route*)transaction->request_handler_data1;
+#endif
 
-    wsgi_object = PyObject_Call(wsgi_layer, py_tmp, NULL /* kwargs */);
-    Py_DECREF(py_tmp);
-    py_tmp = NULL;
+    /* Create a new instance of the WSGI layer class. */
+    args = PyTuple_Pack(/* size */ 1, transaction->wsgi_environ);
+    if(args == NULL)
+        goto http_500_internal_server_error;
+    Py_INCREF(args);
+    wsgi_object = PyObject_Call(wsgi_layer, args, NULL /* kwargs */);
+    Py_DECREF(args);
 
     if(wsgi_object == NULL)
-        return false;
+        goto http_500_internal_server_error;
     Py_INCREF(wsgi_object);
 
     /* Call the WSGI application: app(environ, start_response). */
-    PyObject* args = Py_BuildValue("OO",
+    args = PyTuple_Pack(
+        /* size */ 2,
         transaction->wsgi_environ,
         PyObject_GetAttr(wsgi_object, PY_STRING_start_response)
     );
     if(args == NULL)
-        return false;
+        goto http_500_internal_server_error;
     Py_INCREF(args);
+#ifdef WANT_ROUTING
+    PyObject* return_value = PyObject_Call(route->wsgi_callback,
+                                           args, NULL /* kwargs */);
+#else
     PyObject* return_value = PyObject_Call(wsgi_application,
                                            args, NULL /* kwargs */);
+#endif
     Py_DECREF(args);
 
 
-    if(return_value == NULL) goto http_500_internal_server_error;
+    if(return_value == NULL)
+        goto http_500_internal_server_error;
+
     Py_INCREF(return_value);
 
     if(PyIter_Check(return_value)) {
@@ -259,9 +282,8 @@ wsgi_request_handler(Transaction* transaction)
     if(PySequence_Check(return_value)) {
         /* WSGI-compliant case, we have a list or tuple --
            just pick the first item of that (for now) for the response. */
-        py_tmp = PySequence_GetItem(return_value, 0);
+        transaction->response = PyString_AsString(PySequence_GetItem(return_value, 0));
         Py_DECREF(return_value); /* don't need this anymore */
-        transaction->response = PyString_AsString(py_tmp);
         goto string_response;
     }
 
@@ -271,6 +293,11 @@ wsgi_request_handler(Transaction* transaction)
 
 http_500_internal_server_error:
     transaction->response = HTTP_500_MESSAGE;
+    transaction->response_remaining = strlen(HTTP_500_MESSAGE);
+    transaction->response_headers = NULL;
+    transaction->response_status = PyInt_FromSize_t(500);
+    Py_INCREF(transaction->response_status);
+    return;
 
 string_response:
     transaction->response_remaining = strlen(transaction->response);
@@ -285,7 +312,6 @@ file_response:
 
 cleanup:
     Py_DECREF(wsgi_object);
-    return true;
 }
 
 
