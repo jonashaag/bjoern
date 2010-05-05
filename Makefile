@@ -1,8 +1,8 @@
 FEATURES    	= -D WANT_ROUTING -D WANT_CACHING
 
 CC              = gcc
-CFLAGS_NODEBUG  = -std=c99 -pedantic -Wall -fno-strict-aliasing -shared
-CFLAGS_NODEBUGP = $(CFLAGS_NODEBUG) -g $(FEATURES)
+CFLAGS_NODEBUG  = -std=c99 -pedantic -Wall -fno-strict-aliasing -shared $(FEATURES)
+CFLAGS_NODEBUGP = $(CFLAGS_NODEBUG) -g
 CFLAGS          = $(CFLAGS_NODEBUGP) -D DEBUG
 CFLAGS_WARNALL  = $(CFLAGS) -Wextra
 INCLUDE_DIRS    = -I .							\
@@ -87,3 +87,6 @@ clean-callgrind:
 
 ab:
 	ab -c 100 -n 10000 http://127.0.0.1:8080/
+
+wget:
+	wget -O - -v http://127.0.0.1:8080/

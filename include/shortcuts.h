@@ -21,7 +21,7 @@
 #define PyFileno(py_f)          fileno(PyFile_AsFile(py_f))
 
 #define GIL_LOCK()              _GILState = PyGILState_Ensure()
-#define GIL_UNLOCK()            PyGILState_Release(_GILState); _GILState = 0
+#define GIL_UNLOCK()            do { PyGILState_Release(_GILState); _GILState = 0; } while(0)
 
 #define FORWARD_CURSOR(p,c)     p += c
 #define MAX(a, b)               ((a) > (b) ? (a) : (b))

@@ -1,3 +1,7 @@
+#define STOP_PARSER(code)   do { \
+                                ((bjoern_http_parser*)parser)->exit_code = code; \
+                                return PARSER_EXIT; \
+                            } while(0)
 #define GET_TRANSACTION ((bjoern_http_parser*)parser)->transaction
 
 /*
@@ -11,7 +15,7 @@ http_on_start_parsing(http_parser* parser)
     ((bjoern_http_parser*)parser)->header_value_start  = NULL;
     ((bjoern_http_parser*)parser)->header_value_length = 0;
 
-    return PARSER_OK;
+    return PARSER_CONTINUE;
 }
 
 /*
@@ -32,7 +36,7 @@ http_on_end_parsing(http_parser* parser)
             break;
         default:
             /* Currently, only POST and GET is supported. Fail here. */
-            return HTTP_NOT_IMPLEMENTED;
+            STOP_PARSER(HTTP_NOT_IMPLEMENTED);
     }
 
     PyDict_SetItem(
@@ -50,7 +54,7 @@ http_on_end_parsing(http_parser* parser)
     }
 
     /* TODO: Set SERVER_NAME and SERVER_PORT. */
-    return PARSER_OK;
+    return PARSER_CONTINUE;
 }
 
 /*
@@ -61,21 +65,17 @@ http_on_end_parsing(http_parser* parser)
 static int
 http_on_path(http_parser* parser, const char* path_start, size_t path_length)
 {
-    Transaction* transaction = GET_TRANSACTION;
-
 #ifdef WANT_CACHING
     if(CACHE_HAS(path_start, path_length)) {
-        transaction->request_handler = CACHE_HANDLER;
-        transaction->request_handler_data1 = (void*)path_start;
-        transaction->request_handler_data2 = (void*)path_length;
+        ((char*)path_start)[path_length] = '\0'; /* <-- we can do this safely because we need nothing but the URL for the cache stuff */
+        parser->data = (void*)path_start;
         /* Stop parsing here, we don't need any more information: */
-        return RESPONSE_IS_CACHED;
+        STOP_PARSER(USE_CACHE);
     }
 #endif
-
     PyObject* py_path = PyStringWithLen(path_start, path_length);
     if(py_path == NULL)
-        return HTTP_INTERNAL_SERVER_ERROR;
+        STOP_PARSER(HTTP_INTERNAL_SERVER_ERROR);
 
     Py_INCREF(py_path);
 
@@ -84,15 +84,16 @@ http_on_path(http_parser* parser, const char* path_start, size_t path_length)
     if(route == NULL) {
         Py_DECREF(py_path);
         /* TODO: 404 fallback callback? */
-        return HTTP_NOT_FOUND;
+        STOP_PARSER(HTTP_NOT_FOUND);
     }
-    transaction->request_handler_data1 = route;
+
+    STOP_PARSER(HTTP_NOT_FOUND);
+    parser->data = (void*)route;
 #endif
 
-    transaction->request_handler = WSGI_APPLICATION_HANDLER;
     PyDict_SetItem(GET_TRANSACTION->wsgi_environ, PY_STRING_PATH_INFO, py_path);
 
-    return PARSER_OK;
+    return PARSER_CONTINUE;
 }
 
 /*
@@ -106,7 +107,7 @@ http_on_query(http_parser* parser, const char* query_start, size_t query_length)
 
     PyDict_SetItem(GET_TRANSACTION->wsgi_environ, PY_STRING_QUERY_STRING, py_tmp);
 
-    return PARSER_OK;
+    return PARSER_CONTINUE;
 }
 
 
@@ -157,7 +158,7 @@ http_on_header_name(http_parser* parser, const char* header_start, size_t header
         /* TODO: Documentation */
         bj_parser->header_name_length = \
             (header_start - bj_parser->header_name_start) + header_length;
-        return PARSER_OK;
+        return PARSER_CONTINUE;
     }
     else {
         goto start_new_header;
@@ -170,7 +171,7 @@ start_new_header:
     ((bjoern_http_parser*)parser)->header_value_start  = NULL;
     ((bjoern_http_parser*)parser)->header_value_length = 0;
 
-    return PARSER_OK;
+    return PARSER_CONTINUE;
 }
 
 static int
@@ -188,7 +189,7 @@ http_on_header_value(http_parser* parser, const char* value_start, size_t value_
         bj_parser->header_value_length = value_length;
     }
 
-    return PARSER_OK;
+    return PARSER_CONTINUE;
 }
 
 
@@ -197,26 +198,26 @@ http_on_header_value(http_parser* parser, const char* value_start, size_t value_
 static int
 http_on_body(http_parser* parser, const char* body, size_t body_length)
 {
-    return 0;
+    return PARSER_CONTINUE;
 }
 
 /* TODO: Decide what to do with this one. */
 static int
 http_on_fragment(http_parser* parser, const char* fragment_start, size_t fragment_length)
 {
-    return 0;
+    return PARSER_CONTINUE;
 }
 
 static int
 http_on_url(http_parser* parser, const char* url_start, size_t url_length)
 {
-    return 0;
+    return PARSER_CONTINUE;
 }
 
 static int
 http_on_headers_complete(http_parser* parser)
 {
-    return 0;
+    return PARSER_CONTINUE;
 }
 
 

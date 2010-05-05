@@ -9,10 +9,12 @@ struct _Route {
 };
 
 static Route* Route_new(PyObject* pattern, PyObject* wsgi_callback, Route* next);
-#define Route_free(route) Py_XDECREF(route->pattern); \
-                          Py_XDECREF(route->pattern_match_func); \
-                          Py_XDECREF(route->wsgi_callback); \
-                          free(route)
+#define Route_free(route) do { \
+                            Py_XDECREF(route->pattern); \
+                            Py_XDECREF(route->pattern_match_func); \
+                            Py_XDECREF(route->wsgi_callback); \
+                            free(route); \
+                          } while(0)
 
 Route* first_route;
 Route* last_route;

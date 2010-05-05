@@ -116,6 +116,8 @@ static Transaction* Transaction_new()
         return NULL;
     }
     transaction->request_parser->transaction = transaction;
+    /* Reset the parser exit state */
+    ((http_parser*)transaction->request_parser)->data = PARSER_OK;
 
     http_parser_init((http_parser*)transaction->request_parser, HTTP_REQUEST);
 
@@ -179,7 +181,7 @@ on_sock_read(EV_LOOP* mainloop, ev_io* read_watcher_, int revents)
     bytes_read = read(transaction->client_fd, read_buffer, READ_BUFFER_SIZE);
 
     switch(bytes_read) {
-        case 0:  goto read_finished;
+        case  0: goto read_finished;
         case -1: return; /* An error happened. Try again next time libev calls
                             this function. TODO: Limit retries? */
         default:
@@ -190,21 +192,29 @@ on_sock_read(EV_LOOP* mainloop, ev_io* read_watcher_, int revents)
                 bytes_read
             );
             DEBUG("Parsed %d bytes of %d", (int)bytes_parsed, (int)bytes_read);
+
+            switch(transaction->request_parser->exit_code) {
+                case PARSER_OK:
+                    set_response_from_wsgi_app(transaction);
+                    goto read_finished;
+#ifdef WANT_CACHING
+                case USE_CACHE:
+                    set_response_from_cache(transaction);
+                    goto read_finished;
+#endif
+                case HTTP_NOT_FOUND:
+                    set_response_http_404(transaction);
+                    goto read_finished;
+                case HTTP_INTERNAL_SERVER_ERROR:
+                    set_response_http_500(transaction);
+                    goto read_finished;
+            }
     }
 
 read_finished:
     /* Stop the read loop, we're done reading. */
     ev_io_stop(mainloop, &transaction->read_watcher);
-
-    switch(transaction->request_handler) {
-        case CACHE_HANDLER:
-            assert(0);
-        case WSGI_APPLICATION_HANDLER:
-            wsgi_request_handler(transaction);
-            goto start_write;
-        default:
-            assert(0);
-    }
+    goto start_write;
 
 start_write:
     ev_io_init(&transaction->write_watcher, &while_sock_canwrite,
@@ -213,17 +223,54 @@ start_write:
 }
 
 
-/*
-    Interact with the Python WSGI app.
-*/
+static inline void
+set_response(Transaction* transaction, PyObject* http_status, /* string! */
+             PyObject* headers, const char* response, size_t response_length)
+{
+    transaction->response_status = http_status;
+    transaction->response_headers = headers;
+    transaction->response = response;
+    transaction->response_remaining = response_length;
+}
+
 static void
-wsgi_request_handler(Transaction* transaction)
+set_response_http_500(Transaction* transaction)
+{
+    set_response(transaction,
+        PY_STRING_500_INTERNAL_SERVER_ERROR,
+        /* headers */ NULL,
+        HTTP_500_MESSAGE,
+        strlen(HTTP_500_MESSAGE)
+    );
+}
+
+static void
+set_response_http_404(Transaction* transaction)
+{
+    set_response(transaction,
+        PY_STRING_404_NOT_FOUND,
+        /* headers */ NULL,
+        HTTP_404_MESSAGE,
+        strlen(HTTP_404_MESSAGE)
+    );
+}
+
+#ifdef WANT_CACHING
+static void
+set_response_from_cache(Transaction* transaction)
+{
+}
+#endif
+
+
+static void
+set_response_from_wsgi_app(Transaction* transaction)
 {
     PyObject* args;
     PyObject* wsgi_object;
 
 #ifdef WANT_ROUTING
-    Route* route = (Route*)transaction->request_handler_data1;
+    Route* route = (Route*) ((http_parser*)transaction->request_parser)->data;
 #endif
 
     /* Create a new instance of the WSGI layer class. */
@@ -273,16 +320,19 @@ wsgi_request_handler(Transaction* transaction)
         goto file_response;
     }
 
+
+    const char* response;
+
     if(PyString_Check(return_value)) {
         /* We already have a string. That's ok, take it for the response. */
-        transaction->response = PyString_AsString(return_value);
+        response = PyString_AsString(return_value);
         goto string_response;
     }
 
     if(PySequence_Check(return_value)) {
         /* WSGI-compliant case, we have a list or tuple --
            just pick the first item of that (for now) for the response. */
-        transaction->response = PyString_AsString(PySequence_GetItem(return_value, 0));
+        response = PyString_AsString(PySequence_GetItem(return_value, 0));
         Py_DECREF(return_value); /* don't need this anymore */
         goto string_response;
     }
@@ -292,19 +342,25 @@ wsgi_request_handler(Transaction* transaction)
 
 
 http_500_internal_server_error:
-    transaction->response = HTTP_500_MESSAGE;
-    transaction->response_remaining = strlen(HTTP_500_MESSAGE);
-    transaction->response_headers = NULL;
-    transaction->response_status = PyInt_FromSize_t(500);
-    Py_INCREF(transaction->response_status);
+    set_response_http_500(transaction);
     return;
 
-string_response:
-    transaction->response_remaining = strlen(transaction->response);
-    transaction->response_headers = PyGetAttr(wsgi_object, "response_headers");
-    transaction->response_status  = PyGetAttr(wsgi_object, "response_status");
-    Py_INCREF(transaction->response_headers);
-    Py_INCREF(transaction->response_status);
+string_response: /* keep the following semicolon */;
+    PyObject* response_headers;
+    PyObject* response_status;
+
+    response_headers = PyGetAttr(wsgi_object, "response_headers");
+    response_status  = PyGetAttr(wsgi_object, "response_status");
+    Py_INCREF(response_headers);
+    Py_INCREF(response_status);
+
+    set_response(transaction,
+        response_status,
+        response_headers,
+        response,
+        strlen(response)
+    );
+
     goto cleanup;
 
 file_response:
@@ -390,39 +446,43 @@ bjoern_send_headers(Transaction* transaction)
     bjoern_strcpy(&buffer_position, PyString_AsString(transaction->response_status));
     bjoern_strcpy(&buffer_position, "\r\n");
 
-    /* Make sure a Content-Type header is set: */
-    if(!PyDict_Contains(transaction->response_headers, PY_STRING_Content_Type))
+    if(transaction->response_headers)
     {
-        PyDict_SetItem(
-            transaction->response_headers,
-            PY_STRING_Content_Type,
-            PY_STRING_DEFAULT_RESPONSE_CONTENT_TYPE
-        );
+        /* Make sure a Content-Type header is set: */
+        if(!PyDict_Contains(transaction->response_headers, PY_STRING_Content_Type))
+        {
+            PyDict_SetItem(
+                transaction->response_headers,
+                PY_STRING_Content_Type,
+                PY_STRING_DEFAULT_RESPONSE_CONTENT_TYPE
+            );
+        }
+
+        /* Make sure a Content-Length header is set: */
+        if(!PyDict_Contains(transaction->response_headers, PY_STRING_Content_Length)) {
+            PyObject* py_content_length = _PyInt_Format(
+                (PyIntObject*)PyInt_FromSize_t(transaction->response_remaining),
+                /* base */10, /* newstyle? */0
+            );
+            Py_INCREF(py_content_length);
+            PyDict_SetItem(
+                transaction->response_headers,
+                PY_STRING_Content_Length,
+                py_content_length
+            );
+            Py_DECREF(py_content_length);
+        }
+
+        while(PyDict_Next(transaction->response_headers, &dict_position,
+                          &current_key, &current_value))
+        {
+            bjoern_strcpy(&buffer_position, PyString_AsString(current_key));
+            bjoern_strcpy(&buffer_position, ": ");
+            bjoern_strcpy(&buffer_position, PyString_AsString(current_value));
+            bjoern_strcpy(&buffer_position, "\r\n");
+        }
     }
 
-    /* Make sure a Content-Length header is set: */
-    if(!PyDict_Contains(transaction->response_headers, PY_STRING_Content_Length)) {
-        PyObject* py_content_length = _PyInt_Format(
-            (PyIntObject*)PyInt_FromSize_t(transaction->response_remaining),
-            /* base */10, /* newstyle? */0
-        );
-        Py_INCREF(py_content_length);
-        PyDict_SetItem(
-            transaction->response_headers,
-            PY_STRING_Content_Length,
-            py_content_length
-        );
-        Py_DECREF(py_content_length);
-    }
-
-    while(PyDict_Next(transaction->response_headers, &dict_position,
-                      &current_key, &current_value))
-    {
-        bjoern_strcpy(&buffer_position, PyString_AsString(current_key));
-        bjoern_strcpy(&buffer_position, ": ");
-        bjoern_strcpy(&buffer_position, PyString_AsString(current_value));
-        bjoern_strcpy(&buffer_position, "\r\n");
-    }
     bjoern_strcpy(&buffer_position, "\r\n");
 
     write(transaction->client_fd, header_buffer,

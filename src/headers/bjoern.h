@@ -18,6 +18,7 @@
 #include <arpa/inet.h>
 
 #include "shortcuts.h"
+#include "http-status-codes.h"
 #include "strings.h"
 #include "utils.c"
 
@@ -32,12 +33,6 @@ typedef struct _bjoern_http_parser
         bjoern_http_parser;
 typedef enum http_method
         http_method;
-
-typedef enum {
-    WSGI_APPLICATION_HANDLER = 1,
-    CACHE_HANDLER            = 2
-} request_handler;
-
 
 #include "transaction.h"
 #include "parsing.h"
@@ -69,7 +64,7 @@ static EV_LOOP*     mainloop;
 static PyObject*    wsgi_layer;
 #ifndef WANT_ROUTING
   /* No routing, use one application for every request */
-  static PyObject*    wsgi_application;
+static PyObject*    wsgi_application;
 #endif
 
 
@@ -86,5 +81,10 @@ static ev_io_callback   while_sock_canwrite (EV_LOOP*, ev_io* watcher, const int
 static ssize_t          bjoern_http_response(Transaction*);
 static void             bjoern_send_headers (Transaction*);
 static ssize_t          bjoern_sendfile     (Transaction*);
-static void             wsgi_request_handler(Transaction*);
-static void             cache_request_handler(Transaction*);
+
+static void             set_response_from_wsgi_app(Transaction*);
+#ifdef WANT_CACHING
+static void             set_response_from_cache(Transaction*);
+#endif
+static void             set_response_http_500(Transaction*);
+static void             set_response_http_404(Transaction*);

@@ -10,10 +10,6 @@ struct _Transaction {
     /* WSGI handler: */
     PyObject*   wsgi_environ;
 
-    request_handler request_handler;
-    void*           request_handler_data1;
-    void*           request_handler_data2;
-
     /* Write stuff: */
     ev_io       write_watcher;
     size_t      response_remaining;
@@ -25,9 +21,11 @@ struct _Transaction {
 };
 
 static Transaction* Transaction_new();
-#define Transaction_free(t) Py_XDECREF(t->wsgi_environ); \
-                            Py_XDECREF(t->response_headers); \
-                            Py_XDECREF(t->response_status); \
-                            Py_XDECREF(t->response_file); \
-                            free(t->request_parser); \
-                            free(t)
+#define Transaction_free(t) do { \
+                                Py_XDECREF(t->wsgi_environ); \
+                                Py_XDECREF(t->response_headers); \
+                                Py_XDECREF(t->response_status); \
+                                Py_XDECREF(t->response_file); \
+                                free(t->request_parser); \
+                                free(t); \
+                            } while(0)

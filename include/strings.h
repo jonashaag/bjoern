@@ -12,6 +12,8 @@
     INIT_PYSTRING(   SERVER_PORT         );
     INIT_PYSTRING(   SERVER_PROTOCOL     );
 
+    PY_STRING_404_NOT_FOUND = PyString("404 Not Found");
+    PY_STRING_500_INTERNAL_SERVER_ERROR = PyString("500 Internal Server Error");
     PY_STRING_Content_Type   = PyString("Content-Type");
     PY_STRING_Content_Length = PyString("Content-Length");
     PY_STRING_start_response = PyString("start_response");
@@ -35,9 +37,11 @@
     static PyObject* PY_STRING_SERVER_NAME;
     static PyObject* PY_STRING_SERVER_PORT;
     static PyObject* PY_STRING_SERVER_PROTOCOL;
-    static PyObject* PY_STRING_Content_Type;    /* "Content-Type"   */
-    static PyObject* PY_STRING_Content_Length;  /* "Content-Length" */
-    static PyObject* PY_STRING_start_response;  /* "start_response" */
-    static PyObject* PY_STRING_DEFAULT_RESPONSE_CONTENT_TYPE; /* DEFAULT_RESPONSE_CONTENT_TYPE */
+    static PyObject* PY_STRING_404_NOT_FOUND;
+    static PyObject* PY_STRING_500_INTERNAL_SERVER_ERROR;
+    static PyObject* PY_STRING_Content_Type;
+    static PyObject* PY_STRING_Content_Length;
+    static PyObject* PY_STRING_start_response;
+    static PyObject* PY_STRING_DEFAULT_RESPONSE_CONTENT_TYPE;
 
 #endif

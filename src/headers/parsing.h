@@ -1,13 +1,17 @@
-/* http_parser return value codes */
-#define RESPONSE_IS_CACHED         -1
-#define PARSER_OK                   0
-#define HTTP_NOT_FOUND              404
-#define HTTP_INTERNAL_SERVER_ERROR  500
-#define HTTP_NOT_IMPLEMENTED        501
+#define PARSER_OK   0
+#define PARSER_CONTINUE PARSER_OK
+#define PARSER_EXIT 1
+
+/* codes used for exiting http-parser */
+enum http_parser_exit_codes {
+    USE_CACHE = 1,
+    /* PLUS `enum http_status_codes` */
+};
 
 struct _bjoern_http_parser {
     http_parser     http_parser;
     Transaction*    transaction;
+    unsigned int    exit_code;
 
     /* Temporary variables: */
     const char*     header_name_start;
