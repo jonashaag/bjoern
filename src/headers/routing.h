@@ -4,11 +4,11 @@ typedef PyObject
 struct _Route {
     Route* next;
     PyRegex* pattern;
-    PyObject* pattern_match_func; /* pattern.match(...) */
+    PyObject* pattern_match_func; /* pattern.match */
     PyObject* wsgi_callback;
 };
 
-static Route* Route_new(PyObject* pattern, PyObject* wsgi_callback, Route* next);
+static Route* Route_new(PyObject* pattern, PyObject* wsgi_callback);
 #define Route_free(route) do { \
                             Py_XDECREF(route->pattern); \
                             Py_XDECREF(route->pattern_match_func); \

@@ -14,7 +14,7 @@ what's up?"""
 
 def route(pat):
     def wrapper(func):
-        bjoern.add_route(pat, func)
+        bjoern.add_route('^{pattern}$'.format(pattern=pat), func)
         return func
     return wrapper
 

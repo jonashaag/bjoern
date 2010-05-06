@@ -37,9 +37,13 @@ PyObject* Bjoern_Route_Add(PyObject* self, PyObject* args)
     Py_INCREF(pattern);
     Py_INCREF(callback);
 
-    Route* new_route = Route_new(pattern, callback, last_route);
+    Route* new_route = Route_new(pattern, callback);
+
     if(first_route == NULL)
+        /* The very first route defined. */
         first_route = new_route;
+    else
+        last_route->next = new_route;
     last_route = new_route;
 
     Py_RETURN_NONE;
@@ -47,11 +51,13 @@ PyObject* Bjoern_Route_Add(PyObject* self, PyObject* args)
 
 
 static Route*
-Route_new(PyObject* pattern, PyObject* wsgi_callback, Route* next)
+Route_new(PyObject* pattern, PyObject* wsgi_callback)
 {
     Route* route = malloc(sizeof(Route));
+    if(route == NULL)
+        return NULL;
 
-    route->next = next;
+    route->next = NULL;
     route->wsgi_callback = wsgi_callback;
 
     route->pattern = re_compile(pattern);
@@ -74,12 +80,13 @@ get_route_for_url(PyObject* url)
 {
     PyObject* args = Py_BuildValue("(s)", url);
     Py_INCREF(args);
-    Route* route = first_route;
 
     PyObject* py_tmp;
+    Route* route = first_route;
     while(route) {
+        DEBUG("Trying to match %s", PyString_AS_STRING(PyGetAttr(route->pattern, "pattern")));
         py_tmp = PyObject_Call(route->pattern_match_func, args, /* kwargs */ NULL);
-        if(py_tmp && py_tmp != Py_None) {
+        if(py_tmp != Py_None) {
             /* Match successful */
             goto cleanup;
         }
