@@ -19,12 +19,12 @@ def route(pat):
     return wrapper
 
 @route('/page/[a-z]+')
-def page(start_response, env):
+def page(env, start_response):
     start_response('200 Alles ok', (('Content-type', 'text/plain'),))
     return PAGES['foo']
 
 @route('/')
-def page(start_response, env):
+def page(env, start_response):
     start_response('200 Hi was geht', (('Content-type', 'text/plain'),))
     return PAGES['home']
 

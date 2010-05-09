@@ -9,7 +9,7 @@ static void
 import_re_module()
 {
     PyObject* re_module = PyImport_ImportModule("re");
-    _re_compile = PyGetAttr(re_module, "compile");
+    _re_compile = PyObject_GetAttrString(re_module, "compile");
     Py_INCREF(_re_compile);
 }
 
@@ -65,7 +65,7 @@ Route_new(PyObject* pattern, PyObject* wsgi_callback)
         Route_free(route);
         return NULL;
     }
-    route->pattern_match_func = PyGetAttr(route->pattern, "match");
+    route->pattern_match_func = PyObject_GetAttrString(route->pattern, "match");
     if(route->pattern_match_func == NULL) {
         Route_free(route);
         return NULL;
@@ -84,7 +84,6 @@ get_route_for_url(PyObject* url)
     PyObject* py_tmp;
     Route* route = first_route;
     while(route) {
-        DEBUG("Trying to match %s", PyString_AS_STRING(PyGetAttr(route->pattern, "pattern")));
         py_tmp = PyObject_Call(route->pattern_match_func, args, /* kwargs */ NULL);
         if(py_tmp != Py_None) {
             /* Match successful */

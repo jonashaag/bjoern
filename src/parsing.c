@@ -87,7 +87,6 @@ http_on_path(http_parser* parser, const char* path_start, size_t path_length)
         STOP_PARSER(HTTP_NOT_FOUND);
     }
 
-    STOP_PARSER(HTTP_NOT_FOUND);
     parser->data = (void*)route;
 #endif
 

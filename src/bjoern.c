@@ -236,6 +236,9 @@ set_response(Transaction* transaction, PyObject* http_status, /* string! */
 static void
 set_response_http_500(Transaction* transaction)
 {
+    if(PyErr_Occurred())
+        PyErr_Print();
+
     set_response(transaction,
         PY_STRING_500_INTERNAL_SERVER_ERROR,
         /* headers */ NULL,
@@ -349,8 +352,8 @@ string_response: /* keep the following semicolon */;
     PyObject* response_headers;
     PyObject* response_status;
 
-    response_headers = PyGetAttr(wsgi_object, "response_headers");
-    response_status  = PyGetAttr(wsgi_object, "response_status");
+    response_headers = PyObject_GetAttr(wsgi_object, PY_STRING_response_headers);
+    response_status  = PyObject_GetAttr(wsgi_object, PY_STRING_response_status);
     Py_INCREF(response_headers);
     Py_INCREF(response_status);
 
@@ -434,56 +437,45 @@ bjoern_http_response(Transaction* transaction)
 static void
 bjoern_send_headers(Transaction* transaction)
 {
+    /* TODO: Maybe sprintf is faster than bjoern_strcpy? */
+
     char        header_buffer[MAX_HEADER_SIZE];
     char*       buffer_position = header_buffer;
     char*       orig_buffer_position = buffer_position;
-    PyObject*   current_key;
-    PyObject*   current_value;
-    Py_ssize_t  dict_position = 0;
+    bool        have_content_length = false;
+    PyObject*   header_tuple;
+
+    #define BUF_CPY(s) bjoern_strcpy(&buffer_position, s)
 
     /* Copy the HTTP status message into the buffer: */
-    bjoern_strcpy(&buffer_position, "HTTP/1.1 ");
-    bjoern_strcpy(&buffer_position, PyString_AsString(transaction->response_status));
-    bjoern_strcpy(&buffer_position, "\r\n");
+    BUF_CPY("HTTP/1.1 ");
+    BUF_CPY(PyString_AsString(transaction->response_status));
+    BUF_CPY("\r\n");
 
     if(transaction->response_headers)
     {
-        /* Make sure a Content-Type header is set: */
-        if(!PyDict_Contains(transaction->response_headers, PY_STRING_Content_Type))
+        size_t header_tuple_length = PyTuple_GET_SIZE(transaction->response_headers);
+        for(int i=0; i<header_tuple_length; ++i)
         {
-            PyDict_SetItem(
-                transaction->response_headers,
-                PY_STRING_Content_Type,
-                PY_STRING_DEFAULT_RESPONSE_CONTENT_TYPE
-            );
+            header_tuple = PyTuple_GET_ITEM(transaction->response_headers, i);
+            BUF_CPY(PyString_AsString(PyTuple_GetItem(header_tuple, 0)));
+            BUF_CPY(": ");
+            BUF_CPY(PyString_AsString(PyTuple_GetItem(header_tuple, 1)));
+            BUF_CPY("\r\n");
         }
 
         /* Make sure a Content-Length header is set: */
-        if(!PyDict_Contains(transaction->response_headers, PY_STRING_Content_Length)) {
-            PyObject* py_content_length = _PyInt_Format(
-                (PyIntObject*)PyInt_FromSize_t(transaction->response_remaining),
-                /* base */10, /* newstyle? */0
+        if(!have_content_length)
+            buffer_position += sprintf(
+                buffer_position,
+                "Content-Length: %d\r\n",
+                transaction->response_remaining
             );
-            Py_INCREF(py_content_length);
-            PyDict_SetItem(
-                transaction->response_headers,
-                PY_STRING_Content_Length,
-                py_content_length
-            );
-            Py_DECREF(py_content_length);
-        }
-
-        while(PyDict_Next(transaction->response_headers, &dict_position,
-                          &current_key, &current_value))
-        {
-            bjoern_strcpy(&buffer_position, PyString_AsString(current_key));
-            bjoern_strcpy(&buffer_position, ": ");
-            bjoern_strcpy(&buffer_position, PyString_AsString(current_value));
-            bjoern_strcpy(&buffer_position, "\r\n");
-        }
     }
 
-    bjoern_strcpy(&buffer_position, "\r\n");
+    BUF_CPY("\r\n");
+
+    #undef BUF_CPY
 
     write(transaction->client_fd, header_buffer,
           buffer_position - orig_buffer_position);
@@ -498,6 +490,8 @@ bjoern_sendfile(Transaction* transaction)
     GIL_LOCK();
     PyFile_IncUseCount((PyFileObject*)transaction->response_file);
     GIL_UNLOCK();
+
+    assert(0);
 
     #define SENDFILE \
         sendfile(transaction->client_fd, PyFileno(transaction->response_file), \

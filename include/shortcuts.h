@@ -13,7 +13,6 @@
 #define DO_NOTHING              do{}while(0)
 #define ALLOC(size)             calloc(1, size)
 
-#define PyGetAttr               PyObject_GetAttrString
 #define PyString(s)             PyString_FromString(s)
 #define PyStringWithLen(s, l)   PyString_FromStringAndSize(s, l)
 #define PyRaise(exc, s)         PyErr_SetString(PyExc_##exc, s)
