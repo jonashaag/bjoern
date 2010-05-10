@@ -117,9 +117,8 @@ http_on_query(http_parser* parser, const char* query_start, size_t query_length)
 */
 static inline void store_current_header(bjoern_http_parser* parser)
 {
-    /* Allocate an empty Python string with size 'header-length + 5': */
-    PyObject* py_header_name = PyString_FromStringAndSize(NULL,
-                                  parser->header_name_length + strlen("HTTP_"));
+    PyObject* py_header_name = PyString_FromStringAndSize(NULL /* empty string */,
+                                parser->header_name_length + strlen("HTTP_"));
     Py_INCREF(py_header_name);
     /* Get the internal buffer of `py_header_name`: */
     char* header_name = PyString_AS_STRING(py_header_name);
