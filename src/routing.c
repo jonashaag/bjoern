@@ -78,7 +78,7 @@ Route_new(PyObject* pattern, PyObject* wsgi_callback)
 static Route*
 get_route_for_url(PyObject* url)
 {
-    PyObject* args = Py_BuildValue("(s)", url);
+    PyObject* args = PyTuple_Pack(1, url);
     Py_INCREF(args);
 
     PyObject* py_tmp;
