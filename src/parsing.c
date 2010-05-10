@@ -109,6 +109,10 @@ http_on_query(http_parser* parser, const char* query_start, size_t query_length)
     return PARSER_CONTINUE;
 }
 
+static PyObject* PyStringWithL(const char* str, const int l)
+{
+    return PyStringWithLen(str, l);
+}
 
 /*
     Transform the current header name to something WSGI (CGI) compatible, e.g.
@@ -133,7 +137,7 @@ static inline void store_current_header(bjoern_http_parser* parser)
     bjoern_http_to_wsgi_header(&header_name[5], parser->header_name_start,
                                                 parser->header_name_length);
 
-    PyObject* py_header_value = PyStringWithLen(parser->header_value_start,
+    PyObject* py_header_value = PyStringWithL(parser->header_value_start,
                                                 parser->header_value_length);
     Py_INCREF(py_header_value);
 

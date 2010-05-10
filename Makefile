@@ -22,6 +22,7 @@ FILES_NODEBUG   = $(FILES) include/http-parser/http_parser.o
 FILES_DEBUG     = $(FILES) include/http-parser/http_parser_debug.o
 
 TEST            = python tests
+PAGER		 	= less
 
 
 all: clean
@@ -31,13 +32,13 @@ nodebugprints:
 	$(CC) $(CFLAGS_NODEBUGP) $(LDFLAGS) -o $(OUTFILES) $(FILES_DEBUG)
 
 prep:
-	$(CC) $(LDFLAGS) $(CFLAGS) -E bjoern.c | ${PAGER}
+	$(CC) $(LDFLAGS) $(CFLAGS) -E $(FILES) | ${PAGER}
 
 assembler:
-	$(CC) $(LDFLAGS) $(CFLAGS_NODEBUGP) -S bjoern.c
+	$(CC) $(LDFLAGS) $(CFLAGS_NODEBUGP) -S $(FILES)
 
 assembleropt:
-	$(CC) $(LDFLAGS) $(CFLAGS_OPTDEBUG) -S bjoern.c
+	$(CC) $(LDFLAGS) $(CFLAGS_OPTDEBUG) -S $(FILES)
 
 warnall:
 	$(CC) $(CFLAGS_WARNALL) $(LDFLAGS) -o $(OUTFILES) $(FILES_DEBUG)

@@ -34,13 +34,21 @@ typedef struct _bjoern_http_parser
 typedef enum http_method
         http_method;
 
+
+#include "handler.h"
 #include "transaction.h"
 #include "parsing.h"
+
+#include "handlers/wsgi.h"
+#include "handlers/raw.h"
+
 #ifdef WANT_ROUTING
   #include "routing.h"
 #endif
+
 #ifdef WANT_CACHING
   #include "cache.h"
+  #include "handlers/cache.h"
 #endif
 
 #include "config.h"
@@ -78,13 +86,3 @@ static ev_io_callback   on_sock_accept      (EV_LOOP*, ev_io* watcher, const int
 static ev_io_callback   on_sock_read        (EV_LOOP*, ev_io* watcher, const int revents);
 
 static ev_io_callback   while_sock_canwrite (EV_LOOP*, ev_io* watcher, const int revents);
-static ssize_t          bjoern_http_response(Transaction*);
-static void             bjoern_send_headers (Transaction*);
-static ssize_t          bjoern_sendfile     (Transaction*);
-
-static void             set_response_from_wsgi_app(Transaction*);
-#ifdef WANT_CACHING
-static void             set_response_from_cache(Transaction*);
-#endif
-static void             set_response_http_500(Transaction*);
-static void             set_response_http_404(Transaction*);
