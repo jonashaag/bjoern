@@ -1,6 +1,7 @@
 typedef PyObject
         PyRegex;
 
+typedef struct _Route Route;
 struct _Route {
     Route* next;
     PyRegex* pattern;

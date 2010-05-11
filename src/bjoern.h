@@ -17,56 +17,40 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
+
+typedef struct ev_loop EV_LOOP;
+typedef struct _Transaction Transaction;
+typedef struct _bjoern_http_parser bjoern_http_parser;
+typedef struct _wsgi_handler_data wsgi_handler_data;
+typedef struct _raw_handler_data raw_handler_data;
+#ifdef WANT_CACHING
+typedef struct _cache_handler_data cache_handler_data;
+#endif
+
+typedef enum { RESPONSE_FINISHED = 1, RESPONSE_NOT_YET_FINISHED = 2} response_status;
+
 #include "shortcuts.h"
 #include "http-status-codes.h"
 #include "strings.h"
 #include "utils.c"
-
-
-typedef struct ev_loop
-        EV_LOOP;
-typedef struct _Transaction
-        Transaction;
-typedef struct _Route
-        Route;
-typedef struct _bjoern_http_parser
-        bjoern_http_parser;
-typedef enum http_method
-        http_method;
-
-
-#include "handler.h"
-#include "transaction.h"
 #include "parsing.h"
+
+#ifdef WANT_ROUTING
+#include "routing.h"
+#endif
 
 #include "handlers/wsgi.h"
 #include "handlers/raw.h"
 
-#ifdef WANT_ROUTING
-  #include "routing.h"
+#ifdef WANT_CACHING
+#include "handlers/cache.h"
 #endif
 
-#ifdef WANT_CACHING
-  #include "cache.h"
-  #include "handlers/cache.h"
-#endif
+#include "transaction.h"
 
 #include "config.h"
 
 
-typedef enum {
-    SOCKET_FAILED = -1,
-    BIND_FAILED   = -2,
-    LISTEN_FAILED = -3
-} bjoern_network_error;
-
-static const char* SOCKET_ERROR_MESSAGES[] = {
-    "socket() failed",
-    "bind() failed",
-    "listen() failed"
-};
-
-static PyGILState_STATE _GILState;
 static int          sockfd;
 static EV_LOOP*     mainloop;
 static PyObject*    wsgi_layer;
@@ -74,15 +58,15 @@ static PyObject*    wsgi_layer;
   /* No routing, use one application for every request */
 static PyObject*    wsgi_application;
 #endif
+static PyGILState_STATE _GILState;
 
 
-#define ev_io_callback  void
-#define ev_signal_callback  void
+#define ev_io_callback void
+#define ev_signal_callback void
 
 static PyObject*        Bjoern_Run          (PyObject* self, PyObject* args);
-static int              init_socket         (const char* addr, const int port);
+static ssize_t          init_socket         (const char* addr, const int port);
 static ev_signal_callback on_sigint_received(EV_LOOP*, ev_signal* watcher, const int revents);
 static ev_io_callback   on_sock_accept      (EV_LOOP*, ev_io* watcher, const int revents);
 static ev_io_callback   on_sock_read        (EV_LOOP*, ev_io* watcher, const int revents);
-
 static ev_io_callback   while_sock_canwrite (EV_LOOP*, ev_io* watcher, const int revents);

@@ -1,20 +1,21 @@
 struct _Transaction {
     int client_fd;
-
     ev_io read_watcher;
     size_t read_seek;
-
-    /* TODO: put request_* into a seperate data structure. */
     bjoern_http_parser* request_parser;
-    http_method request_method;
-
-    PyObject* wsgi_environ;
+    enum http_method request_method;
 
     ev_io write_watcher;
 
-    handler_write writer;
-    handler_finalize finalizer;
-    request_handler_data request_handler;
+    response_status (*handler_write)(Transaction*);
+    void (*handler_finalize)(Transaction*);
+    union {
+        wsgi_handler_data  wsgi;
+        raw_handler_data   raw;
+#ifdef WANT_CACHING
+        cache_handler_data cache;
+#endif
+    } handler_data;
 };
 
 static Transaction* Transaction_new();

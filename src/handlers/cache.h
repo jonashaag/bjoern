@@ -1,6 +1,7 @@
-struct cache_handler_data {
+struct _cache_handler_data {
+    const char* cache_key;
 };
 
-static handler_initialize   cache_handler_initialize;
-static handler_write        cache_handler_write;
-static handler_finalize     cache_handler_finalize;
+static bool cache_handler_initialize(Transaction*);
+static response_status cache_handler_write(Transaction*);
+static void cache_handler_finalize(Transaction*);

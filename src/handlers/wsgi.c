@@ -1,71 +1,56 @@
+#define WSGI_HANDLER transaction->handler_data.wsgi
+#define PYOBJ_GET_OR_HTTP_500(var, stmt) \
+            do { \
+                if(!(var = stmt)) \
+                    goto http_500_internal_server_error; \
+            } while(0)
+
 static bool
 wsgi_handler_initialize(Transaction* transaction)
 {
-    wsgi_handler_data response_data = transaction->request_handler;
-    PyObject* args;
+    bool retval = true;
+    PyObject* args1 = NULL;
+    PyObject* args2 = NULL;
+    PyObject* return_value = NULL;
     PyObject* wsgi_object = NULL;
 
 #ifdef WANT_ROUTING
-    Route* route = response_data.route;
+    Route* route = WSGI_HANDLER.route;
 #endif
-
-    /* Create a new response header dictionary. */
-    response_data.wsgi_environ = PyDict_New();
-    if(response_data.wsgi_environ == NULL)
-        goto http_500_internal_server_error;
-    Py_INCREF(response_data.wsgi_environ);
 
     /* Create a new instance of the WSGI layer class. */
-    args = PyTuple_Pack(/* size */ 1, response_data.wsgi_environ);
-    if(args == NULL)
-        goto http_500_internal_server_error;
-    Py_INCREF(args);
-    wsgi_object = PyObject_Call(wsgi_layer, args, NULL /* kwargs */);
-    Py_DECREF(args);
-
-    if(wsgi_object == NULL)
-        goto http_500_internal_server_error;
-    Py_INCREF(wsgi_object);
+    PYOBJ_GET_OR_HTTP_500(args1, PyTuple_Pack(/* size */ 1, WSGI_HANDLER.request_environ));
+    PYOBJ_GET_OR_HTTP_500(wsgi_object, PyObject_CallObject(wsgi_layer, args1));
 
     /* Call the WSGI application: app(environ, start_response). */
-    args = PyTuple_Pack(
-        /* size */ 2,
-        response_data.wsgi_environ,
-        PyObject_GetAttr(wsgi_object, PY_STRING_start_response)
-    );
-    if(args == NULL)
-        goto http_500_internal_server_error;
-    Py_INCREF(args);
+    PYOBJ_GET_OR_HTTP_500(args2, PyTuple_Pack(/* size */ 2, WSGI_HANDLER.request_environ,
+                                              PyObject_GetAttr(wsgi_object, PY_STRING_start_response)));
+
 #ifdef WANT_ROUTING
-    PyObject* return_value = PyObject_Call(route->wsgi_callback,
-                                           args, NULL /* kwargs */);
+    PYOBJ_GET_OR_HTTP_500(return_value,
+        PyObject_CallObject(route->wsgi_callback, args2)
+    );
 #else
-    PyObject* return_value = PyObject_Call(wsgi_application,
-                                           args, NULL /* kwargs */);
+    PYOBJ_GET_OR_HTTP_500(return_value,
+        PyObject_CallObject(wsgi_application, args2)
+    );
 #endif
-    Py_DECREF(args);
 
-
-    if(return_value == NULL)
-        goto http_500_internal_server_error;
-
-    Py_INCREF(return_value);
+    WSGI_HANDLER.dealloc_extra = return_value;
 
     if(PyIter_Check(return_value)) {
-        Py_DECREF(return_value); /* don't need this anymore */
         goto http_500_internal_server_error;
     }
 
     if(PyFile_Check(return_value)) {
-        transaction->response_file = return_value;
-        /* TODO: Use proper file size for `sendfile`. */
+        WSGI_HANDLER.file = return_value;
         goto file_response;
     }
 
 
     if(PyString_Check(return_value)) {
         /* We already have a string. That's ok, take it for the response. */
-        response_data.body = PyString_AsString(return_value);
+        WSGI_HANDLER.body = PyString_AsString(return_value);
         goto response;
     }
 
@@ -73,8 +58,7 @@ wsgi_handler_initialize(Transaction* transaction)
         /* WSGI-compliant case, we have a list or tuple --
            just pick the first item of that (for now) for the response.
            FIXME. */
-        response_data.body = PyString_AsString(PySequence_GetItem(return_value, 0));
-        Py_DECREF(return_value); /* don't need this anymore */
+        WSGI_HANDLER.body = PyString_AsString(PySequence_GetItem(return_value, 0));
         goto response;
     }
 
@@ -83,40 +67,48 @@ wsgi_handler_initialize(Transaction* transaction)
 
 
 http_500_internal_server_error:
-    /* HACK: We redirect this request directly to the HTTP 500 handler. */
+    /* HACK: We redirect this request directly to the HTTP 500 WSGI_HANDLER. */
     transaction->request_parser->exit_code = HTTP_INTERNAL_SERVER_ERROR;
-    return false;
-
-response:
-    response_data.body_length = strlen(body);
-    response_data.headers = PyObject_GetAttr(wsgi_object, PY_STRING_response_headers);
-    response_data.status  = PyObject_GetAttr(wsgi_object, PY_STRING_response_status);
-    Py_INCREF(response_data.headers);
-    Py_INCREF(response_data.status);
-
+    retval = false;
     goto cleanup;
 
 file_response:
-    response_data.writer = wsgi_handler_sendfile;
+    transaction->handler_write = wsgi_handler_sendfile;
+    goto cleanup;
+
+response:
+    WSGI_HANDLER.body_length = strlen(WSGI_HANDLER.body);
+    PYOBJ_GET_OR_HTTP_500(
+        WSGI_HANDLER.headers,
+        PyObject_GetAttr(wsgi_object, PY_STRING_response_headers)
+    );
+    PYOBJ_GET_OR_HTTP_500(
+        WSGI_HANDLER.status,
+        PyObject_GetAttr(wsgi_object, PY_STRING_response_status)
+    );
+    goto cleanup;
 
 cleanup:
+    Py_XDECREF(args1);
+    Py_XDECREF(args2);
     Py_XDECREF(wsgi_object);
-    return true;
+    return retval;
 }
 
 static response_status
 wsgi_handler_write(Transaction* transaction)
 {
     /* TODO: Maybe it's faster to write HTTP headers and request body at once? */
-    if(!transaction->headers_sent) {
+    if(!WSGI_HANDLER.headers_sent) {
         /* First time we write to this client, send HTTP headers. */
-        bjoern_wsgi_response_send_headers(transaction);
+        wsgi_handler_send_headers(transaction);
+        WSGI_HANDLER.headers_sent = true;
         return RESPONSE_NOT_YET_FINISHED;
     } else {
         ssize_t bytes_sent = write(
             transaction->client_fd,
-            transaction->request_handler.body
-            transaction->request_handler.body_length
+            WSGI_HANDLER.body,
+            WSGI_HANDLER.body_length
         );
         if(bytes_sent == -1) {
             /* An error occured. */
@@ -144,15 +136,15 @@ wsgi_handler_send_headers(Transaction* transaction)
 
     /* Copy the HTTP status message into the buffer: */
     BUF_CPY("HTTP/1.1 ");
-    BUF_CPY(PyString_AsString(transaction->response_handler->status));
+    BUF_CPY(PyString_AsString(WSGI_HANDLER.status));
     BUF_CPY("\r\n");
 
-    if(transaction->response_headers)
+    if(WSGI_HANDLER.headers)
     {
-        size_t header_tuple_length = PyTuple_GET_SIZE(transaction->response_handler->headers);
+        size_t header_tuple_length = PyTuple_GET_SIZE(WSGI_HANDLER.headers);
         for(int i=0; i<header_tuple_length; ++i)
         {
-            header_tuple = PyTuple_GET_ITEM(transaction->response_handler->headers, i);
+            header_tuple = PyTuple_GET_ITEM(WSGI_HANDLER.headers, i);
             BUF_CPY(PyString_AsString(PyTuple_GetItem(header_tuple, 0)));
             BUF_CPY(": ");
             BUF_CPY(PyString_AsString(PyTuple_GetItem(header_tuple, 1)));
@@ -164,7 +156,7 @@ wsgi_handler_send_headers(Transaction* transaction)
             buffer_position += sprintf(
                 buffer_position,
                 "Content-Length: %d\r\n",
-                transaction->response_handler->body_length
+                WSGI_HANDLER.body_length
             );
     }
 
@@ -174,6 +166,9 @@ wsgi_handler_send_headers(Transaction* transaction)
 
     write(transaction->client_fd, header_buffer,
           buffer_position - orig_buffer_position);
+
+    Py_DECREF(WSGI_HANDLER.headers);
+    Py_DECREF(WSGI_HANDLER.status);
 }
 
 static response_status
@@ -182,21 +177,23 @@ wsgi_handler_sendfile(Transaction* transaction)
     assert(0);
 
     GIL_LOCK();
-    PyFile_IncUseCount((PyFileObject*)transaction->response_file);
+    PyFile_IncUseCount((PyFileObject*)WSGI_HANDLER.file);
     GIL_UNLOCK();
-
-    #define __blaaaa__ sendfile(transaction->client_fd, PyFileno(transaction->response_file), \
-                 /* offset, *must* be */NULL, /* TODO: Proper file size */ 0)
 
     GIL_LOCK();
-    PyFile_DecUseCount((PyFileObject*)transaction->response_file);
+    PyFile_DecUseCount((PyFileObject*)WSGI_HANDLER.file);
     GIL_UNLOCK();
 
-    return RESPONE_FINISHED;
+    Py_DECREF(WSGI_HANDLER.file);
+
+    return RESPONSE_FINISHED;
 }
 
 static void
 wsgi_handler_finalize(Transaction* transaction)
 {
-    assert(0);
+    Py_DECREF(WSGI_HANDLER.request_environ);
+    Py_DECREF(WSGI_HANDLER.dealloc_extra);
 }
+
+#undef WSGI_HANDLER

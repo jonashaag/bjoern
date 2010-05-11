@@ -1,8 +1,13 @@
 #include "bjoern.h"
-#include "parsing.c"
+#include "handlers/wsgi.c"
+#include "handlers/raw.c"
+#ifdef WANT_CACHING
+  #include "handlers/cache.c"
+#endif
 #ifdef WANT_ROUTING
   #include "routing.c"
 #endif
+#include "parsing.c"
 
 static PyMethodDef Bjoern_FunctionTable[] = {
     {"run", Bjoern_Run, METH_VARARGS, "Run bjoern. :-)"},
@@ -12,6 +17,11 @@ static PyMethodDef Bjoern_FunctionTable[] = {
     {NULL,  NULL, 0, NULL}
 };
 
+IF_DEBUG(
+    static PyObject* gc_module
+);
+
+
 PyMODINIT_FUNC init_bjoern()
 {
     #define INIT_PYSTRINGS
@@ -19,6 +29,14 @@ PyMODINIT_FUNC init_bjoern()
     #undef  INIT_PYSTRINGS
 
     Py_InitModule("_bjoern", Bjoern_FunctionTable);
+
+IF_DEBUG(
+    gc_module = PyImport_ImportModule("gc");
+    PyObject* args = PyTuple_Pack(1, PyObject_GetAttrString(gc_module, "DEBUG_LEAK"));
+    Py_INCREF(args);
+    assert(PyObject_CallObject(PyObject_GetAttrString(gc_module, "set_debug"), args) != NULL);
+    Py_DECREF(args)
+);
 
 #ifdef WANT_ROUTING
     import_re_module();
@@ -45,7 +63,8 @@ PyObject* Bjoern_Run(PyObject* self, PyObject* args)
     Py_INCREF(wsgi_layer);
 
     sockfd = init_socket(hostaddress, port);
-    if(sockfd < 0) return PyErr(PyExc_RuntimeError, SOCKET_ERROR_MESSAGES[-sockfd]);
+    if(sockfd < 0)
+        return PyErr(PyExc_RuntimeError, "%s", /* error message */(char*)sockfd);
 
     mainloop = ev_loop_new(0);
 
@@ -65,11 +84,11 @@ PyObject* Bjoern_Run(PyObject* self, PyObject* args)
     Py_RETURN_NONE;
 }
 
-static int
+static ssize_t
 init_socket(const char* hostaddress, const int port)
 {
     sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if(sockfd < 0) return SOCKET_FAILED;
+    if(sockfd < 0) return (size_t) "socket() failed";
 
     DEBUG("sockfd is %d", sockfd);
 
@@ -88,10 +107,10 @@ init_socket(const char* hostaddress, const int port)
 
     int st;
     st = bind(sockfd, &server_address.sockaddress, sizeof(server_address));
-    if(st < 0) return BIND_FAILED;
+    if(st < 0) return (size_t) "bind() failed";
 
     st = listen(sockfd, MAX_LISTEN_QUEUE_LENGTH);
-    if(st < 0) return LISTEN_FAILED;
+    if(st < 0) return (size_t) "listen() failed";
 
     return sockfd;
 }
@@ -186,8 +205,9 @@ on_sock_read(EV_LOOP* mainloop, ev_io* read_watcher_, int revents)
 
             #define TRY_HANDLER(name) \
                     if(name##_handler_initialize(transaction)) {\
-                        transaction->request_handler.writer = name##_handler_write; \
-                        transaction->request_handler.finalizer = name##_handler_finalize; \
+                        DEBUG("Using %s request handler.", #name); \
+                        transaction->handler_write = name##_handler_write; \
+                        transaction->handler_finalize = name##_handler_finalize; \
                         break; \
                     }
 
@@ -205,12 +225,12 @@ on_sock_read(EV_LOOP* mainloop, ev_io* read_watcher_, int revents)
                 case HTTP_INTERNAL_SERVER_ERROR:
                     if(PyErr_Occurred())
                         PyErr_Print();
-                    transaction->request_handler.response = HTTP_500_MESSAGE;
+                    transaction->handler_data.raw.response = HTTP_500_MESSAGE;
                     TRY_HANDLER(raw);
 
                 /* Send a built-in HTTP 404 response. */
                 case HTTP_NOT_FOUND:
-                    transaction->request_handler.response = HTTP_404_MESSAGE;
+                    transaction->handler_data.raw.response = HTTP_404_MESSAGE;
                     TRY_HANDLER(raw);
 
                 default:
@@ -238,7 +258,7 @@ while_sock_canwrite(EV_LOOP* mainloop, ev_io* write_watcher_, int revents)
 {
     Transaction* transaction = OFFSETOF(write_watcher, write_watcher_, Transaction);
 
-    switch(transaction->request_handler.writer(transaction)) {
+    switch(transaction->handler_write(transaction)) {
         case RESPONSE_NOT_YET_FINISHED:
             /* Please come around again. */
             return;
@@ -251,5 +271,26 @@ while_sock_canwrite(EV_LOOP* mainloop, ev_io* write_watcher_, int revents)
 finish:
     ev_io_stop(mainloop, &transaction->write_watcher);
     close(transaction->client_fd);
-    transaction->request_handler.finalizer(transaction);
+    transaction->handler_finalize(transaction);
+    Transaction_free(transaction);
+
+IF_DEBUG(
+    assert(PyObject_CallObject(PyObject_GetAttrString(gc_module, "collect"), NULL) != NULL);
+    PyObject* args = PyTuple_Pack(1, transaction->handler_data.wsgi.request_environ);
+    Py_INCREF(args);
+    PyObject* retval = PyObject_CallObject(PyObject_GetAttrString(gc_module, "get_referrers"), args);
+    assert(retval != NULL);
+    Py_DECREF(args);
+    PyObject* pprint_module;
+    assert((pprint_module = PyImport_ImportModule("pprint")) != NULL);
+    args = PyTuple_Pack(1, retval);
+    Py_INCREF(args);
+    assert(PyObject_CallObject(PyObject_GetAttrString(pprint_module, "pprint"), args) != NULL);
+    Py_DECREF(args);
+    assert((args = PyTuple_Pack(1, PyObject_GetAttrString(gc_module, "garbage"))) != NULL);
+    Py_INCREF(args);
+    assert(PyObject_CallObject(PyObject_GetAttrString(pprint_module, "pprint"), args) != NULL); 
+    Py_DECREF(args);
+    fflush(stdout)
+);
 }

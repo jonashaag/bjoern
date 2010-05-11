@@ -1,16 +1,17 @@
 static bool
-cache_handler_initialize(Transaction* transaction)
+raw_handler_initialize(Transaction* transaction)
 {
-    transaction->request_handler->response_length = strlen(transaction->request_handler->response);
+    transaction->handler_data.raw.response_length = strlen(transaction->handler_data.raw.response);
+    return true;
 }
 
 static response_status
-cache_handler_write(Transaction* transaction)
+raw_handler_write(Transaction* transaction)
 {
     ssize_t bytes_sent = write(
         transaction->client_fd,
-        transaction->request_handler.response
-        transaction->request_handler.response_length
+        transaction->handler_data.raw.response,
+        transaction->handler_data.raw.response_length
     );
     if(bytes_sent == -1) {
         /* An error occured. */
@@ -23,6 +24,6 @@ cache_handler_write(Transaction* transaction)
 }
 
 static void
-cache_handler_finalize(Transaction* transaction)
+raw_handler_finalize(Transaction* transaction)
 {
 }

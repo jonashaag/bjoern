@@ -1,9 +1,9 @@
-#define STOP_PARSER(code)   do { \
-                                ((bjoern_http_parser*)parser)->exit_code = code; \
-                                return PARSER_EXIT; \
-                            } while(0)
-#define GET_TRANSACTION ((bjoern_http_parser*)parser)->transaction
-
+#define STOP_PARSER(code) \
+            do { \
+                ((bjoern_http_parser*)parser)->exit_code = code; \
+                return PARSER_EXIT; \
+            } while(0)
+#define WSGI_HANDLER (((bjoern_http_parser*)parser)->transaction->handler_data.wsgi)
 /*
     Initialize the http parser.
 */
@@ -40,16 +40,16 @@ http_on_end_parsing(http_parser* parser)
     }
 
     PyDict_SetItem(
-        GET_TRANSACTION->wsgi_environ,
+        WSGI_HANDLER.request_environ,
         PY_STRING_REQUEST_METHOD,
         py_request_method
     );
 
     /* Set the CONTENT_TYPE, which is the same as HTTP_CONTENT_TYPE. */
-    PyObject* content_type = PyDict_GetItem(GET_TRANSACTION->wsgi_environ,
+    PyObject* content_type = PyDict_GetItem(WSGI_HANDLER.request_environ,
                                             PY_STRING_HTTP_CONTENT_TYPE);
     if(content_type) {
-        PyDict_SetItem(GET_TRANSACTION->wsgi_environ,
+        PyDict_SetItem(WSGI_HANDLER.request_environ,
                        PY_STRING_CONTENT_TYPE, content_type);
     }
 
@@ -66,31 +66,34 @@ static int
 http_on_path(http_parser* parser, const char* path_start, size_t path_length)
 {
 #ifdef WANT_CACHING
-    if(CACHE_HAS(path_start, path_length)) {
+    if(cache_has(path_start, path_length)) {
         ((char*)path_start)[path_length] = '\0'; /* <-- we can do this safely because we need nothing but the URL for the cache stuff */
         parser->data = (void*)path_start;
         /* Stop parsing here, we don't need any more information: */
         STOP_PARSER(USE_CACHE);
     }
 #endif
+
     PyObject* py_path = PyStringWithLen(path_start, path_length);
     if(py_path == NULL)
         STOP_PARSER(HTTP_INTERNAL_SERVER_ERROR);
 
-    Py_INCREF(py_path);
-
 #ifdef WANT_ROUTING
     Route* route = get_route_for_url(py_path);
     if(route == NULL) {
-        Py_DECREF(py_path);
-        /* TODO: 404 fallback callback? */
+        /* TODO: user-defined 404 fallback callback? */
         STOP_PARSER(HTTP_NOT_FOUND);
     }
-
-    parser->data = (void*)route;
+    WSGI_HANDLER.route = route;
 #endif
 
-    PyDict_SetItem(GET_TRANSACTION->wsgi_environ, PY_STRING_PATH_INFO, py_path);
+    /* Create a new response header dictionary. */
+    WSGI_HANDLER.request_environ = PyDict_New();
+    if(WSGI_HANDLER.request_environ == NULL)
+        STOP_PARSER(HTTP_INTERNAL_SERVER_ERROR);
+    Py_INCREF(WSGI_HANDLER.request_environ);
+
+    PyDict_SetItem(WSGI_HANDLER.request_environ, PY_STRING_PATH_INFO, py_path);
 
     return PARSER_CONTINUE;
 }
@@ -102,16 +105,9 @@ static int
 http_on_query(http_parser* parser, const char* query_start, size_t query_length)
 {
     PyObject* py_tmp = PyStringWithLen(query_start, query_length);
-    Py_INCREF(py_tmp);
-
-    PyDict_SetItem(GET_TRANSACTION->wsgi_environ, PY_STRING_QUERY_STRING, py_tmp);
+    PyDict_SetItem(WSGI_HANDLER.request_environ, PY_STRING_QUERY_STRING, py_tmp);
 
     return PARSER_CONTINUE;
-}
-
-static PyObject* PyStringWithL(const char* str, const int l)
-{
-    return PyStringWithLen(str, l);
 }
 
 /*
@@ -137,12 +133,10 @@ static inline void store_current_header(bjoern_http_parser* parser)
     bjoern_http_to_wsgi_header(&header_name[5], parser->header_name_start,
                                                 parser->header_name_length);
 
-    PyObject* py_header_value = PyStringWithL(parser->header_value_start,
+    PyObject* py_header_value = PyStringWithLen(parser->header_value_start,
                                                 parser->header_value_length);
-    Py_INCREF(py_header_value);
-
-
-    PyDict_SetItem(GET_TRANSACTION->wsgi_environ, py_header_name, py_header_value);
+    PyDict_SetItem(WSGI_HANDLER.request_environ, py_header_name, py_header_value);
+    Py_DECREF(py_header_name);
 }
 
 
@@ -237,4 +231,4 @@ static struct http_parser_settings
     http_on_end_parsing,        /* http_cb      on_message_complete; */
 };
 
-#undef GET_TRANSACTION
+#undef WSGI_HANDLER

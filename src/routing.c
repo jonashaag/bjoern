@@ -10,19 +10,18 @@ import_re_module()
 {
     PyObject* re_module = PyImport_ImportModule("re");
     _re_compile = PyObject_GetAttrString(re_module, "compile");
-    Py_INCREF(_re_compile);
+    Py_DECREF(_re_compile);
+    assert(_re_compile->ob_refcnt == 1);
 }
 
 static PyRegex*
 re_compile(PyObject* pattern)
 {
     PyObject* args = PyTuple_Pack(/* size */ 1, pattern);
-    Py_INCREF(args);
-
-    PyRegex* regex = PyObject_Call(_re_compile, args, /* kwargs */ NULL);
-    if(regex == NULL)
-        return NULL;
-    Py_INCREF(regex);
+    PyRegex* regex = PyObject_CallObject(_re_compile, args);
+    Py_DECREF(args);
+    Py_DECREF(regex);
+    assert(regex->ob_refcnt == 1);
     return regex;
 }
 
@@ -78,13 +77,14 @@ Route_new(PyObject* pattern, PyObject* wsgi_callback)
 static Route*
 get_route_for_url(PyObject* url)
 {
+    Py_INCREF(url);
     PyObject* args = PyTuple_Pack(1, url);
-    Py_INCREF(args);
 
     PyObject* py_tmp;
     Route* route = first_route;
     while(route) {
-        py_tmp = PyObject_Call(route->pattern_match_func, args, /* kwargs */ NULL);
+        py_tmp = PyObject_CallObject(route->pattern_match_func, args);
+        Py_DECREF(py_tmp);
         if(py_tmp != Py_None) {
             /* Match successful */
             goto cleanup;
@@ -94,5 +94,6 @@ get_route_for_url(PyObject* url)
 
 cleanup:
     Py_DECREF(args);
+    Py_DECREF(url);
     return route;
 }

@@ -1,1 +1,8 @@
-We only need one http parser
+
+        TODO/BUGS
+    =================
+
+* We only need one http parser
+* fix wsgi handler:
+  `.request_environ` seems to not be collected by the garbage collector;
+  check refcount

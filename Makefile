@@ -75,7 +75,7 @@ valgrind: nodebugprints
 	valgrind $(TEST)
 
 memcheck: nodebugprints
-	valgrind --tool=memcheck --leak-check=full $(TEST)
+	valgrind --tool=memcheck --leak-check=full --show-reachable=yes $(TEST)
 
 callgrind: nodebugprints clean-callgrind
 	valgrind --tool=callgrind $(TEST)
