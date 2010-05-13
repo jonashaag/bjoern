@@ -15,7 +15,7 @@ cache_handler_write(Transaction* transaction)
     assert(0);
 }
 
-static void
+static inline void
 cache_handler_finalize(Transaction* transaction)
 {
 }

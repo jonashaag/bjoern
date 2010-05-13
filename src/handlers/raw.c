@@ -23,7 +23,7 @@ raw_handler_write(Transaction* transaction)
     return RESPONSE_FINISHED;
 }
 
-static void
+static inline void
 raw_handler_finalize(Transaction* transaction)
 {
 }

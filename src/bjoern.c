@@ -204,12 +204,10 @@ on_sock_read(EV_LOOP* mainloop, ev_io* read_watcher_, int revents)
             );
 
             #define TRY_HANDLER(name) \
-                    if(name##_handler_initialize(transaction)) {\
-                        DEBUG("Using %s request handler.", #name); \
-                        transaction->handler_write = name##_handler_write; \
-                        transaction->handler_finalize = name##_handler_finalize; \
-                        break; \
-                    }
+                transaction->handler_write = name##_handler_write; \
+                transaction->handler_finalize = name##_handler_finalize; \
+                if(name##_handler_initialize(transaction)) \
+                    break; \
 
             switch(transaction->request_parser->exit_code) {
 #ifdef WANT_CACHING

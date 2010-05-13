@@ -4,7 +4,7 @@
                 PARSER->exit_code = code; \
                 return PARSER_EXIT; \
             } while(0)
-#define WSGI_HANDLER (PARSER->transaction->handler_data.wsgi)
+#define WSGI_HANDLER_DATA (PARSER->transaction->handler_data.wsgi)
 /*
     Initialize the http parser.
 */
@@ -41,16 +41,16 @@ http_on_end_parsing(http_parser* parser)
     }
 
     PyDict_SetItem(
-        WSGI_HANDLER.request_environ,
+        WSGI_HANDLER_DATA.request_environ,
         PYSTRING(REQUEST_METHOD),
         py_request_method
     );
 
     /* Set the CONTENT_TYPE, which is the same as HTTP_CONTENT_TYPE. */
-    PyObject* content_type = PyDict_GetItem(WSGI_HANDLER.request_environ,
+    PyObject* content_type = PyDict_GetItem(WSGI_HANDLER_DATA.request_environ,
                                             PYSTRING(HTTP_CONTENT_TYPE));
     if(content_type) {
-        PyDict_SetItem(WSGI_HANDLER.request_environ,
+        PyDict_SetItem(WSGI_HANDLER_DATA.request_environ,
                        PYSTRING(CONTENT_TYPE), content_type);
     }
 
@@ -87,15 +87,15 @@ http_on_path(http_parser* parser, const char* path_start, size_t path_length)
         Py_DECREF(py_path);
         STOP_PARSER(HTTP_NOT_FOUND);
     }
-    WSGI_HANDLER.route = route;
+    WSGI_HANDLER_DATA.route = route;
 #endif
 
     /* Create a new response header dictionary. */
-    WSGI_HANDLER.request_environ = PyDict_New();
-    if(WSGI_HANDLER.request_environ == NULL)
+    WSGI_HANDLER_DATA.request_environ = PyDict_New();
+    if(WSGI_HANDLER_DATA.request_environ == NULL)
         STOP_PARSER(HTTP_INTERNAL_SERVER_ERROR);
 
-    PyDict_SetItem(WSGI_HANDLER.request_environ, PYSTRING(PATH_INFO), py_path);
+    PyDict_SetItem(WSGI_HANDLER_DATA.request_environ, PYSTRING(PATH_INFO), py_path);
 
     return PARSER_CONTINUE;
 }
@@ -107,7 +107,7 @@ static int
 http_on_query(http_parser* parser, const char* query_start, size_t query_length)
 {
     PyObject* py_tmp = PyString_FromStringAndSize(query_start, query_length);
-    PyDict_SetItem(WSGI_HANDLER.request_environ, PYSTRING(QUERY_STRING), py_tmp);
+    PyDict_SetItem(WSGI_HANDLER_DATA.request_environ, PYSTRING(QUERY_STRING), py_tmp);
 
     return PARSER_CONTINUE;
 }
@@ -133,7 +133,7 @@ static inline void store_current_header(bjoern_http_parser* parser)
 
     header_value = PyString_FromStringAndSize(parser->header_value_start,
                                               parser->header_value_length);
-    PyDict_SetItem(WSGI_HANDLER.request_environ, header_name, header_value);
+    PyDict_SetItem(WSGI_HANDLER_DATA.request_environ, header_name, header_value);
 
     Py_DECREF(header_name);
     Py_DECREF(header_value);
@@ -230,4 +230,4 @@ parser_settings = {
 };
 
 #undef PARSER
-#undef WSGI_HANDLER
+#undef WSGI_HANDLER_DATA

@@ -30,7 +30,7 @@ CC_ARGS		= $(LDFLAGS) -o $(OUTPUT_FILES)  $(SOURCE_FILES)
 
 OUTPUT_FILES	= _bjoern.so
 
-HTTP_PARSER_MODULE	= include/http-parser/http_parser_debug.o
+HTTP_PARSER_MODULE	= include/http-parser/http_parser_g.o
 SOURCE_FILES	= $(HTTP_PARSER_MODULE)	\
 		  src/bjoern.c
 
@@ -58,11 +58,11 @@ warnall:
 
 opt:
 	$(CC) $(CFLAGS_OPT) $(CC_ARGS)
-	strip $(OUTFILES)
+	strip $(OUTPUT_FILES)
 
 optdebug:
 	$(CC) $(CFLAGS_OPTDEBUG) $(CC_ARGS)
-	strip $(OUTFILES)
+	strip $(OUTPUT_FILES)
 
 optsmall:
 	$(CC) $(CFLAGS_OPTSMALL) $(CC_ARGS)

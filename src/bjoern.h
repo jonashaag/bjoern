@@ -19,8 +19,6 @@
 #include <arpa/inet.h>
 
 
-#define OFFSETOF(mbr_name, ptr, type)  ((type*) (((char*)ptr) - offsetof(type, mbr_name)))
-
 typedef struct ev_loop EV_LOOP;
 typedef struct _Transaction Transaction;
 typedef struct _bjoern_http_parser bjoern_http_parser;
@@ -33,10 +31,10 @@ typedef struct _cache_handler_data cache_handler_data;
 typedef enum { RESPONSE_FINISHED = 1, RESPONSE_NOT_YET_FINISHED = 2} response_status;
 
 
-#include "http_status_codes.h"
-#include "stringcache.h"
-#include "debug.h"
 #include "utils.h"
+#include "debug.h"
+#include "stringcache.h"
+#include "http_status_codes.h"
 
 #ifdef WANT_ROUTING
   #include "routing.h"
