@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <stddef.h>
 #include <sys/types.h>
@@ -18,6 +19,8 @@
 #include <arpa/inet.h>
 
 
+#define OFFSETOF(mbr_name, ptr, type)  ((type*) (((char*)ptr) - offsetof(type, mbr_name)))
+
 typedef struct ev_loop EV_LOOP;
 typedef struct _Transaction Transaction;
 typedef struct _bjoern_http_parser bjoern_http_parser;
@@ -29,25 +32,23 @@ typedef struct _cache_handler_data cache_handler_data;
 
 typedef enum { RESPONSE_FINISHED = 1, RESPONSE_NOT_YET_FINISHED = 2} response_status;
 
-#include "shortcuts.h"
-#include "http-status-codes.h"
-#include "strings.h"
-#include "utils.c"
-#include "parsing.h"
+
+#include "http_status_codes.h"
+#include "stringcache.h"
+#include "debug.h"
+#include "utils.h"
 
 #ifdef WANT_ROUTING
-#include "routing.h"
+  #include "routing.h"
 #endif
-
+#include "parsing.h"
 #include "handlers/wsgi.h"
 #include "handlers/raw.h"
-
 #ifdef WANT_CACHING
-#include "handlers/cache.h"
+  #include "handlers/cache.h"
 #endif
 
 #include "transaction.h"
-
 #include "config.h"
 
 
@@ -58,7 +59,6 @@ static PyObject*    wsgi_layer;
   /* No routing, use one application for every request */
 static PyObject*    wsgi_application;
 #endif
-static PyGILState_STATE _GILState;
 
 
 #define ev_io_callback void

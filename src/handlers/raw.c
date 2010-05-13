@@ -18,7 +18,7 @@ raw_handler_write(Transaction* transaction)
         if(errno == EAGAIN)
             return RESPONSE_NOT_YET_FINISHED; /* Try again next time. */
         else
-            DO_NOTHING; /* TODO: Machwas! */
+            ; /* TODO: Machwas! */
     }
     return RESPONSE_FINISHED;
 }

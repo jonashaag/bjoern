@@ -1,10 +1,22 @@
-FEATURES    	= -D WANT_ROUTING -D WANT_CACHING
+WANT_ROUTING	= yes
+WANT_CACHING	= yes
+
+FEATURES		=
+ifeq ($(WANT_ROUTING), yes)
+FEATURES		+= -D WANT_ROUTING
+endif
+ifeq ($(WANT_CACHING), yes)
+FEATURES		+= -D WANT_CACHING
+endif
 
 CC              = gcc
 CFLAGS_NODEBUG  = -std=c99 -pedantic -Wall -fno-strict-aliasing -shared $(FEATURES)
 CFLAGS_NODEBUGP = $(CFLAGS_NODEBUG) -g
 CFLAGS          = $(CFLAGS_NODEBUGP) -D DEBUG
-CFLAGS_WARNALL  = $(CFLAGS) -Wextra
+CFLAGS_OPTDEBUG = $(CFLAGS_NODEBUGP) -O3
+CFLAGS_OPT      = $(CFLAGS_NODEBUG) -O3
+CLFAGS_OPTSMALL = $(CFLAGS_NODEBUG) -Os
+CFLAGS_WARNALL  = $(CFLAGS_OPT) -Wextra
 INCLUDE_DIRS    = -I .							\
 				  -I src                     	\
 				  -I src/headers 				\
@@ -12,24 +24,24 @@ INCLUDE_DIRS    = -I .							\
 				  -I include 					\
 				  -I include/http-parser
 LDFLAGS         = $(INCLUDE_DIRS) -l ev -I http-parser -l python2.6
-CFLAGS_OPTDEBUG = $(CFLAGS_NODEBUGP) -O3
-CFLAGS_OPT      = $(CFLAGS_NODEBUG) -O3
-CLFAGS_OPTSMALL = $(CFLAGS_NODEBUG) -Os
 
-OUTFILES		= _bjoern.so
-FILES           = src/bjoern.c
-FILES_NODEBUG   = $(FILES) include/http-parser/http_parser.o
-FILES_DEBUG     = $(FILES) include/http-parser/http_parser_debug.o
+CC_ARGS			= $(LDFLAGS) -o $(OUTPUT_FILES)  $(SOURCE_FILES)
+
+OUTPUT_FILES	= _bjoern.so
+
+HTTP_PARSER_MODULE	= include/http-parser/http_parser_debug.o
+SOURCE_FILES    = $(HTTP_PARSER_MODULE)	\
+				  src/bjoern.c
 
 TEST            = python tests
 PAGER		 	= less
 
 
 all: clean
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $(OUTFILES) $(FILES_DEBUG)
+	$(CC) $(CFLAGS) $(CC_ARGS)
 
 nodebugprints:
-	$(CC) $(CFLAGS_NODEBUGP) $(LDFLAGS) -o $(OUTFILES) $(FILES_DEBUG)
+	$(CC) $(CFLAGS_NODEBUGP) $(CC_ARGS)
 
 prep:
 	$(CC) $(LDFLAGS) $(CFLAGS) -E $(FILES) | ${PAGER}
@@ -41,18 +53,18 @@ assembleropt:
 	$(CC) $(LDFLAGS) $(CFLAGS_OPTDEBUG) -S $(FILES)
 
 warnall:
-	$(CC) $(CFLAGS_WARNALL) $(LDFLAGS) -o $(OUTFILES) $(FILES_DEBUG)
+	$(CC) $(CFLAGS_WARNALL) $(CC_ARGS)
 
 opt:
-	$(CC) $(CFLAGS_OPT) $(LDFLAGS) -o $(OUTFILES) $(FILES_NODEBUG)
+	$(CC) $(CFLAGS_OPT) $(CC_ARGS)
 	strip $(OUTFILES)
 
 optdebug:
-	$(CC) $(CFLAGS_OPTDEBUG) $(LDFLAGS) -o $(OUTFILES) $(FILES_DEBUG)
+	$(CC) $(CFLAGS_OPTDEBUG) $(CC_ARGS)
 	strip $(OUTFILES)
 
 optsmall:
-	$(CC) $(CFLAGS_OPTSMALL) $(LDFLAGS) -o $(OUTFILES) $(FILES_NODEBUG)
+	$(CC) $(CFLAGS_OPTSMALL) $(CC_ARGS)
 
 clean:
 	rm -f *.o

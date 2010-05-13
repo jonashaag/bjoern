@@ -24,7 +24,7 @@ def page(env, start_response):
     return PAGES['foo']
 
 @route('/')
-def page(env, start_response):
+def home(env, start_response):
     start_response('200 Hi was geht', (('Content-type', 'text/plain'),))
     return PAGES['home']
 

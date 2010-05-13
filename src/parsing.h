@@ -8,6 +8,8 @@ enum http_parser_exit_codes {
     /* PLUS `enum http_status_codes` */
 };
 
+http_parser_settings parser_settings;
+
 struct _bjoern_http_parser {
     http_parser     http_parser;
     Transaction*    transaction;

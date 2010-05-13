@@ -1,13 +1,14 @@
 #include "bjoern.h"
+#include "utils.c"
+#include "parsing.c"
+#ifdef WANT_ROUTING
+  #include "routing.c"
+#endif
 #include "handlers/wsgi.c"
 #include "handlers/raw.c"
 #ifdef WANT_CACHING
   #include "handlers/cache.c"
 #endif
-#ifdef WANT_ROUTING
-  #include "routing.c"
-#endif
-#include "parsing.c"
 
 static PyMethodDef Bjoern_FunctionTable[] = {
     {"run", Bjoern_Run, METH_VARARGS, "Run bjoern. :-)"},
@@ -24,16 +25,12 @@ IF_DEBUG(
 
 PyMODINIT_FUNC init_bjoern()
 {
-    #define INIT_PYSTRINGS
-    #include "strings.h"
-    #undef  INIT_PYSTRINGS
-
+    #include "stringcache.h"
     Py_InitModule("_bjoern", Bjoern_FunctionTable);
 
 IF_DEBUG(
     gc_module = PyImport_ImportModule("gc");
     PyObject* args = PyTuple_Pack(1, PyObject_GetAttrString(gc_module, "DEBUG_LEAK"));
-    Py_INCREF(args);
     assert(PyObject_CallObject(PyObject_GetAttrString(gc_module, "set_debug"), args) != NULL);
     Py_DECREF(args)
 );
@@ -63,8 +60,10 @@ PyObject* Bjoern_Run(PyObject* self, PyObject* args)
     Py_INCREF(wsgi_layer);
 
     sockfd = init_socket(hostaddress, port);
-    if(sockfd < 0)
-        return PyErr(PyExc_RuntimeError, "%s", /* error message */(char*)sockfd);
+    if(sockfd < 0) {
+        PyErr_Format(PyExc_RuntimeError, "%s", /* error message */(char*)sockfd);
+        return NULL;
+    }
 
     mainloop = ev_loop_new(0);
 
@@ -126,10 +125,11 @@ on_sigint_received(EV_LOOP* mainloop, ev_signal *signal, int revents)
 
 static Transaction* Transaction_new()
 {
-    Transaction* transaction = ALLOC(sizeof(Transaction));
+    /* calloc(n, m): allocate n*m bytes of NULL-ed memory */
+    Transaction* transaction = calloc(1, sizeof(Transaction));
 
     /* Allocate and initialize the http parser. */
-    transaction->request_parser = ALLOC(sizeof(bjoern_http_parser));
+    transaction->request_parser = calloc(1, sizeof(bjoern_http_parser));
     if(!transaction->request_parser) {
         free(transaction);
         return NULL;
@@ -162,8 +162,8 @@ on_sock_accept(EV_LOOP* mainloop, ev_io* accept_watcher, int revents)
     DEBUG("Accepted client on %d.", transaction->client_fd);
 
     /* Set the file descriptor non-blocking. */
-    fcntl(transaction->client_fd, F_SETFL,
-          MAX(fcntl(transaction->client_fd, F_GETFL, 0), 0) | O_NONBLOCK);
+    int v = fcntl(transaction->client_fd, F_GETFL, 0);
+    fcntl(transaction->client_fd, F_SETFL, (v < 0 ? 0 : v) | O_NONBLOCK);
 
     /* Run the read-watch loop. */
     ev_io_init(&transaction->read_watcher, &on_sock_read, transaction->client_fd, EV_READ);
@@ -274,23 +274,30 @@ finish:
     transaction->handler_finalize(transaction);
     Transaction_free(transaction);
 
+#if 0
 IF_DEBUG(
+    /* import pprint */
+    PyObject* pprint_module;
+    PyObject* args;
+    assert((pprint_module = PyImport_ImportModule("pprint")) != NULL);
+
+    /* gc.collect() */
     assert(PyObject_CallObject(PyObject_GetAttrString(gc_module, "collect"), NULL) != NULL);
-    PyObject* args = PyTuple_Pack(1, transaction->handler_data.wsgi.request_environ);
-    Py_INCREF(args);
+
+    /* print gc.get_referrers(wsgi.request_environ) */
+    args = PyTuple_Pack(1, transaction->handler_data.wsgi.request_environ);
     PyObject* retval = PyObject_CallObject(PyObject_GetAttrString(gc_module, "get_referrers"), args);
     assert(retval != NULL);
     Py_DECREF(args);
-    PyObject* pprint_module;
-    assert((pprint_module = PyImport_ImportModule("pprint")) != NULL);
     args = PyTuple_Pack(1, retval);
-    Py_INCREF(args);
     assert(PyObject_CallObject(PyObject_GetAttrString(pprint_module, "pprint"), args) != NULL);
     Py_DECREF(args);
+
+    /* print gc.garbage() */
     assert((args = PyTuple_Pack(1, PyObject_GetAttrString(gc_module, "garbage"))) != NULL);
-    Py_INCREF(args);
-    assert(PyObject_CallObject(PyObject_GetAttrString(pprint_module, "pprint"), args) != NULL); 
+    assert(PyObject_CallObject(PyObject_GetAttrString(pprint_module, "pprint"), args) != NULL);
     Py_DECREF(args);
     fflush(stdout)
 );
+#endif
 }

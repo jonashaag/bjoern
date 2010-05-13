@@ -19,12 +19,14 @@ wsgi_handler_initialize(Transaction* transaction)
 #endif
 
     /* Create a new instance of the WSGI layer class. */
-    PYOBJ_GET_OR_HTTP_500(args1, PyTuple_Pack(/* size */ 1, WSGI_HANDLER.request_environ));
+    PYOBJ_GET_OR_HTTP_500(args1,
+        PyTuple_Pack_NoINCREF(/* size */ 1, WSGI_HANDLER.request_environ));
     PYOBJ_GET_OR_HTTP_500(wsgi_object, PyObject_CallObject(wsgi_layer, args1));
 
     /* Call the WSGI application: app(environ, start_response). */
-    PYOBJ_GET_OR_HTTP_500(args2, PyTuple_Pack(/* size */ 2, WSGI_HANDLER.request_environ,
-                                              PyObject_GetAttr(wsgi_object, PY_STRING_start_response)));
+    PYOBJ_GET_OR_HTTP_500(args2,
+        PyTuple_Pack_NoINCREF(/* size */ 2, WSGI_HANDLER.request_environ,
+                              PyObject_GetAttr(wsgi_object, PYSTRING(start_response))));
 
 #ifdef WANT_ROUTING
     PYOBJ_GET_OR_HTTP_500(return_value,
@@ -80,11 +82,11 @@ response:
     WSGI_HANDLER.body_length = strlen(WSGI_HANDLER.body);
     PYOBJ_GET_OR_HTTP_500(
         WSGI_HANDLER.headers,
-        PyObject_GetAttr(wsgi_object, PY_STRING_response_headers)
+        PyObject_GetAttr(wsgi_object, PYSTRING(response_headers))
     );
     PYOBJ_GET_OR_HTTP_500(
         WSGI_HANDLER.status,
-        PyObject_GetAttr(wsgi_object, PY_STRING_response_status)
+        PyObject_GetAttr(wsgi_object, PYSTRING(response_status))
     );
     goto cleanup;
 
@@ -115,7 +117,7 @@ wsgi_handler_write(Transaction* transaction)
             if(errno == EAGAIN)
                 return RESPONSE_NOT_YET_FINISHED; /* Try again next time. */
             else
-                DO_NOTHING; /* TODO: Machwas! */
+                ; /* TODO: Machwas! */
         }
         return RESPONSE_FINISHED;
     }
@@ -176,13 +178,17 @@ wsgi_handler_sendfile(Transaction* transaction)
 {
     assert(0);
 
-    GIL_LOCK();
-    PyFile_IncUseCount((PyFileObject*)WSGI_HANDLER.file);
-    GIL_UNLOCK();
+    PyGILState_STATE GILState;
 
-    GIL_LOCK();
+    GIL_LOCK(GILState);
+    PyFile_IncUseCount((PyFileObject*)WSGI_HANDLER.file);
+    GIL_UNLOCK(GILState);
+
+    /* sendfile(...) */
+
+    GIL_LOCK(GILState);
     PyFile_DecUseCount((PyFileObject*)WSGI_HANDLER.file);
-    GIL_UNLOCK();
+    GIL_UNLOCK(GILState);
 
     Py_DECREF(WSGI_HANDLER.file);
 
