@@ -1,40 +1,41 @@
+# vim :tabstop=8 :noexpandtag
 WANT_ROUTING	= yes
 WANT_CACHING	= yes
 
-FEATURES		=
+FEATURES	=
 ifeq ($(WANT_ROUTING), yes)
-FEATURES		+= -D WANT_ROUTING
+FEATURES	+= -D WANT_ROUTING
 endif
 ifeq ($(WANT_CACHING), yes)
-FEATURES		+= -D WANT_CACHING
+FEATURES	+= -D WANT_CACHING
 endif
 
-CC              = gcc
-CFLAGS_NODEBUG  = -std=c99 -pedantic -Wall -fno-strict-aliasing -shared $(FEATURES)
-CFLAGS_NODEBUGP = $(CFLAGS_NODEBUG) -g
-CFLAGS          = $(CFLAGS_NODEBUGP) -D DEBUG
-CFLAGS_OPTDEBUG = $(CFLAGS_NODEBUGP) -O3
-CFLAGS_OPT      = $(CFLAGS_NODEBUG) -O3
-CLFAGS_OPTSMALL = $(CFLAGS_NODEBUG) -Os
-CFLAGS_WARNALL  = $(CFLAGS_OPT) -Wextra
-INCLUDE_DIRS    = -I .							\
-				  -I src                     	\
-				  -I src/headers 				\
-				  -I /usr/include/python2.6/	\
-				  -I include 					\
-				  -I include/http-parser
-LDFLAGS         = $(INCLUDE_DIRS) -l ev -I http-parser -l python2.6
+CC		= gcc
+CFLAGS_NODEBUG	= -std=c99 -pedantic -Wall -fno-strict-aliasing -shared $(FEATURES)
+CFLAGS_NODEBUGP	= $(CFLAGS_NODEBUG) -g
+CFLAGS		= $(CFLAGS_NODEBUGP) -D DEBUG
+CFLAGS_OPTDEBUG	= $(CFLAGS_NODEBUGP) -O3
+CFLAGS_OPT	= $(CFLAGS_NODEBUG) -O3
+CLFAGS_OPTSMALL	= $(CFLAGS_NODEBUG) -Os
+CFLAGS_WARNALL	= $(CFLAGS_OPT) -Wextra
+INCLUDE_DIRS	= -I .				\
+		  -I src			\
+		  -I src/headers 		\
+		  -I /usr/include/python2.6/	\
+		  -I include 			\
+		  -I include/http-parser
+LDFLAGS		= $(INCLUDE_DIRS) -l ev -I http-parser -l python2.6
 
-CC_ARGS			= $(LDFLAGS) -o $(OUTPUT_FILES)  $(SOURCE_FILES)
+CC_ARGS		= $(LDFLAGS) -o $(OUTPUT_FILES)  $(SOURCE_FILES)
 
 OUTPUT_FILES	= _bjoern.so
 
 HTTP_PARSER_MODULE	= include/http-parser/http_parser_debug.o
-SOURCE_FILES    = $(HTTP_PARSER_MODULE)	\
-				  src/bjoern.c
+SOURCE_FILES	= $(HTTP_PARSER_MODULE)	\
+		  src/bjoern.c
 
-TEST            = python tests
-PAGER		 	= less
+TEST		= python tests
+PAGER		= less
 
 
 all: clean
