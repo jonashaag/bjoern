@@ -1,4 +1,4 @@
-# vim :tabstop=8 :noexpandtag
+# vim :tabstop=8 :noexpandtab
 WANT_ROUTING	= yes
 WANT_CACHING	= yes
 
