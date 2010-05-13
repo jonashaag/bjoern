@@ -198,7 +198,7 @@ on_sock_read(EV_LOOP* mainloop, ev_io* read_watcher_, int revents)
         default:
             bytes_parsed = http_parser_execute(
                 (http_parser*)transaction->request_parser,
-                parser_settings,
+                &parser_settings,
                 read_buffer,
                 bytes_read
             );
