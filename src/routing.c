@@ -70,24 +70,27 @@ Route_new(PyObject* pattern, PyObject* wsgi_callback)
 }
 
 
-static Route*
-get_route_for_url(PyObject* url)
+static void
+get_route_for_url(PyObject* url, Route** route_, PyObject** matchdict_)
 {
     PyObject* args = PyTuple_Pack(1, url);
-
-    PyObject* py_tmp;
+    PyObject* matchobj;
     Route* route = first_route;
     while(route) {
-        py_tmp = PyObject_CallObject(route->pattern_match_func, args);
-        Py_DECREF(py_tmp);
-        if(py_tmp != Py_None) {
+        matchobj = PyObject_CallObject(route->pattern_match_func, args);
+        if(matchobj != Py_None) {
             /* Match successful */
+            PyObject* matchdict = PyObject_CallObject(PyObject_GetAttrString(matchobj, "groupdict"), NULL);
+            assert(matchdict);
+            (*route_) = route;
+            (*matchdict_) = matchdict;
+            Py_DECREF(matchobj);
             goto cleanup;
         }
+        Py_DECREF(matchobj);
         route = route->next;
     }
 
 cleanup:
     Py_DECREF(args);
-    return route;
 }

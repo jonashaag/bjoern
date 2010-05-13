@@ -43,3 +43,9 @@ class Response(object):
         else:
             self.response_status  = response_status
             self.response_headers = response_headers
+
+def route(pat):
+    def wrapper(func):
+        add_route('^{pattern}$'.format(pattern=pat), func)
+        return func
+    return wrapper

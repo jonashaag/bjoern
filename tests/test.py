@@ -19,19 +19,12 @@ foo
 what's up?"""
 )
 
-
-def route(pat):
-    def wrapper(func):
-        bjoern.add_route('^{pattern}$'.format(pattern=pat), func)
-        return func
-    return wrapper
-
-@route('/page/[a-z]+')
+@bjoern.route('/page/[a-z]+')
 def page(env, start_response):
     start_response('200 Alles ok', (('Content-Type', 'text/plain'),))
     return PAGES['foo']
 
-@route('/files/.*')
+@bjoern.route('/files/.*')
 def files(env, start_response):
     file_= env['PATH_INFO'][len('/files/'):]
     if file_:
@@ -39,7 +32,7 @@ def files(env, start_response):
     start_response('200 Alles ok', (('Content-Type', 'text/html'),))
     return listdir('~/movies')
 
-@route('/')
+@bjoern.route('/')
 def home(env, start_response):
     start_response('200 Hi was geht', (('Content-type', 'text/plain'),))
     return PAGES['home']

@@ -22,6 +22,6 @@ Route* last_route;
 static PyObject* _re_compile;
 
 static PyObject* Bjoern_Route_Add(PyObject* self, PyObject* args);
-static Route* get_route_for_url(PyObject* url);
+static void get_route_for_url(PyObject* url, Route** route, PyObject** matchdict);
 static void init_routing();
 static void import_re_module();

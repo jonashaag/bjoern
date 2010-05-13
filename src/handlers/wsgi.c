@@ -24,7 +24,7 @@ wsgi_handler_initialize(Transaction* transaction)
         wsgi_object = PyObject_CallObject(wsgi_layer, args1)
     );
 
-    /* Call the WSGI application: app(environ, start_response). */
+    /* Call the WSGI application: app(environ, start_response, [**kwargs]). */
     HTTP_500_IF_FALSE(
         args2 = PyTuple_Pack_NoINCREF(
             /* size */ 2,
@@ -35,11 +35,11 @@ wsgi_handler_initialize(Transaction* transaction)
 
 #ifdef WANT_ROUTING
     HTTP_500_IF_FALSE(
-        return_value =  PyObject_CallObject(route->wsgi_callback, args2)
+        return_value = PyObject_Call(route->wsgi_callback, args2, WSGI_HANDLER.route_kwargs)
     );
 #else
     HTTP_500_IF_FALSE(
-        return_value =  PyObject_CallObject(wsgi_application, args2)
+        return_value = PyObject_CallObject(wsgi_application, args2)
     );
 #endif
 
@@ -74,7 +74,6 @@ http_500_internal_server_error:
     goto cleanup;
 
 file_response:
-    DEBUG("sendfile()");
     transaction->handler_write = wsgi_handler_sendfile;
     Py_INCREF(return_value);
     HTTP_500_IF_FALSE(

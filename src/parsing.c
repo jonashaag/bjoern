@@ -81,13 +81,16 @@ http_on_path(http_parser* parser, const char* path_start, size_t path_length)
         STOP_PARSER(HTTP_INTERNAL_SERVER_ERROR);
 
 #ifdef WANT_ROUTING
-    Route* route = get_route_for_url(py_path);
+    Route* route = NULL;
+    PyObject* kwargs = NULL;
+    get_route_for_url(py_path, &route, &kwargs);
     if(route == NULL) {
         /* TODO: user-defined 404 fallback callback? */
         Py_DECREF(py_path);
         STOP_PARSER(HTTP_NOT_FOUND);
     }
     WSGI_HANDLER_DATA.route = route;
+    WSGI_HANDLER_DATA.route_kwargs = kwargs;
 #endif
 
     /* Create a new response header dictionary. */
