@@ -78,11 +78,11 @@ run: nodebugprints
 runwithdebug: all
 	$(TEST)
 
-gdb: all
-	gdb python
-
-cgdb: all
-	cgdb python
+DEBUGGER	= `which cgdb 2>/dev/null 1>&2 && echo -n c; echo gdb`
+gdb: nodebugprints
+	$(DEBUGGER) python
+gdb-verbose: all
+	$(DEBUGGER) python
 
 valgrind: nodebugprints
 	valgrind $(TEST)

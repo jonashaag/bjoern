@@ -51,8 +51,7 @@ PyObject* Bjoern_Run(PyObject* self, PyObject* args)
     if(!PyArg_ParseTuple(args, "siO", &hostaddress, &port, &wsgi_layer))
         return NULL;
 #else
-    if(!PyArg_ParseTuple(args, "OsiO",
-                         &wsgi_application, &hostaddress, &port, &wsgi_layer))
+    if(!PyArg_ParseTuple(args, "OsiO", &wsgi_application, &hostaddress, &port, &wsgi_layer))
         return NULL;
     Py_INCREF(wsgi_application);
 #endif
@@ -65,22 +64,40 @@ PyObject* Bjoern_Run(PyObject* self, PyObject* args)
         return NULL;
     }
 
-    mainloop = ev_loop_new(0);
+    EV_LOOP* mainloop = ev_loop_new(0);
 
-    /* Run the SIGINT-watch loop. */
-    ev_signal sigint_watcher;
-    ev_signal_init(&sigint_watcher, &on_sigint_received, SIGINT);
-    ev_signal_start(mainloop, &sigint_watcher);
-
-
-    /* Run the accept-watch loop. */
     ev_io accept_watcher;
     ev_io_init(&accept_watcher, on_sock_accept, sockfd, EV_READ);
     ev_io_start(mainloop, &accept_watcher);
 
+    ev_signal signal_watcher;
+    ev_signal_init(&signal_watcher, on_sigint, SIGINT);
+    ev_signal_start(mainloop, &signal_watcher);
+
+    shall_cleanup = true;
     ev_loop(mainloop, 0);
+    bjoern_cleanup(mainloop);
 
     Py_RETURN_NONE;
+}
+
+static inline void
+bjoern_cleanup(EV_LOOP* loop)
+{
+    if(shall_cleanup) {
+        ev_unloop(loop, EVUNLOOP_ALL);
+        shall_cleanup = false;
+    }
+}
+
+/*
+    Called if the program received a SIGINT (^C, KeyboardInterrupt, ...) signal.
+*/
+static void
+on_sigint(EV_LOOP* loop, ev_signal* signal_watcher, const int revents)
+{
+    PyErr_SetInterrupt();
+    bjoern_cleanup(loop);
 }
 
 static ssize_t
@@ -115,14 +132,6 @@ init_socket(const char* hostaddress, const int port)
 }
 
 
-static ev_signal_callback
-on_sigint_received(EV_LOOP* mainloop, ev_signal *signal, int revents)
-{
-    printf("\b\bReceived SIGINT, shutting down. Goodbye!\n");
-    ev_unloop(mainloop, EVUNLOOP_ALL);
-}
-
-
 static Transaction* Transaction_new()
 {
     /* calloc(n, m): allocate n*m bytes of NULL-ed memory */
@@ -143,7 +152,10 @@ static Transaction* Transaction_new()
     return transaction;
 }
 
-static ev_io_callback
+/*
+    Called when a new client is accepted on the socket file.
+*/
+static void
 on_sock_accept(EV_LOOP* mainloop, ev_io* accept_watcher, int revents)
 {
     Transaction* transaction = Transaction_new();
@@ -173,9 +185,9 @@ on_sock_accept(EV_LOOP* mainloop, ev_io* accept_watcher, int revents)
 
 
 /*
-    TODO: Make sure this function is very, very fast as it is called many times.
+    Called when the socket is readable, thus, an HTTP request waits to be parsed.
 */
-static ev_io_callback
+static void
 on_sock_read(EV_LOOP* mainloop, ev_io* read_watcher_, int revents)
 {
     /* Check whether we can still read. */
@@ -249,9 +261,9 @@ start_write:
 
 
 /*
-    Start (or continue) writing to the socket.
+    Called when the socket is writable, thus, we can send the HTTP response.
 */
-static ev_io_callback
+static void
 while_sock_canwrite(EV_LOOP* mainloop, ev_io* write_watcher_, int revents)
 {
     Transaction* transaction = OFFSETOF(write_watcher, write_watcher_, Transaction);

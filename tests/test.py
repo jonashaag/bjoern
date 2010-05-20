@@ -1,5 +1,7 @@
 import bjoern
 import os
+import time
+import thread
 
 def listdir(d):
     d = os.path.expanduser(d)
@@ -40,4 +42,13 @@ def home(env, start_response):
 print "Defining routes..."
 
 print "Starting up server..."
-bjoern.run('0.0.0.0', 8080, bjoern.Response)
+in_thread = 1
+if not in_thread:
+    bjoern.run('0.0.0.0', 8080, bjoern.Response)
+else:
+    thread.start_new_thread(bjoern.run, ('0.0.0.0', 8080, bjoern.Response))
+    i = 1
+    while True:
+        i += 1
+        print "This number should be printed and increased steadily while running the program:",i
+        time.sleep(1)

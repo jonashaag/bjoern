@@ -3,7 +3,4 @@
     =================
 
 * We only need one http parser
-* fix wsgi handler:
-  `.request_environ` seems to not be collected by the garbage collector;
-  check refcount
 * Figure out a proper way to do header inclusion

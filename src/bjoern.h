@@ -1,6 +1,7 @@
 #include <Python.h>
 #include <ev.h>
 #include <http_parser.h>
+#include <pthread.h>
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -50,21 +51,22 @@ typedef enum { RESPONSE_FINISHED = 1, RESPONSE_NOT_YET_FINISHED = 2} response_st
 #include "config.h"
 
 
-static int          sockfd;
-static EV_LOOP*     mainloop;
-static PyObject*    wsgi_layer;
+static int sockfd;
+static bool shall_cleanup;
+static PyObject* wsgi_layer;
 #ifndef WANT_ROUTING
   /* No routing, use one application for every request */
 static PyObject*    wsgi_application;
 #endif
 
 
-#define ev_io_callback void
-#define ev_signal_callback void
+typedef void ev_io_callback(EV_LOOP*, ev_io* watcher, const int revents);
+typedef void ev_signal_callback(EV_LOOP*, ev_signal* watcher, const int revents);
 
-static PyObject*        Bjoern_Run          (PyObject* self, PyObject* args);
-static ssize_t          init_socket         (const char* addr, const int port);
-static ev_signal_callback on_sigint_received(EV_LOOP*, ev_signal* watcher, const int revents);
-static ev_io_callback   on_sock_accept      (EV_LOOP*, ev_io* watcher, const int revents);
-static ev_io_callback   on_sock_read        (EV_LOOP*, ev_io* watcher, const int revents);
-static ev_io_callback   while_sock_canwrite (EV_LOOP*, ev_io* watcher, const int revents);
+static PyObject* Bjoern_Run(PyObject* self, PyObject* args);
+static ssize_t init_socket(const char* addr, const int port);
+static void bjoern_cleanup(EV_LOOP*);
+static ev_io_callback on_sock_accept;
+static ev_io_callback on_sock_read;
+static ev_io_callback while_sock_canwrite;
+static ev_signal_callback on_sigint;
