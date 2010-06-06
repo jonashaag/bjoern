@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 function clone {
     git clone git://github.com/ry/http-parser
