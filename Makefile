@@ -104,3 +104,6 @@ ab:
 
 wget:
 	wget -O - -v http://127.0.0.1:8080/
+
+get-http-parser:
+	./.http-parser-update.sh
