@@ -54,7 +54,13 @@ http_on_end_parsing(http_parser* parser)
                        PYSTRING(CONTENT_TYPE), content_type);
     }
 
+    /* Ensure have QUERY_STRING. */
+    if(! PyDict_Contains(WSGI_HANDLER_DATA.request_environ, PYSTRING(QUERY_STRING)))
+        PyDict_SetItem(WSGI_HANDLER_DATA.request_environ,
+                       PYSTRING(QUERY_STRING), PyString_FromString(""));
+
     /* TODO: Set SERVER_NAME and SERVER_PORT. */
+    /* TODO: wsgi.* */
     return PARSER_CONTINUE;
 }
 
