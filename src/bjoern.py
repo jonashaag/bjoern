@@ -1,5 +1,5 @@
 # TODO: If it isn't a too great efford, rewrite this in C.
-from _bjoern import add_route, run
+from _bjoern import add_route, run as _run
 
 class WSGIError(Exception):
     pass
@@ -52,3 +52,6 @@ def route(pat):
         add_route('^{pattern}$'.format(pattern=pat), func)
         return func
     return wrapper
+
+def run(host, port, response=Response):
+    return _run(host, port, response)
