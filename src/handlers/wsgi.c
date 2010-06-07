@@ -114,8 +114,15 @@ wsgi_handler_write(Transaction* transaction)
             else
                 ; /* TODO: Machwas! */
         }
-        /* TODO: handle data that is longer than one write() call. */
-        return RESPONSE_FINISHED;
+        else {
+            WSGI_HANDLER_DATA.body_length -= bytes_sent;
+            WSGI_HANDLER_DATA.body += bytes_sent;
+        }
+
+        if(WSGI_HANDLER_DATA.body_length < 1) {
+            return RESPONSE_FINISHED;
+        }
+        return RESPONSE_NOT_YET_FINISHED;
     }
 }
 
