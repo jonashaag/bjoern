@@ -75,6 +75,9 @@ get_route_for_url(PyObject* url, Route** route_, PyObject** matchdict_)
 {
     PyObject* args = PyTuple_Pack(1, url);
     PyObject* matchobj;
+
+    GIL_LOCK();
+
     Route* route = first_route;
     while(route) {
         matchobj = PyObject_CallObject(route->pattern_match_func, args);
@@ -93,4 +96,5 @@ get_route_for_url(PyObject* url, Route** route_, PyObject** matchdict_)
 
 cleanup:
     Py_DECREF(args);
+    GIL_UNLOCK();
 }

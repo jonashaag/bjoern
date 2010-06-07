@@ -23,6 +23,9 @@ class Response(object):
     def __init__(self, environ):
         self.environ = environ
 
+    def __call__(self, *args, **kwargs):
+        return self.start_response(*args, **kwargs)
+
     def start_response(self, response_status, response_headers, exc_info=None):
         """
         Implementation of the WSGI 1.0 `start_response` callback[2].

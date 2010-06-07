@@ -4,3 +4,4 @@
 
 * We only need one http parser
 * Figure out a proper way to do header inclusion
+* SIGINT doesn't work

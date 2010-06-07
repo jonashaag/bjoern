@@ -8,6 +8,7 @@ struct _Transaction {
     ev_io write_watcher;
 
     response_status (*handler_write)(Transaction*);
+    bool handler_needs_gil;
     void (*handler_finalize)(Transaction*);
     union {
         wsgi_handler_data  wsgi;

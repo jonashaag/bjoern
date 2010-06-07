@@ -63,7 +63,11 @@ PyObject* Bjoern_Run(PyObject* self, PyObject* args)
     ev_signal_start(mainloop, &signal_watcher);
 
     shall_cleanup = true;
+
+    Py_BEGIN_ALLOW_THREADS
     ev_loop(mainloop, 0);
+    Py_END_ALLOW_THREADS
+
     bjoern_cleanup(mainloop);
 
     Py_RETURN_NONE;
@@ -215,16 +219,24 @@ on_sock_read(EV_LOOP* mainloop, ev_io* read_watcher_, int revents)
                 case USE_CACHE:
                     TRY_HANDLER(cache);
 #endif
-                /* Send the response from the WSGI app */
                 case PARSER_OK:
-                    TRY_HANDLER(wsgi);
+                case HTTP_INTERNAL_SERVER_ERROR: ;
+                    GIL_LOCK();
+                    switch(transaction->request_parser->exit_code) {
+                        /* Send the response from the WSGI app */
+                        case PARSER_OK:
+                            TRY_HANDLER(wsgi);
 
-                /* Send a built-in HTTP 500 response. */
-                case HTTP_INTERNAL_SERVER_ERROR:
-                    if(PyErr_Occurred())
-                        PyErr_Print();
-                    transaction->handler_data.raw.response = HTTP_500_MESSAGE;
-                    TRY_HANDLER(raw);
+                        /* Send a built-in HTTP 500 response. */
+                        case HTTP_INTERNAL_SERVER_ERROR: ;
+                            if(PyErr_Occurred())
+                                PyErr_Print();
+                            transaction->handler_data.raw.response = HTTP_500_MESSAGE;
+                            TRY_HANDLER(raw);
+                            assert(0);
+                    }
+                    GIL_UNLOCK();
+                    goto read_finished;
 
                 /* Send a built-in HTTP 404 response. */
                 case HTTP_NOT_FOUND:

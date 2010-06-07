@@ -3,5 +3,5 @@ static inline void bjoern_http_to_wsgi_header(char* destination, const char* sou
 static PyObject* PyTuple_Pack_NoINCREF(Py_ssize_t n, ...);
 
 #define OFFSETOF(mbr_name, ptr, type)  ((type*) (((char*)ptr) - offsetof(type, mbr_name)))
-#define GIL_LOCK() PyGILState_Ensure()
-#define GIL_UNLOCK(var) PyGILState_Release(var)
+#define GIL_LOCK() PyGILState_STATE GILState = PyGILState_Ensure()
+#define GIL_UNLOCK() PyGILState_Release(GILState)

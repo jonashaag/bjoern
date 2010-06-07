@@ -1,7 +1,7 @@
 #define WSGI_HANDLER transaction->handler_data.wsgi
 #define WSGI_HANDLER_DATA transaction->handler_data.wsgi.data.wsgi
 #define WSGI_SENDFILE_DATA transaction->handler_data.wsgi.data.sendfile
-#define HTTP_500_IF_FALSE(stmt) do { if(!(stmt)) goto http_500_internal_server_error; } while(0)
+#define SERVER_ERROR do { DEBUG("Error on line %d", __LINE__); goto http_500_internal_server_error; } while(0)
 
 static bool
 wsgi_handler_initialize(Transaction* transaction)
@@ -17,30 +17,21 @@ wsgi_handler_initialize(Transaction* transaction)
 #endif
 
     /* Create a new instance of the WSGI layer class. */
-    HTTP_500_IF_FALSE(
-        args1 =  PyTuple_Pack_NoINCREF(/* size */ 1, WSGI_HANDLER.request_environ)
-    );
-    HTTP_500_IF_FALSE(
-        wsgi_object = PyObject_CallObject(wsgi_layer, args1)
-    );
+    if(! (args1 = PyTuple_Pack_NoINCREF(/* size */ 1, WSGI_HANDLER.request_environ)))
+        SERVER_ERROR;
+    if(! (wsgi_object = PyObject_CallObject(wsgi_layer, args1)))
+        SERVER_ERROR;
 
     /* Call the WSGI application: app(environ, start_response, [**kwargs]). */
-    HTTP_500_IF_FALSE(
-        args2 = PyTuple_Pack_NoINCREF(
-            /* size */ 2,
-            WSGI_HANDLER.request_environ,
-            PyObject_GetAttr(wsgi_object, PYSTRING(start_response))
-        )
-    );
+    if(! (args2 = PyTuple_Pack_NoINCREF(/* size */ 2, WSGI_HANDLER.request_environ, wsgi_object)))
+        SERVER_ERROR;
 
 #ifdef WANT_ROUTING
-    HTTP_500_IF_FALSE(
-        return_value = PyObject_Call(route->wsgi_callback, args2, WSGI_HANDLER.route_kwargs)
-    );
+    if(! (return_value = PyObject_Call(route->wsgi_callback, args2, WSGI_HANDLER.route_kwargs)))
+        SERVER_ERROR;
 #else
-    HTTP_500_IF_FALSE(
-        return_value = PyObject_CallObject(wsgi_application, args2)
-    );
+    if(! (return_value = PyObject_CallObject(wsgi_application, args2)))
+        SERVER_ERROR;
 #endif
 
     WSGI_HANDLER.dealloc_extra = return_value;
@@ -52,6 +43,7 @@ wsgi_handler_initialize(Transaction* transaction)
     if(PyString_Check(return_value)) {
         /* We already have a string. That's ok, take it for the response. */
         WSGI_HANDLER_DATA.body = PyString_AsString(return_value);
+        WSGI_HANDLER_DATA.body_length = PyString_Size(return_value);
         goto response;
     }
 
@@ -59,12 +51,14 @@ wsgi_handler_initialize(Transaction* transaction)
         /* WSGI-compliant case, we have a list or tuple --
            just pick the first item of that (for now) for the response.
            FIXME. */
-        WSGI_HANDLER_DATA.body = PyString_AsString(PySequence_GetItem(return_value, 0));
+        PyObject* item_at_0 = PySequence_GetItem(return_value, 0);
+        WSGI_HANDLER_DATA.body = PyString_AsString(item_at_0);
+        WSGI_HANDLER_DATA.body_length = PyString_Size(item_at_0);
         goto response;
     }
 
     /* Not a string, not a file, no list/tuple/sequence -- TypeError */
-    goto http_500_internal_server_error;
+    SERVER_ERROR;
 
 
 http_500_internal_server_error:
@@ -76,25 +70,25 @@ http_500_internal_server_error:
 file_response:
     transaction->handler_write = wsgi_handler_sendfile;
     Py_INCREF(return_value);
-    HTTP_500_IF_FALSE(
-        wsgi_handler_sendfile_init(transaction, (PyFileObject*)return_value)
-    );
+    if(!wsgi_handler_sendfile_init(transaction, (PyFileObject*)return_value))
+        goto http_500_internal_server_error;
     goto cleanup;
 
 response:
-    WSGI_HANDLER_DATA.body_length = strlen(WSGI_HANDLER_DATA.body);
-    HTTP_500_IF_FALSE(
-        WSGI_HANDLER_DATA.headers = PyObject_GetAttr(wsgi_object, PYSTRING(response_headers))
-    );
-    HTTP_500_IF_FALSE(
-        WSGI_HANDLER_DATA.status  = PyObject_GetAttr(wsgi_object, PYSTRING(response_status))
-    );
+    WSGI_HANDLER_DATA.headers = PyObject_GetAttr(wsgi_object, PYSTRING(response_headers));
+    if(PyTuple_Size(WSGI_HANDLER_DATA.headers) == -1)
+        goto http_500_internal_server_error;
+    WSGI_HANDLER_DATA.status  = PyObject_GetAttr(wsgi_object, PYSTRING(response_status));
+    if(PyString_AsString(WSGI_HANDLER_DATA.status) == NULL)
+        goto http_500_internal_server_error;
+
     goto cleanup;
 
 cleanup:
     Py_XDECREF(args1);
     Py_XDECREF(args2);
     Py_XDECREF(wsgi_object);
+
     return retval;
 }
 
@@ -136,11 +130,13 @@ wsgi_handler_send_headers(Transaction* transaction)
     bool        have_content_length = false;
     PyObject*   header_tuple;
 
+    GIL_LOCK();
+
     #define BUF_CPY(s) bjoern_strcpy(&buffer_position, s)
 
     /* Copy the HTTP status message into the buffer: */
     BUF_CPY("HTTP/1.1 ");
-    BUF_CPY(PyString_AsString(WSGI_HANDLER_DATA.status));
+    BUF_CPY(PyString_AS_STRING(WSGI_HANDLER_DATA.status));
     BUF_CPY("\r\n");
 
     if(WSGI_HANDLER_DATA.headers)
@@ -173,14 +169,14 @@ wsgi_handler_send_headers(Transaction* transaction)
 
     Py_DECREF(WSGI_HANDLER_DATA.headers);
     Py_DECREF(WSGI_HANDLER_DATA.status);
+
+    GIL_UNLOCK();
 }
 
 static bool
 wsgi_handler_sendfile_init(Transaction* transaction, PyFileObject* file)
 {
-    PyGILState_STATE GILState = GIL_LOCK();
     PyFile_IncUseCount(file);
-    GIL_UNLOCK(GILState);
 
     WSGI_SENDFILE_DATA.file = file;
     WSGI_SENDFILE_DATA.file_descriptor = PyObject_AsFileDescriptor((PyObject*)file);
@@ -209,9 +205,7 @@ wsgi_handler_sendfile(Transaction* transaction)
     WSGI_SENDFILE_DATA.file_size -= bytes_sent;
 
     if(bytes_sent == 0 || WSGI_SENDFILE_DATA.file_size == 0) {
-        PyGILState_STATE GILState = GIL_LOCK();
         PyFile_DecUseCount(WSGI_SENDFILE_DATA.file);
-        GIL_UNLOCK(GILState);
         Py_DECREF(WSGI_SENDFILE_DATA.file);
         return RESPONSE_FINISHED;
     }

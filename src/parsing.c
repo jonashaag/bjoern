@@ -100,6 +100,8 @@ http_on_path(http_parser* parser, const char* path_start, size_t path_length)
 
     PyDict_SetItem(WSGI_HANDLER_DATA.request_environ, PYSTRING(PATH_INFO), py_path);
 
+    DEBUG("*** %s %s", (parser->method == HTTP_GET ? "GET" : "POST"), PyString_AS_STRING(py_path));
+
     return PARSER_CONTINUE;
 }
 

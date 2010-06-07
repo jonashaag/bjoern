@@ -19,6 +19,5 @@ wuerg(HTTP_CONTENT_TYPE);
 wuerg(CONTENT_TYPE);
 //wuerg(404_NOT_FOUND);
 //wuerg(500_INTERNAL_SERVER_ERROR);
-wuerg(start_response);
 wuerg(response_headers);
 wuerg(response_status);
