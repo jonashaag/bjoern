@@ -6,10 +6,8 @@
 
 #define DEFAULT_RESPONSE_CONTENT_TYPE   "text/plain"
 
-static const char* HTTP_500_MESSAGE = "HTTP/1.1 500 Internal Server Error\r\n\r\n\
-Oh no! HTTP 500 -- Internal Server Error. Try again later.";
-static const char* HTTP_404_MESSAGE = "HTTP/1.1 404 Not Found\r\n\r\n\
-Oh no! HTTP 404 -- Not Found. Try some other URL.";
+#define HTTP_500_MESSAGE "HTTP/1.1 500 Internal Server Error\r\n\r\nOh no! HTTP 500 -- Internal Server Error. Try again later."
+#define HTTP_404_MESSAGE "HTTP/1.1 404 Not Found\r\n\r\nOh no! HTTP 404 -- Not Found. Try some other URL."
 
 
 /*

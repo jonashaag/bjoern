@@ -1,13 +1,9 @@
 # vim :tabstop=8 :noexpandtab
 WANT_ROUTING	= yes
-WANT_CACHING	= yes
 
 FEATURES	=
 ifeq ($(WANT_ROUTING), yes)
 FEATURES	+= -D WANT_ROUTING
-endif
-ifeq ($(WANT_CACHING), yes)
-FEATURES	+= -D WANT_CACHING
 endif
 
 CC		= gcc

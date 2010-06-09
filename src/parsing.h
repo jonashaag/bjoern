@@ -2,12 +2,6 @@
 #define PARSER_CONTINUE PARSER_OK
 #define PARSER_EXIT 1
 
-/* codes used for exiting http-parser */
-enum http_parser_exit_codes {
-    USE_CACHE = 1,
-    /* PLUS `enum http_status_codes` */
-};
-
 http_parser_settings parser_settings;
 
 struct _bjoern_http_parser {

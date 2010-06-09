@@ -51,4 +51,4 @@ else:
     while True:
         i += 1
         print "This number should be printed and increased steadily while running the program:",i
-        time.sleep(1)
+        time.sleep(15)

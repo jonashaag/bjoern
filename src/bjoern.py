@@ -17,8 +17,8 @@ class Response(object):
     [1] http://www.python.org/dev/peps/pep-0333/#the-start-response-callable
     """
     response_headers_sent = False
-    response_status = None
-    response_headers = None
+    response_status = '200 Alles ok'
+    _response_headers = ()
 
     def __init__(self, environ):
         self.environ = environ
@@ -45,7 +45,7 @@ class Response(object):
                                 " `exc_info`. Forbidden according to PEP333.")
         else:
             self.response_status  = response_status
-            self.response_headers = response_headers
+            self._response_headers = response_headers
 
 def route(pat):
     def wrapper(func):

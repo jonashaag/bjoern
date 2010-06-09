@@ -1,14 +1,11 @@
 #include "bjoern.h"
 #include "utils.c"
+#include "file.c"
 #include "parsing.c"
 #ifdef WANT_ROUTING
   #include "routing.c"
 #endif
-#include "handlers/wsgi.c"
-#include "handlers/raw.c"
-#ifdef WANT_CACHING
-  #include "handlers/cache.c"
-#endif
+#include "wsgi.c"
 
 static PyMethodDef Bjoern_FunctionTable[] = {
     {"run", Bjoern_Run, METH_VARARGS, "Run bjoern. :-)"},
@@ -207,45 +204,30 @@ on_sock_read(EV_LOOP* mainloop, ev_io* read_watcher_, int revents)
                 bytes_read
             );
 
-            #define TRY_HANDLER(name) \
-                transaction->handler_write = name##_handler_write; \
-                transaction->handler_finalize = name##_handler_finalize; \
-                if(name##_handler_initialize(transaction)) \
-                    break; \
+            unsigned int exit_code = transaction->request_parser->exit_code;
 
-            switch(transaction->request_parser->exit_code) {
-#ifdef WANT_CACHING
-                /* If available, send a cached response. */
-                case USE_CACHE:
-                    TRY_HANDLER(cache);
-#endif
+            switch(exit_code) {
                 case PARSER_OK:
-                case HTTP_INTERNAL_SERVER_ERROR: ;
-                    GIL_LOCK();
-                    switch(transaction->request_parser->exit_code) {
-                        /* Send the response from the WSGI app */
-                        case PARSER_OK:
-                            TRY_HANDLER(wsgi);
+                    /* standard case, call wsgi app */
+                    if(wsgi_call_app(transaction))
+                        break;
+                    else
+                        /* error in `wsgi_call_app`, "forward" to HTTP 500 */
 
-                        /* Send a built-in HTTP 500 response. */
-                        case HTTP_INTERNAL_SERVER_ERROR: ;
-                            if(PyErr_Occurred())
-                                PyErr_Print();
-                            transaction->handler_data.raw.response = HTTP_500_MESSAGE;
-                            TRY_HANDLER(raw);
-                            assert(0);
-                    }
-                    GIL_UNLOCK();
-                    goto read_finished;
-
-                /* Send a built-in HTTP 404 response. */
+                case HTTP_INTERNAL_SERVER_ERROR:
+                    transaction->body = PYSTRING(HTTP_500_MESSAGE);
+                    break;
                 case HTTP_NOT_FOUND:
-                    transaction->handler_data.raw.response = HTTP_404_MESSAGE;
-                    TRY_HANDLER(raw);
-
+                    transaction->body = PYSTRING(HTTP_404_MESSAGE);
+                    break;
                 default:
                     assert(0);
             }
+
+            GIL_LOCK();
+            if(PyErr_Occurred())
+                PyErr_Print();
+            GIL_UNLOCK();
     }
 
 read_finished:
@@ -268,11 +250,15 @@ while_sock_canwrite(EV_LOOP* mainloop, ev_io* write_watcher_, int revents)
 {
     Transaction* transaction = OFFSETOF(write_watcher, write_watcher_, Transaction);
 
-    switch(transaction->handler_write(transaction)) {
+    switch(wsgi_send_response(transaction)) {
         case RESPONSE_NOT_YET_FINISHED:
             /* Please come around again. */
             return;
         case RESPONSE_FINISHED:
+            goto finish;
+        case RESPONSE_SOCKET_ERROR_OCCURRED:
+            /* occurrs e.g. if the client closed the connection before we sent all data.
+               Simply do the same: Close the connection. Goodbye client! */
             goto finish;
         default:
             assert(0);
@@ -281,6 +267,6 @@ while_sock_canwrite(EV_LOOP* mainloop, ev_io* write_watcher_, int revents)
 finish:
     ev_io_stop(mainloop, &transaction->write_watcher);
     close(transaction->client_fd);
-    transaction->handler_finalize(transaction);
+    wsgi_finalize(transaction);
     Transaction_free(transaction);
 }

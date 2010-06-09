@@ -7,16 +7,18 @@ struct _Transaction {
 
     ev_io write_watcher;
 
-    response_status (*handler_write)(Transaction*);
-    bool handler_needs_gil;
-    void (*handler_finalize)(Transaction*);
-    union {
-        wsgi_handler_data  wsgi;
-        raw_handler_data   raw;
-#ifdef WANT_CACHING
-        cache_handler_data cache;
+    PyObject* request_environ;
+#ifdef WANT_ROUTING
+    Route* route;
+    PyObject* route_kwargs;
 #endif
-    } handler_data;
+    PyObject* status;
+    PyObject* headers;
+    bool headers_sent;
+    void* body; /* PyObject* py_file on sendfile; else char* body */
+    size_t body_length;
+    bool use_sendfile;
+    PyObject* dealloc_extra;
 };
 
 static Transaction* Transaction_new();
