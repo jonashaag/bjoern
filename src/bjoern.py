@@ -18,7 +18,7 @@ class Response(object):
     """
     response_headers_sent = False
     response_status = '200 Alles ok'
-    _response_headers = ()
+    response_headers = ()
 
     def __init__(self, environ):
         self.environ = environ

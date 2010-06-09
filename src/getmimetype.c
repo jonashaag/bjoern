@@ -1,12 +1,16 @@
-#include "file.h"
+#include "getmimetype.h"
 
 const char*
 get_mimetype(const char* filename_)
 {
     size_t len = strlen(filename_);
 
+    if(filename_[len-1] == 'l')
+        return "text/html";
     if(filename_[len-2] == 'j')
         return "text/javascript";
+    if(filename_[len-1] == 'g')
+        return "image/png";
     else
         return "text/css";
 

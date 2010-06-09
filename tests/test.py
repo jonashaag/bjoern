@@ -23,6 +23,7 @@ what's up?"""
 
 @bjoern.route('/page/[a-z]+')
 def page(env, start_response):
+    a
     start_response('200 Alles ok', (('Content-Type', 'text/plain'),))
     return PAGES['foo']
 

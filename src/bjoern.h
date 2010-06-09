@@ -31,7 +31,7 @@ typedef enum {
 
 
 #include "utils.h"
-#include "file.h"
+#include "getmimetype.h"
 #include "debug.h"
 #include "stringcache.h"
 #include "http_status_codes.h"
@@ -60,8 +60,9 @@ typedef void ev_signal_callback(EV_LOOP*, ev_signal* watcher, const int revents)
 
 static PyObject* Bjoern_Run(PyObject* self, PyObject* args);
 static ssize_t init_socket(const char* addr, const int port);
-static void bjoern_cleanup(EV_LOOP*);
 static ev_io_callback on_sock_accept;
 static ev_io_callback on_sock_read;
 static ev_io_callback while_sock_canwrite;
 static ev_signal_callback on_sigint;
+static void bjoern_cleanup(EV_LOOP*);
+static void bjoern_err_check(EV_LOOP*);

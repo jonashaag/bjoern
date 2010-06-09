@@ -1,10 +1,10 @@
+#define DIE_ON_ERROR true
+
 #define READ_BUFFER_SIZE                4096
 #define WRITE_SIZE                      50*4096
 #define MAX_HEADER_SIZE                 1<<13   /* see [1] */
 #define MAX_LISTEN_QUEUE_LENGTH         1024
 #define HTTP_MAX_HEADER_NAME_LENGTH     30      /* see [2] */
-
-#define DEFAULT_RESPONSE_CONTENT_TYPE   "text/plain"
 
 #define HTTP_500_MESSAGE "HTTP/1.1 500 Internal Server Error\r\n\r\nOh no! HTTP 500 -- Internal Server Error. Try again later."
 #define HTTP_404_MESSAGE "HTTP/1.1 404 Not Found\r\n\r\nOh no! HTTP 404 -- Not Found. Try some other URL."

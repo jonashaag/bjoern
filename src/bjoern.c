@@ -1,6 +1,6 @@
 #include "bjoern.h"
 #include "utils.c"
-#include "file.c"
+#include "getmimetype.c"
 #include "parsing.c"
 #ifdef WANT_ROUTING
   #include "routing.c"
@@ -68,25 +68,6 @@ PyObject* Bjoern_Run(PyObject* self, PyObject* args)
     bjoern_cleanup(mainloop);
 
     Py_RETURN_NONE;
-}
-
-static inline void
-bjoern_cleanup(EV_LOOP* loop)
-{
-    if(shall_cleanup) {
-        ev_unloop(loop, EVUNLOOP_ALL);
-        shall_cleanup = false;
-    }
-}
-
-/*
-    Called if the program received a SIGINT (^C, KeyboardInterrupt, ...) signal.
-*/
-static void
-on_sigint(EV_LOOP* loop, ev_signal* signal_watcher, const int revents)
-{
-    PyErr_SetInterrupt();
-    bjoern_cleanup(loop);
 }
 
 static ssize_t
@@ -215,19 +196,21 @@ on_sock_read(EV_LOOP* mainloop, ev_io* read_watcher_, int revents)
                         /* error in `wsgi_call_app`, "forward" to HTTP 500 */
 
                 case HTTP_INTERNAL_SERVER_ERROR:
-                    transaction->body = PYSTRING(HTTP_500_MESSAGE);
+                    transaction->body = HTTP_500_MESSAGE;
+                    transaction->body_length = strlen(HTTP_500_MESSAGE);
+                    transaction->headers_sent = true; /* ^ contains the body, no additional headers needed */
                     break;
                 case HTTP_NOT_FOUND:
-                    transaction->body = PYSTRING(HTTP_404_MESSAGE);
+                    transaction->body = HTTP_404_MESSAGE;
+                    transaction->body_length = strlen(HTTP_404_MESSAGE);
+                    transaction->headers_sent = true; /* ^ contains the body, no additional headers needed */
                     break;
                 default:
                     assert(0);
             }
 
-            GIL_LOCK();
-            if(PyErr_Occurred())
-                PyErr_Print();
-            GIL_UNLOCK();
+            bjoern_err_check(mainloop);
+
     }
 
 read_finished:
@@ -269,4 +252,39 @@ finish:
     close(transaction->client_fd);
     wsgi_finalize(transaction);
     Transaction_free(transaction);
+}
+
+
+/* Shutdown/cleanup stuff */
+static void
+bjoern_err_check(EV_LOOP* loop)
+{
+    GIL_LOCK();
+    if(PyErr_Occurred()) {
+        PyErr_Print();
+        /*#if DIE_ON_ERROR
+          bjoern_cleanup(loop);
+          PyErr_SetInterrupt();
+        #endif*/
+    }
+    GIL_UNLOCK();
+}
+
+static inline void
+bjoern_cleanup(EV_LOOP* loop)
+{
+    if(shall_cleanup) {
+        ev_unloop(loop, EVUNLOOP_ALL);
+        shall_cleanup = false;
+    }
+}
+
+/*
+    Called if the program received a SIGINT (^C, KeyboardInterrupt, ...) signal.
+*/
+static void
+on_sigint(EV_LOOP* loop, ev_signal* signal_watcher, const int revents)
+{
+    PyErr_SetInterrupt();
+    bjoern_cleanup(loop);
 }

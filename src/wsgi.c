@@ -36,9 +36,16 @@ wsgi_call_app(Transaction* transaction)
     transaction->dealloc_extra = return_value;
 
     /* Make sure to fetch the `_response_headers` attribute before anything else. */
-    transaction->headers = PyObject_GetAttr(wsgi_object, PYSTRING(_response_headers));
-    if(PyTuple_Size(transaction->headers) == -1)
+    transaction->headers = PyObject_GetAttr(wsgi_object, PYSTRING(response_headers));
+    if(!PyTuple_Check(transaction->headers)) {
+        PyErr_Format(
+            PyExc_TypeError,
+            "response_headers must be a tuple, not %.200s",
+            Py_TYPE(transaction->headers)->tp_name
+        );
+        transaction->headers = PyTuple_Pack(/* size */ 0);
         goto http_500_internal_server_error;
+    }
 
     if(PyFile_Check(return_value)) {
         goto file_response;
@@ -46,7 +53,7 @@ wsgi_call_app(Transaction* transaction)
 
     if(PyString_Check(return_value)) {
         /* We already have a string. That's ok, take it for the response. */
-        transaction->body = PyString_AsString(return_value);
+
         transaction->body_length = PyString_Size(return_value);
         goto response;
     }
@@ -67,6 +74,8 @@ wsgi_call_app(Transaction* transaction)
 
 http_500_internal_server_error:
     /* HACK: We redirect this request directly to the HTTP 500 transaction-> */
+    transaction->status = PYSTRING(500_INTERNAL_SERVER_ERROR);
+    assert(transaction->status);
     retval = false;
     goto cleanup;
 
@@ -78,10 +87,15 @@ file_response:
     goto response;
 
 response:
-    transaction->status  = PyObject_GetAttr(wsgi_object, PYSTRING(response_status));
-    if(PyString_AsString(transaction->status) == NULL)
+    transaction->status = PyObject_GetAttr(wsgi_object, PYSTRING(response_status));
+    if(!PyString_Check(transaction->status)) {
+        PyErr_Format(
+            PyExc_TypeError,
+            "response_status must be a string, not %.200s",
+            Py_TYPE(transaction->status)->tp_name
+        );
         goto http_500_internal_server_error;
-
+    }
     goto cleanup;
 
 cleanup:
@@ -154,7 +168,7 @@ wsgi_send_headers(Transaction* transaction)
 
     /* Copy the HTTP status message into the buffer: */
     BUF_CPY("HTTP/1.1 ");
-    BUF_CPY(PyString_AS_STRING(transaction->status));
+    BUF_CPY(PyString_AsString(transaction->status));
     BUF_CPY("\r\n");
 
     assert(transaction->headers);
@@ -214,7 +228,6 @@ wsgi_sendfile_init(Transaction* transaction, PyFileObject* file)
             const char* mimetype = get_mimetype(filename);
             if(mimetype == NULL)
                 return false;
-            DEBUG("mimetype: %s", mimetype);
             /* the following is equivalent to the Python expression
                   headers = headers + (('Content-Type', the_mimetype),)
                hence, it concats a tuple containing 'Content-Type' as
@@ -242,25 +255,24 @@ wsgi_sendfile(Transaction* transaction)
     GIL_LOCK();
 
     file_descriptor = PyObject_AsFileDescriptor(transaction->body);
-    DEBUG("Continue sendfile() , %d bytes left to send.", transaction->body_length);
+    //DEBUG("Continue sendfile() , %d bytes left to send.", transaction->body_length);
     ssize_t bytes_sent = sendfile(
         transaction->client_fd,
         file_descriptor,
         NULL /* offset=NULL: let sendfile() manage the file offset */,
         transaction->body_length
     );
-    DEBUG("sendfile(): sent %d bytes.", bytes_sent);
+    //DEBUG("sendfile(): sent %d bytes.", bytes_sent);
     if(bytes_sent == -1) {
         /* socket error [note 1] */
-        if(errno == EAGAIN)
-            return RESPONSE_NOT_YET_FINISHED; /* Try again next time. */
-        else
-            return RESPONSE_SOCKET_ERROR_OCCURRED;
-    }
-
-    if(bytes_sent == -1) {
-        return_value = RESPONSE_SOCKET_ERROR_OCCURRED;
-        goto close_connection;
+        if(errno == EAGAIN) {
+            return_value = RESPONSE_NOT_YET_FINISHED; /* Try again next time. */
+            goto unlock_GIL_and_return;
+        }
+        else {
+            return_value = RESPONSE_SOCKET_ERROR_OCCURRED;
+            goto close_connection;
+        }
     }
 
     transaction->body_length -= bytes_sent;
@@ -289,7 +301,7 @@ static inline void
 wsgi_finalize(Transaction* transaction)
 {
     GIL_LOCK();
-    Py_DECREF(transaction->request_environ);
-    Py_DECREF(transaction->dealloc_extra);
+    Py_XDECREF(transaction->request_environ);
+    Py_XDECREF(transaction->dealloc_extra);
     GIL_UNLOCK();
 }
