@@ -20,14 +20,15 @@ INCLUDE_DIRS	= -I .				\
 		  -I /usr/include/python2.6/	\
 		  -I include 			\
 		  -I include/http-parser
-LDFLAGS		= $(INCLUDE_DIRS) -l ev -I http-parser -l python2.6
+LDFLAGS		= -static $(INCLUDE_DIRS) -l ev -I http-parser -l python2.6
 
 CC_ARGS		= $(LDFLAGS) -o $(OUTPUT_FILES)  $(SOURCE_FILES)
 
 OUTPUT_FILES	= _bjoern.so
 
 HTTP_PARSER_MODULE	= include/http-parser/http_parser_g.o
-SOURCE_FILES	= $(HTTP_PARSER_MODULE)	\
+HTTP_PARSER_SOURCE	= include/http-parser/http_parser.c
+SOURCE_FILES	= $(HTTP_PARSER_SOURCE)	\
 		  src/bjoern.c
 
 TEST		= python tests
@@ -76,9 +77,9 @@ runwithdebug: all
 
 DEBUGGER	= `which cgdb 2>/dev/null 1>&2 && echo -n c; echo gdb`
 gdb: nodebugprints
-	$(DEBUGGER) python
+	$(DEBUGGER) --args python tests
 gdb-verbose: all
-	$(DEBUGGER) python
+	$(DEBUGGER) --args python tests
 
 valgrind: nodebugprints
 	valgrind $(TEST)
