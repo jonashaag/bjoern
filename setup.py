@@ -20,7 +20,7 @@ setup(
             libraries     = ['ev'],
             define_macros = [('WANT_ROUTING', True), ('WANT_SENDFILE', os.name == 'posix')],
             extra_link_flags = '-static',
-            extra_compile_flags = CFLAGS
+            extra_compile_args = CFLAGS.split()
         )
     ]
 )
