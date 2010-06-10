@@ -1,13 +1,13 @@
 # vim :tabstop=8 :noexpandtab
 WANT_ROUTING	= yes
-HAVE_SENDFILE	= no
+WANT_SENDFILE	= yes
 
 FEATURES	=
 ifeq ($(WANT_ROUTING), yes)
 FEATURES	+= -D WANT_ROUTING
 endif
 ifeq ($(WANT_SENDFILE), yes)
-		+= -D WANT_SENDFILE
+FEATURES	+= -D WANT_SENDFILE
 endif
 
 CC		= gcc
