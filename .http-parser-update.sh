@@ -8,11 +8,6 @@ function update {
     git pull
 }
 
-function compile {
-    make
-}
-
-
 cd include
 
 if [ ! -d http-parser ]; then
@@ -22,7 +17,5 @@ else
     cd http-parser
     update
 fi
-
-compile
 
 cd ../..
