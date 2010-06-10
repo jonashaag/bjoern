@@ -1,6 +1,10 @@
 import os
+from subprocess import Popen
+
 from distutils.core import setup, Extension
 from distutils.sysconfig import get_python_inc
+
+Popen('./.http-parser-update.sh').wait()
 
 if 'CFLAGS' not in os.environ:
     os.environ['CFLAGS'] = ''
@@ -13,11 +17,11 @@ setup(name='bjoern',
       py_modules=['bjoern'],
       ext_modules = [
           Extension('_bjoern',
-                  sources=['src/bjoern.c'],
+                  sources=['src/bjoern.c', 'include/http-parser/http_parser.c'],
                   include_dirs=[get_python_inc(plat_specific=1), 'include/http-parser', '.'],
                   library_dirs=[],
-                  libraries=[],
-                  define_macros=[('WANT_ROUTING',)],
+                  libraries=['ev'],
+                  define_macros=[('WANT_ROUTING', None)],
                   )
           ]
 )
