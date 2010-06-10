@@ -82,9 +82,14 @@ http_500_internal_server_error:
     goto cleanup;
 
 file_response:
+#ifdef WANT_SENDFILE
     transaction->use_sendfile = true;
     if(!wsgi_sendfile_init(transaction, (PyFileObject*)return_value))
         goto http_500_internal_server_error;
+#else
+    if(!wsgi_mmap_init(transaction, (PyFileObject*)return_value))
+        goto http_500_internal_server_error;
+#endif
     goto response;
 
 response:
@@ -122,7 +127,11 @@ wsgi_send_response(Transaction* transaction)
         return RESPONSE_NOT_YET_FINISHED;
     } else {
         if(transaction->use_sendfile)
+#if WANT_SENDFILE
             return wsgi_sendfile(transaction);
+#else
+            return wsgi_mmap_send(transaction);
+#endif
         else
             return wsgi_send_body(transaction);
     }
