@@ -23,7 +23,6 @@ what's up?"""
 
 @bjoern.route('/page/[a-z]+')
 def page(env, start_response):
-    a
     start_response('200 Alles ok', (('Content-Type', 'text/plain'),))
     return PAGES['foo']
 
@@ -48,8 +47,5 @@ if not in_thread:
     bjoern.run('0.0.0.0', 8080, bjoern.Response)
 else:
     thread.start_new_thread(bjoern.run, ('0.0.0.0', 8080, bjoern.Response))
-    i = 1
     while True:
-        i += 1
-        print "This number should be printed and increased steadily while running the program:",i
-        time.sleep(15)
+        time.sleep(0.5)

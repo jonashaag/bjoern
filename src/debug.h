@@ -4,7 +4,7 @@
   #define DEBUG_LINE()          DEBUG("%s:%d", __FUNCTION__, __LINE__)
   #define IF_DEBUG(statement)   statement
 #else
-  #define DEBUG(...)
+  #define DEBUG(...)            do{}while(0)
   #define DEBUG_LINE()
   #define IF_DEBUG(statement)
 #endif

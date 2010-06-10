@@ -15,6 +15,7 @@ static PyMethodDef Bjoern_FunctionTable[] = {
     {NULL,  NULL, 0, NULL}
 };
 
+
 PyMODINIT_FUNC init_bjoern()
 {
     #include "stringcache.h"
@@ -194,23 +195,18 @@ on_sock_read(EV_LOOP* mainloop, ev_io* read_watcher_, int revents)
                         break;
                     else
                         /* error in `wsgi_call_app`, "forward" to HTTP 500 */
-
                 case HTTP_INTERNAL_SERVER_ERROR:
-                    transaction->body = HTTP_500_MESSAGE;
-                    transaction->body_length = strlen(HTTP_500_MESSAGE);
-                    transaction->headers_sent = true; /* ^ contains the body, no additional headers needed */
+                    set_http_500_response(transaction);
                     break;
                 case HTTP_NOT_FOUND:
-                    transaction->body = HTTP_404_MESSAGE;
-                    transaction->body_length = strlen(HTTP_404_MESSAGE);
-                    transaction->headers_sent = true; /* ^ contains the body, no additional headers needed */
+                    set_http_404_response(transaction);
                     break;
                 default:
                     assert(0);
             }
 
-            bjoern_err_check(mainloop);
-
+            if(bjoern_check_errors(mainloop))
+                set_http_500_response(transaction);
     }
 
 read_finished:
@@ -222,6 +218,22 @@ start_write:
     ev_io_init(&transaction->write_watcher, &while_sock_canwrite,
                transaction->client_fd, EV_WRITE);
     ev_io_start(mainloop, &transaction->write_watcher);
+}
+
+static void
+set_http_500_response(Transaction* transaction)
+{
+    transaction->body = HTTP_500_MESSAGE;
+    transaction->body_length = strlen(HTTP_500_MESSAGE);
+    transaction->headers_sent = true; /* ^ contains the body, no additional headers needed */
+}
+
+static void
+set_http_404_response(Transaction* transaction)
+{
+    transaction->body = HTTP_404_MESSAGE;
+    transaction->body_length = strlen(HTTP_404_MESSAGE);
+    transaction->headers_sent = true; /* ^ contains the body, no additional headers needed */
 }
 
 
@@ -256,8 +268,8 @@ finish:
 
 
 /* Shutdown/cleanup stuff */
-static void
-bjoern_err_check(EV_LOOP* loop)
+static bool
+bjoern_check_errors(EV_LOOP* loop)
 {
     GIL_LOCK();
     if(PyErr_Occurred()) {
@@ -266,8 +278,12 @@ bjoern_err_check(EV_LOOP* loop)
           bjoern_cleanup(loop);
           PyErr_SetInterrupt();
         #endif*/
+        GIL_UNLOCK();
+        return true;
+    } else {
+        GIL_UNLOCK();
+        return false;
     }
-    GIL_UNLOCK();
 }
 
 static inline void

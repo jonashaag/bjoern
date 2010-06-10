@@ -16,13 +16,13 @@ wsgi_call_app(Transaction* transaction)
     GIL_LOCK();
 
     /* Create a new instance of the WSGI layer class. */
-    if(! (args1 = PyTuple_Pack_NoINCREF(/* size */ 1, transaction->request_environ)))
+    if(! (args1 = PyTuple_Pack(/* size */ 1, transaction->request_environ)))
         SERVER_ERROR;
     if(! (wsgi_object = PyObject_CallObject(wsgi_layer, args1)))
         SERVER_ERROR;
 
     /* Call the WSGI application: app(environ, start_response, [**kwargs]). */
-    if(! (args2 = PyTuple_Pack_NoINCREF(/* size */ 2, transaction->request_environ, wsgi_object)))
+    if(! (args2 = PyTuple_Pack(/* size */ 2, transaction->request_environ, wsgi_object)))
         SERVER_ERROR;
 
 #ifdef WANT_ROUTING
@@ -45,6 +45,8 @@ wsgi_call_app(Transaction* transaction)
         );
         transaction->headers = PyTuple_Pack(/* size */ 0);
         goto http_500_internal_server_error;
+    } else {
+        Py_INCREF(transaction->headers);
     }
 
     if(PyFile_Check(return_value)) {
@@ -53,7 +55,7 @@ wsgi_call_app(Transaction* transaction)
 
     if(PyString_Check(return_value)) {
         /* We already have a string. That's ok, take it for the response. */
-
+        transaction->body = PyString_AsString(return_value);
         transaction->body_length = PyString_Size(return_value);
         goto response;
     }
@@ -81,7 +83,6 @@ http_500_internal_server_error:
 
 file_response:
     transaction->use_sendfile = true;
-    Py_INCREF(return_value);
     if(!wsgi_sendfile_init(transaction, (PyFileObject*)return_value))
         goto http_500_internal_server_error;
     goto response;
@@ -95,6 +96,8 @@ response:
             Py_TYPE(transaction->status)->tp_name
         );
         goto http_500_internal_server_error;
+    } else {
+        Py_INCREF(transaction->status);
     }
     goto cleanup;
 
@@ -301,6 +304,8 @@ static inline void
 wsgi_finalize(Transaction* transaction)
 {
     GIL_LOCK();
+    Py_XDECREF(transaction->status);
+    Py_XDECREF(transaction->headers);
     Py_XDECREF(transaction->request_environ);
     Py_XDECREF(transaction->dealloc_extra);
     GIL_UNLOCK();
