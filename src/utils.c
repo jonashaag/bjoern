@@ -16,7 +16,7 @@ bjoern_strcpy(char** destination, const char* source)
 static inline void
 bjoern_http_to_wsgi_header(char* destination, const char* source, size_t length)
 {
-    for(int i=0; i<length; ++i)
+    for(unsigned int i=0; i<length; ++i)
     {
         if(source[i] == '-')
             *destination++ = '_';

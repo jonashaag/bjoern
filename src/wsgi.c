@@ -183,7 +183,7 @@ wsgi_send_headers(Transaction* transaction)
     assert(transaction->headers);
 
     size_t header_tuple_length = PyTuple_GET_SIZE(transaction->headers);
-    for(int i=0; i<header_tuple_length; ++i)
+    for(unsigned int i=0; i<header_tuple_length; ++i)
     {
         header_tuple = PyTuple_GET_ITEM(transaction->headers, i);
         BUF_CPY(PyString_AsString(PyTuple_GetItem(header_tuple, 0)));
@@ -196,7 +196,7 @@ wsgi_send_headers(Transaction* transaction)
     if(!have_content_length)
         buffer_position += sprintf(
             buffer_position,
-            "Content-Length: %d\r\n",
+            "Content-Length: %zu\r\n",
             transaction->body_length
         );
 
