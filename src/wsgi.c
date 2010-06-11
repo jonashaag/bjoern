@@ -217,8 +217,6 @@ static inline void
 wsgi_finalize(Transaction* transaction)
 {
     GIL_LOCK();
-    Py_XDECREF(transaction->status);
-    Py_XDECREF(transaction->headers);
     Py_XDECREF(transaction->request_environ);
     Py_XDECREF(transaction->dealloc_extra);
     GIL_UNLOCK();
