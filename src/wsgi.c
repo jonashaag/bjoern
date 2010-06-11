@@ -33,6 +33,7 @@ wsgi_call_app(Transaction* transaction)
         SERVER_ERROR;
 #endif
 
+    Py_INCREF(return_value);
     transaction->dealloc_extra = return_value;
 
     /* Make sure to fetch the `_response_headers` attribute before anything else. */
