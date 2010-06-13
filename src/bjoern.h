@@ -54,6 +54,9 @@ static PyObject* wsgi_layer;
 static PyObject*    wsgi_application;
 #endif
 
+#ifndef Py_TYPE
+#  define Py_TYPE(o) ((o)->ob_type)
+#endif
 
 typedef void ev_io_callback(EV_LOOP*, ev_io* watcher, const int revents);
 typedef void ev_signal_callback(EV_LOOP*, ev_signal* watcher, const int revents);
