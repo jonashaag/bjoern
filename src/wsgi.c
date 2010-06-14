@@ -151,7 +151,7 @@ wsgi_send_body(Transaction* transaction)
     }
     else {
         transaction->body_length -= bytes_sent;
-        transaction->body += bytes_sent;
+        transaction->body = (char*)transaction->body + bytes_sent;
     }
 
     if(transaction->body_length == 0)
