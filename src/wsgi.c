@@ -1,8 +1,8 @@
 #define SERVER_ERROR do { DEBUG("Error on line %d", __LINE__); goto http_500_internal_server_error; } while(0)
 #ifdef WANT_SENDFILE
-  #include "wsgi_sendfile.c"
+#  include "wsgi_sendfile.c"
 #else
-  #include "wsgi_mmap.c"
+#  include "wsgi_mmap.c"
 #endif
 
 static bool

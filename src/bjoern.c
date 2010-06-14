@@ -3,7 +3,7 @@
 #include "getmimetype.c"
 #include "parsing.c"
 #ifdef WANT_ROUTING
-  #include "routing.c"
+#  include "routing.c"
 #endif
 #include "wsgi.c"
 

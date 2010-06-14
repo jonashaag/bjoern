@@ -37,7 +37,7 @@ typedef enum {
 #include "http_status_codes.h"
 
 #ifdef WANT_ROUTING
-  #include "routing.h"
+#  include "routing.h"
 #endif
 #include "parsing.h"
 #include "wsgi.h"
@@ -54,8 +54,11 @@ static PyObject* wsgi_layer;
 static PyObject*    wsgi_application;
 #endif
 
-#ifndef Py_TYPE
+/* Python 2.5 compatibility */
+#if PY_VERSION_HEX < 0x2060000
 #  define Py_TYPE(o) ((o)->ob_type)
+#  define PyFile_IncUseCount(file) do{}while(0)
+#  define PyFile_DecUseCount(file) do{}while(0)
 #endif
 
 typedef void ev_io_callback(EV_LOOP*, ev_io* watcher, const int revents);
