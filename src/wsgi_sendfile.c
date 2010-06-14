@@ -83,7 +83,7 @@ wsgi_sendfile(Transaction* transaction)
 
 close_connection:
     PyFile_DecUseCount(transaction->body);
-    Py_DECREF(transaction->body);
+    Py_DECREF((PyObject*)transaction->body);
     goto unlock_GIL_and_return;
 
 unlock_GIL_and_return:
