@@ -49,6 +49,7 @@ wsgi_call_app(Transaction* transaction)
             "response_headers must be a tuple, not %.200s",
             Py_TYPE(transaction->headers)->tp_name
         );
+        Py_DECREF(transaction->headers);
         transaction->headers = PyTuple_Pack(/* size */ 0);
         goto http_500_internal_server_error;
     } else {
@@ -101,6 +102,7 @@ response:
             "response_status must be a string, not %.200s",
             Py_TYPE(transaction->status)->tp_name
         );
+        Py_DECREF(transaction->status);
         goto http_500_internal_server_error;
     } else {
         Py_INCREF(transaction->status);
