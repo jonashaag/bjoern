@@ -66,6 +66,7 @@ Route_new(PyObject* pattern, PyObject* wsgi_callback)
         return NULL;
     }
 
+    Py_INCREF(route->pattern_match_func);
     return route;
 }
 

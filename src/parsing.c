@@ -116,7 +116,8 @@ http_on_query(http_parser* parser, const char* query_start, size_t query_length)
         User-Agent => HTTP_USER_AGENT
     and store it in the `wsgi_environ` dictionary.
 */
-static inline void store_current_header(bjoern_http_parser* parser)
+static inline void
+store_current_header(bjoern_http_parser* parser)
 {
     PyObject* header_name;
     PyObject* header_value;

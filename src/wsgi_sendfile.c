@@ -5,7 +5,7 @@ wsgi_sendfile_init(Transaction* transaction, PyFileObject* file)
 
     PyFile_IncUseCount(file);
 
-    transaction->body = file;
+    transaction->body = (PyObject*)file;
     file_descriptor = PyObject_AsFileDescriptor((PyObject*)file);
 
     struct stat file_stat;
@@ -82,8 +82,7 @@ wsgi_sendfile(Transaction* transaction)
     }
 
 close_connection:
-    PyFile_DecUseCount(transaction->body);
-    Py_DECREF((PyObject*)transaction->body);
+    PyFile_DecUseCount((PyFileObject*)transaction->body);
     goto unlock_GIL_and_return;
 
 unlock_GIL_and_return:
