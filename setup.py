@@ -3,7 +3,7 @@ from subprocess import Popen
 from distutils.core import setup, Extension
 from distutils.sysconfig import get_python_inc
 
-Popen('./.http-parser-update.sh').wait()
+Popen('stuff/update-http-parser.sh').wait()
 
 CFLAGS = '-std=c99 -pedantic -Wall -fno-strict-aliasing -shared -O3'
 
