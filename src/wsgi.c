@@ -38,9 +38,6 @@ wsgi_call_app(Transaction* transaction)
         SERVER_ERROR;
 #endif
 
-    Py_INCREF(return_value);
-    transaction->dealloc_extra = return_value;
-
     /* Make sure to fetch the `_response_headers` attribute before anything else. */
     transaction->headers = PyObject_GetAttr(wsgi_object, PYSTRING(response_headers));
     if(!PyTuple_Check(transaction->headers)) {
@@ -61,8 +58,9 @@ wsgi_call_app(Transaction* transaction)
 
     if(PyString_Check(return_value)) {
         /* We already have a string. That's ok, take it for the response. */
-        transaction->body = PyString_AsString(return_value);
+        transaction->body = return_value;
         transaction->body_length = PyString_Size(return_value);
+        transaction->body_position = PyString_AsString(return_value);
         goto response;
     }
 
@@ -71,8 +69,11 @@ wsgi_call_app(Transaction* transaction)
            just pick the first item of that (for now) for the response.
            FIXME. */
         PyObject* item_at_0 = PySequence_GetItem(return_value, 0);
-        transaction->body = PyString_AsString(item_at_0);
+        Py_INCREF(item_at_0);
+        Py_DECREF(return_value);
+        transaction->body = item_at_0;
         transaction->body_length = PyString_Size(item_at_0);
+        transaction->body_position = PyString_AsString(item_at_0);
         goto response;
     }
 
@@ -81,7 +82,6 @@ wsgi_call_app(Transaction* transaction)
 
 
 http_500_internal_server_error:
-    /* HACK: We redirect this request directly to the HTTP 500 transaction-> */
     transaction->status = PYSTRING(500_INTERNAL_SERVER_ERROR);
     assert(transaction->status);
     retval = false;
@@ -139,7 +139,7 @@ wsgi_send_body(Transaction* transaction)
 {
     ssize_t bytes_sent = write(
         transaction->client_fd,
-        transaction->body,
+        transaction->body_position,
         transaction->body_length
     );
     if(bytes_sent == -1) {
@@ -151,7 +151,7 @@ wsgi_send_body(Transaction* transaction)
     }
     else {
         transaction->body_length -= bytes_sent;
-        transaction->body += bytes_sent;
+        transaction->body_position += bytes_sent;
     }
 
     if(transaction->body_length == 0)
@@ -217,7 +217,13 @@ static inline void
 wsgi_finalize(Transaction* transaction)
 {
     GIL_LOCK();
+    DEBUG("refc: %d", transaction->body->ob_refcnt);
+    DEBUG("refc: %d", transaction->request_environ->ob_refcnt);
+    DEBUG("refc: %d", transaction->body->ob_refcnt);
+    Py_DECREF(transaction->route_kwargs);
     Py_XDECREF(transaction->request_environ);
-    Py_XDECREF(transaction->dealloc_extra);
+#ifdef WANT_ROUTING
+    Py_XDECREF(transaction->route_kwargs);
+#endif
     GIL_UNLOCK();
 }

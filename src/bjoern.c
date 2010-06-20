@@ -223,7 +223,7 @@ start_write:
 static void
 set_http_500_response(Transaction* transaction)
 {
-    transaction->body = HTTP_500_MESSAGE;
+    transaction->body = PyString_FromString(HTTP_500_MESSAGE);
     transaction->body_length = strlen(HTTP_500_MESSAGE);
     transaction->headers_sent = true; /* ^ contains the body, no additional headers needed */
 }
@@ -231,7 +231,7 @@ set_http_500_response(Transaction* transaction)
 static void
 set_http_404_response(Transaction* transaction)
 {
-    transaction->body = HTTP_404_MESSAGE;
+    transaction->body = PyString_FromString(HTTP_404_MESSAGE);
     transaction->body_length = strlen(HTTP_404_MESSAGE);
     transaction->headers_sent = true; /* ^ contains the body, no additional headers needed */
 }

@@ -15,10 +15,10 @@ struct _Transaction {
     PyObject* status;
     PyObject* headers;
     bool headers_sent;
-    void* body; /* PyObject* py_file on sendfile; else char* body */
-    size_t body_length;
     bool use_sendfile;
-    PyObject* dealloc_extra;
+    PyObject* body;
+    size_t body_length;
+    const char* body_position;
 };
 
 static Transaction* Transaction_new();
