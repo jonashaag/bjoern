@@ -222,7 +222,6 @@ wsgi_finalize(Transaction* transaction)
     DEBUG("refc: %d", transaction->body->ob_refcnt);
     DEBUG("refc: %d", transaction->request_environ->ob_refcnt);
     DEBUG("refc: %d", transaction->body->ob_refcnt);
-    Py_DECREF(transaction->route_kwargs);
     Py_XDECREF(transaction->request_environ);
 #ifdef WANT_ROUTING
     Py_XDECREF(transaction->route_kwargs);

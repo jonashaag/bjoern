@@ -19,7 +19,7 @@ setup(
             include_dirs  = ['include/http-parser', '.'],
             libraries     = ['ev'],
             define_macros = [('WANT_ROUTING', True), ('WANT_SENDFILE', os.name == 'posix')],
-            extra_link_flags = '-static',
+            extra_link_args = ['-static', '-g'],
             extra_compile_args = CFLAGS.split()
         )
     ]

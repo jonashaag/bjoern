@@ -188,6 +188,8 @@ on_sock_read(EV_LOOP* mainloop, ev_io* read_watcher_, int revents)
 
             unsigned int exit_code = transaction->request_parser->exit_code;
 
+            DEBUG("Parser exited with %d.", exit_code);
+
             switch(exit_code) {
                 case PARSER_OK:
                     /* standard case, call wsgi app */
@@ -224,6 +226,7 @@ static void
 set_http_500_response(Transaction* transaction)
 {
     transaction->body = PyString_FromString(HTTP_500_MESSAGE);
+    transaction->body_position = PyString_AsString(transaction->body);
     transaction->body_length = strlen(HTTP_500_MESSAGE);
     transaction->headers_sent = true; /* ^ contains the body, no additional headers needed */
 }
@@ -232,6 +235,7 @@ static void
 set_http_404_response(Transaction* transaction)
 {
     transaction->body = PyString_FromString(HTTP_404_MESSAGE);
+    transaction->body_position = PyString_AsString(transaction->body);
     transaction->body_length = strlen(HTTP_404_MESSAGE);
     transaction->headers_sent = true; /* ^ contains the body, no additional headers needed */
 }
@@ -243,17 +247,21 @@ set_http_404_response(Transaction* transaction)
 static void
 while_sock_canwrite(EV_LOOP* mainloop, ev_io* write_watcher_, int revents)
 {
+    DEBUG("Can write.");
     Transaction* transaction = OFFSETOF(write_watcher, write_watcher_, Transaction);
 
     switch(wsgi_send_response(transaction)) {
         case RESPONSE_NOT_YET_FINISHED:
             /* Please come around again. */
+            DEBUG("Not yet finished.");
             return;
         case RESPONSE_FINISHED:
+            DEBUG("Finished!");
             goto finish;
         case RESPONSE_SOCKET_ERROR_OCCURRED:
             /* occurrs e.g. if the client closed the connection before we sent all data.
                Simply do the same: Close the connection. Goodbye client! */
+            DEBUG("Socket error: %d", errno);
             goto finish;
         default:
             assert(0);
