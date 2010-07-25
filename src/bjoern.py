@@ -1,5 +1,11 @@
 # TODO: If it isn't a too great efford, rewrite this in C.
-from _bjoern import add_route, run as _run
+from _bjoern import run as _run
+try:
+    from _bjoern import add_route
+    HAVE_ROUTING = True
+except ImportError:
+    # compiled without routing
+    HAVE_ROUTING = False
 
 class WSGIError(Exception):
     pass
@@ -45,13 +51,17 @@ class Response(object):
                                 " `exc_info`. Forbidden according to PEP333.")
         else:
             self.response_status  = response_status
-            self._response_headers = response_headers
+            self.response_headers = response_headers
 
-def route(pat):
-    def wrapper(func):
-        add_route('^{pattern}$'.format(pattern=pat), func)
-        return func
-    return wrapper
+if HAVE_ROUTING:
+    def route(pat):
+        def wrapper(func):
+            add_route('^{pattern}$'.format(pattern=pat), func)
+            return func
+        return wrapper
 
-def run(host, port, response=Response):
-    return _run(host, port, response)
+    def run(host, port, response=Response):
+        return _run(host, port, response)
+else:
+    def run(app, host, port, response=Response):
+        return _run(app, host, port, response)

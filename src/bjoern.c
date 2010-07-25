@@ -179,6 +179,7 @@ on_sock_read(EV_LOOP* mainloop, ev_io* read_watcher_, int revents)
         case -1: return; /* An error happened. Try again next time libev calls
                             this function. TODO: Limit retries? */
         default:
+            transaction->received_anything = true;
             bytes_parsed = http_parser_execute(
                 (http_parser*)transaction->request_parser,
                 &parser_settings,
@@ -212,6 +213,12 @@ on_sock_read(EV_LOOP* mainloop, ev_io* read_watcher_, int revents)
     }
 
 read_finished:
+    if(!transaction->received_anything) {
+        DEBUG("HTTP 400 Bad Request for that beautiful "
+              "0 byte request on socket %d.", transaction->client_fd);
+        set_http_400_response(transaction);
+    }
+    DEBUG("Read finished!");
     /* Stop the read loop, we're done reading. */
     ev_io_stop(mainloop, &transaction->read_watcher);
     goto start_write;
@@ -237,6 +244,15 @@ set_http_404_response(Transaction* transaction)
     transaction->body = PyString_FromString(HTTP_404_MESSAGE);
     transaction->body_position = PyString_AsString(transaction->body);
     transaction->body_length = strlen(HTTP_404_MESSAGE);
+    transaction->headers_sent = true; /* ^ contains the body, no additional headers needed */
+}
+
+static void
+set_http_400_response(Transaction* transaction)
+{
+    transaction->body = PyString_FromString(HTTP_400_MESSAGE);
+    transaction->body_position = PyString_AsString(transaction->body);
+    transaction->body_length = strlen(HTTP_400_MESSAGE);
     transaction->headers_sent = true; /* ^ contains the body, no additional headers needed */
 }
 

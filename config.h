@@ -8,6 +8,7 @@
 
 #define HTTP_500_MESSAGE "HTTP/1.1 500 Internal Server Error\r\n\r\nOh no! HTTP 500 -- Internal Server Error. Try again later."
 #define HTTP_404_MESSAGE "HTTP/1.1 404 Not Found\r\n\r\nOh no! HTTP 404 -- Not Found. Try some other URL."
+#define HTTP_400_MESSAGE "HTTP/1.1 404 Bad Request\r\n\r\nbjoern could not understand your Bad Request"
 
 
 /*

@@ -1,7 +1,7 @@
 struct _Transaction {
     int client_fd;
     ev_io read_watcher;
-    size_t read_seek;
+    bool received_anything;
     bjoern_http_parser* request_parser;
     enum http_method request_method;
 

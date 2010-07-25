@@ -75,16 +75,16 @@ http_on_path(http_parser* parser, const char* path_start, size_t path_length)
         STOP_PARSER(HTTP_INTERNAL_SERVER_ERROR);
 
 #ifdef WANT_ROUTING
-    Route* route = NULL;
-    PyObject* kwargs = NULL;
-    get_route_for_url(py_path, &route, &kwargs);
-    if(route == NULL) {
+    get_route_for_url(
+        py_path,
+        &PARSER->transaction->route,
+        &PARSER->transaction->route_kwargs
+    );
+    if(PARSER->transaction->route == NULL) {
         /* TODO: user-defined 404 fallback callback? */
         Py_DECREF(py_path);
         STOP_PARSER(HTTP_NOT_FOUND);
     }
-    PARSER->transaction->route = route;
-    PARSER->transaction->route_kwargs = kwargs;
 #endif
 
     /* Create a new response header dictionary. */

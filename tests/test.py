@@ -21,6 +21,8 @@ foo
 what's up?"""
 )
 
+print id(PAGES['home'])
+
 @bjoern.route('/page/[a-z]+')
 def page(env, start_response):
     start_response('200 Alles ok', (('Content-Type', 'text/plain'),))

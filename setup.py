@@ -18,7 +18,7 @@ setup(
             sources       = ['src/bjoern.c', 'include/http-parser/http_parser.c'],
             include_dirs  = ['include/http-parser', '.'],
             libraries     = ['ev'],
-            define_macros = [('WANT_ROUTING', True), ('WANT_SENDFILE', os.name == 'posix')],
+            define_macros = [('WANT_ROUTING', True), ('WANT_SENDFILE', os.name == 'posix'), ('DEBUG', True)],
             extra_link_args = ['-static', '-g'],
             extra_compile_args = CFLAGS.split()
         )

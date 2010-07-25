@@ -72,5 +72,6 @@ static ev_io_callback while_sock_canwrite;
 static ev_signal_callback on_sigint;
 static void set_http_500_response(Transaction*);
 static void set_http_404_response(Transaction*);
+static void set_http_400_response(Transaction*);
 static void bjoern_cleanup(EV_LOOP*);
 static bool bjoern_check_errors(EV_LOOP*);

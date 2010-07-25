@@ -19,6 +19,7 @@ wsgi_call_app(Transaction* transaction)
 #endif
 
     GIL_LOCK();
+    DEBUG("Calling WSGI application.");
 
     /* Create a new instance of the WSGI layer class. */
     if(! (args1 = PyTuple_Pack(/* size */ 1, transaction->request_environ)))
@@ -37,6 +38,8 @@ wsgi_call_app(Transaction* transaction)
     if(! (return_value = PyObject_CallObject(wsgi_application, args2)))
         SERVER_ERROR;
 #endif
+
+    DEBUG("Call done; return_value->obj_refcnt=%d", return_value->ob_refcnt);
 
     /* Make sure to fetch the `_response_headers` attribute before anything else. */
     transaction->headers = PyObject_GetAttr(wsgi_object, PYSTRING(response_headers));
@@ -230,6 +233,7 @@ static inline void
 wsgi_finalize(Transaction* transaction)
 {
     GIL_LOCK();
+    Py_DECREF(transaction->body);
     Py_XDECREF(transaction->request_environ);
 #ifdef WANT_ROUTING
     Py_XDECREF(transaction->route_kwargs);
