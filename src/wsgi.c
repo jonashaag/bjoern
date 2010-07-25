@@ -179,14 +179,10 @@ wsgi_send_headers(Transaction* transaction)
 
     #define BUF_CPY(s) bjoern_strcpy(&buffer_position, s)
 
-    printf("status: %d\n", transaction->status);
-    printf("line %d\n", __LINE__);
-
     /* Copy the HTTP status message into the buffer: */
     PyObject_Print(transaction->status, stdout, Py_PRINT_RAW);
     BUF_CPY("HTTP/1.1 ");
     BUF_CPY(PyString_AsString(transaction->status));
-    printf("line %d\n", __LINE__);
     BUF_CPY("\r\n");
 
     assert(transaction->headers);
@@ -194,19 +190,13 @@ wsgi_send_headers(Transaction* transaction)
     size_t header_tuple_length = PyTuple_GET_SIZE(transaction->headers);
     for(unsigned int i=0; i<header_tuple_length; ++i)
     {
-    printf("line %d\n", __LINE__);
         header_tuple = PyTuple_GET_ITEM(transaction->headers, i);
-    printf("line %d\n", __LINE__);
         PyObject_Print(header_tuple, stdout, Py_PRINT_RAW);
-    printf("line %d\n", __LINE__);
         BUF_CPY(PyString_AsString(PyTuple_GetItem(header_tuple, 0)));
-    printf("line %d\n", __LINE__);
         BUF_CPY(": ");
         BUF_CPY(PyString_AsString(PyTuple_GetItem(header_tuple, 1)));
-    printf("line %d\n", __LINE__);
         BUF_CPY("\r\n");
     }
-    printf("line %d\n", __LINE__);
 
     /* Make sure a Content-Length header is set: */
     if(!have_content_length)
