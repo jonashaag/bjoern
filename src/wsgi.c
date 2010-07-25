@@ -40,11 +40,11 @@ wsgi_call_app(Transaction* transaction)
 
     /* Make sure to fetch the `_response_headers` attribute before anything else. */
     transaction->headers = PyObject_GetAttr(wsgi_object, PYSTRING(response_headers));
-    if(!PyTuple_Check(transaction->headers)) {
+    if(transaction->headers == NULL || !PyTuple_Check(transaction->headers)) {
         PyErr_Format(
             PyExc_TypeError,
             "response_headers must be a tuple, not %.200s",
-            Py_TYPE(transaction->headers)->tp_name
+            transaction->headers ? Py_TYPE(transaction->headers)->tp_name : Py_None
         );
         Py_DECREF(transaction->headers);
         transaction->headers = PyTuple_Pack(/* size */ 0);
@@ -83,8 +83,7 @@ wsgi_call_app(Transaction* transaction)
 
 
 http_500_internal_server_error:
-    transaction->status = PYSTRING(500_INTERNAL_SERVER_ERROR);
-    assert(transaction->status);
+    set_http_500_response(transaction);
     retval = false;
     goto cleanup;
 
@@ -96,11 +95,11 @@ file_response:
 
 response:
     transaction->status = PyObject_GetAttr(wsgi_object, PYSTRING(response_status));
-    if(!PyString_Check(transaction->status)) {
+    if(transaction->status == NULL || !PyString_Check(transaction->status)) {
         PyErr_Format(
             PyExc_TypeError,
             "response_status must be a string, not %.200s",
-            Py_TYPE(transaction->status)->tp_name
+            transaction->status ? Py_TYPE(transaction->status)->tp_name : Py_None
         );
         Py_DECREF(transaction->status);
         goto http_500_internal_server_error;
@@ -177,9 +176,14 @@ wsgi_send_headers(Transaction* transaction)
 
     #define BUF_CPY(s) bjoern_strcpy(&buffer_position, s)
 
+    printf("status: %d\n", transaction->status);
+    printf("line %d\n", __LINE__);
+
     /* Copy the HTTP status message into the buffer: */
+    PyObject_Print(transaction->status, stdout, Py_PRINT_RAW);
     BUF_CPY("HTTP/1.1 ");
     BUF_CPY(PyString_AsString(transaction->status));
+    printf("line %d\n", __LINE__);
     BUF_CPY("\r\n");
 
     assert(transaction->headers);
@@ -187,12 +191,19 @@ wsgi_send_headers(Transaction* transaction)
     size_t header_tuple_length = PyTuple_GET_SIZE(transaction->headers);
     for(unsigned int i=0; i<header_tuple_length; ++i)
     {
+    printf("line %d\n", __LINE__);
         header_tuple = PyTuple_GET_ITEM(transaction->headers, i);
+    printf("line %d\n", __LINE__);
+        PyObject_Print(header_tuple, stdout, Py_PRINT_RAW);
+    printf("line %d\n", __LINE__);
         BUF_CPY(PyString_AsString(PyTuple_GetItem(header_tuple, 0)));
+    printf("line %d\n", __LINE__);
         BUF_CPY(": ");
         BUF_CPY(PyString_AsString(PyTuple_GetItem(header_tuple, 1)));
+    printf("line %d\n", __LINE__);
         BUF_CPY("\r\n");
     }
+    printf("line %d\n", __LINE__);
 
     /* Make sure a Content-Length header is set: */
     if(!have_content_length)
@@ -219,9 +230,6 @@ static inline void
 wsgi_finalize(Transaction* transaction)
 {
     GIL_LOCK();
-    DEBUG("refc: %d", transaction->body->ob_refcnt);
-    DEBUG("refc: %d", transaction->request_environ->ob_refcnt);
-    DEBUG("refc: %d", transaction->body->ob_refcnt);
     Py_XDECREF(transaction->request_environ);
 #ifdef WANT_ROUTING
     Py_XDECREF(transaction->route_kwargs);
