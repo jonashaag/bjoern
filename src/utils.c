@@ -31,7 +31,7 @@ bjoern_http_to_wsgi_header(char* destination, const char* source, size_t length)
 static bool
 validate_header_tuple(PyObject* tuple)
 {
-    const char* bloedmann;
+    PyObject* bloedmann;
     const char* errmsg;
 
     if(tuple == NULL || !PyTuple_Check(tuple)) {

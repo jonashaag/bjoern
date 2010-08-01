@@ -9,35 +9,33 @@ wsgi_sendfile_init(Transaction* transaction, PyFileObject* file)
     file_descriptor = PyObject_AsFileDescriptor((PyObject*)file);
 
     struct stat file_stat;
-    if(fstat(file_descriptor, &file_stat) == -1) {
-        /* an error occured */
+    if(fstat(file_descriptor, &file_stat) == -1)
         return false;
-    } else {
-        transaction->body_length = file_stat.st_size;
 
-        /* Ensure the file's mime type is set. */
-        if(true || !PyDict_Contains(transaction->headers, PYSTRING(Content_Type)))
-        {
-            const char* filename = PyString_AsString(PyFile_Name((PyObject*)file));
-            const char* mimetype = get_mimetype(filename);
-            if(mimetype == NULL)
-                return false;
-            /* the following is equivalent to the Python expression
-                  headers = headers + (('Content-Type', the_mimetype),)
-               hence, it concats a tuple containing 'Content-Type' as
-               item 0 and the_mimetype as item 1 to the headers tuple.
-            */
-            PyObject* inner_tuple = PyTuple_Pack(/* size */ 2, PYSTRING(Content_Type), PyString_FromString(mimetype));
-            PyObject* outer_tuple = PyTuple_Pack(/* size */ 1, inner_tuple);
-            transaction->headers = PyNumber_Add(transaction->headers, outer_tuple);
-            /* `PyNumber_Add` isn't restricted to numbers at all but just represents
-               a Python '+'.  Fuck the Python C API! */
-            return transaction->headers != NULL;
-        }
-        else {
-            return true;
-        }
+    transaction->body_length = file_stat.st_size;
+
+    /* Ensure the file's mime type is set. */
+    if(!PyDict_Contains(transaction->headers, PYSTRING(Content_Type)))
+    {
+        const char* filename = PyString_AsString(PyFile_Name((PyObject*)file));
+        const char* mimetype = get_mimetype(filename);
+        if(mimetype == NULL)
+            return false;
+
+        /* the following is equivalent to the Python expression
+              headers = headers + (('Content-Type', the_mimetype),)
+           - Hence, it concats a tuple containing 'Content-Type' as
+           item 0 and the_mimetype as item 1 to the headers tuple.
+        */
+        PyObject* inner_tuple = PyTuple_Pack(/* size */ 2, PYSTRING(Content_Type), PyString_FromString(mimetype));
+        PyObject* outer_tuple = PyTuple_Pack(/* size */ 1, inner_tuple);
+        transaction->headers = PyNumber_Add(transaction->headers, outer_tuple);
+        /* `PyNumber_Add` isn't restricted to numbers at all but just represents
+           a Python '+'.  Fuck the Python C API! */
+        return transaction->headers != NULL;
     }
+
+    return true;
 }
 
 static response_status
