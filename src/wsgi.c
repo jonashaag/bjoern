@@ -180,7 +180,6 @@ wsgi_send_headers(Transaction* transaction)
     #define BUF_CPY(s) bjoern_strcpy(&buffer_position, s)
 
     /* Copy the HTTP status message into the buffer: */
-    PyObject_Print(transaction->status, stdout, Py_PRINT_RAW);
     BUF_CPY("HTTP/1.1 ");
     BUF_CPY(PyString_AsString(transaction->status));
     BUF_CPY("\r\n");
@@ -191,7 +190,6 @@ wsgi_send_headers(Transaction* transaction)
     for(unsigned int i=0; i<header_tuple_length; ++i)
     {
         header_tuple = PyTuple_GET_ITEM(transaction->headers, i);
-        PyObject_Print(header_tuple, stdout, Py_PRINT_RAW);
         BUF_CPY(PyString_AsString(PyTuple_GetItem(header_tuple, 0)));
         BUF_CPY(": ");
         BUF_CPY(PyString_AsString(PyTuple_GetItem(header_tuple, 1)));

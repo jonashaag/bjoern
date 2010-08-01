@@ -84,11 +84,12 @@ get_route_for_url(PyObject* url, Route** route_, PyObject** matchdict_)
         matchobj = PyObject_CallObject(route->pattern_match_func, args);
         if(matchobj != Py_None) {
             /* Match successful */
-            PyObject* matchdict = PyObject_CallObject(PyObject_GetAttrString(matchobj, "groupdict"), NULL);
-            assert(matchdict);
-            (*route_) = route;
-            (*matchdict_) = matchdict;
+            PyObject* groupdict_method = PyObject_GetAttr(matchobj, PYSTRING(groupdict));
+            PyObject* matchdict = PyObject_CallObject(groupdict_method, NULL);
+            Py_DECREF(groupdict_method);
             Py_DECREF(matchobj);
+            *route_ = route;
+            *matchdict_ = matchdict;
             goto cleanup;
         }
         Py_DECREF(matchobj);
