@@ -42,6 +42,8 @@ def files(env, start_response):
 
 @bjoern.route('/')
 def home(env, start_response):
+    #start_response('200 hi was geht', (('a', 1),))
+    #return 'hello'
     start_response('200 Hi was geht', (('Content-type', 'text/plain'),))
     return PAGES['home']
 

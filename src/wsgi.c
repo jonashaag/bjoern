@@ -39,21 +39,12 @@ wsgi_call_app(Transaction* transaction)
         SERVER_ERROR;
 #endif
 
-    DEBUG("Call done; return_value->obj_refcnt=%d", return_value->ob_refcnt);
-
-    /* Make sure to fetch the `_response_headers` attribute before anything else. */
+    /* Make sure to fetch the `response_headers` attribute before anything else. */
     transaction->headers = PyObject_GetAttr(wsgi_object, PYSTRING(response_headers));
-    if(transaction->headers == NULL || !PyTuple_Check(transaction->headers)) {
-        PyErr_Format(
-            PyExc_TypeError,
-            "response_headers must be a tuple, not %.200s",
-            transaction->headers ? Py_TYPE(transaction->headers)->tp_name : Py_None
-        );
+    if(!validate_header_tuple(transaction->headers)) {
         Py_DECREF(transaction->headers);
-        transaction->headers = PyTuple_Pack(/* size */ 0);
+        Py_DECREF(return_value);
         goto http_500_internal_server_error;
-    } else {
-        Py_INCREF(transaction->headers);
     }
 
     if(PyFile_Check(return_value)) {
@@ -102,14 +93,14 @@ response:
         PyErr_Format(
             PyExc_TypeError,
             "response_status must be a string, not %.200s",
-            transaction->status ? Py_TYPE(transaction->status)->tp_name : Py_None
+            Py_TYPE(transaction->status ? transaction->status : Py_None)->tp_name
         );
         Py_DECREF(transaction->status);
         goto http_500_internal_server_error;
     } else {
         Py_INCREF(transaction->status);
+        goto cleanup;
     }
-    goto cleanup;
 
 cleanup:
     Py_XDECREF(args1);
