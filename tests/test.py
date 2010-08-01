@@ -12,13 +12,17 @@ def listdir(d):
 
 PAGES = dict(
     home = """
-home
-====""",
+=====================
+THIS IS THA HOME PAGE
+=====================
+""",
 
     foo = """
-foo
-===
-what's up?"""
+===================
+THIS IS A FOO PAGE!
+what's up?
+===================
+"""
 )
 
 print id(PAGES['home'])
