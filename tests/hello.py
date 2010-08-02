@@ -2,7 +2,7 @@ import bjoern
 
 def wsgi_app(env, start_response):
     start_response('200 alles im gruenen bereich',
-                   ('Content-Type', 'text/plain'))
+                   (('Content-Type', 'text/plain'),))
     return ['hello world!']
 
 if bjoern.HAVE_ROUTING:
