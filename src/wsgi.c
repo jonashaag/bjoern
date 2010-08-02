@@ -158,8 +158,8 @@ wsgi_send_body(Transaction* transaction)
 static void
 wsgi_send_headers(Transaction* transaction)
 {
-    char        buf[MAX_HEADER_SIZE];
-    size_t      bufpos = 0;
+    char        buf[MAX_HEADER_SIZE]; memcpy((char*)buf, "HTTP/1.1", 8);
+    size_t      bufpos = 8;
     bool        have_content_length = false;
 
     #define BUFPOS (((char*)buf)+bufpos)
@@ -172,8 +172,6 @@ wsgi_send_headers(Transaction* transaction)
                         buf[bufpos++] = '\n'; } while(0)
 
     /* Copy the HTTP status message into the buffer: */
-    memcpy(BUFPOS, "HTTP/1.1", 8);
-    bufpos += 8;
     COPY_STRING(transaction->status);
     NEWLINE;
 
