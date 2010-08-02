@@ -158,54 +158,53 @@ wsgi_send_body(Transaction* transaction)
 static void
 wsgi_send_headers(Transaction* transaction)
 {
-    /* TODO: Maybe sprintf is faster than bjoern_strcpy? */
-
-    char        header_buffer[MAX_HEADER_SIZE];
-    char*       buffer_position = header_buffer;
-    char*       orig_buffer_position = buffer_position;
+    char        buf[MAX_HEADER_SIZE] = "HTTP/1.1 ";
+    size_t      bufpos = 0;
     bool        have_content_length = false;
-    PyObject*   header_tuple;
 
-    GIL_LOCK();
-
-    #define BUF_CPY(s) bjoern_strcpy(&buffer_position, s)
+    #define BUFPOS (((char*)buf)+bufpos)
+    #define COPY_STRING(obj) do{{ \
+        const size_t s_len = PyString_GET_SIZE(obj); \
+        memcpy(BUFPOS, PyString_AS_STRING(obj), s_len); \
+        bufpos += s_len; \
+    }}while(0)
+    #define NEWLINE do{ buf[bufpos++] = '\r'; \
+                        buf[bufpos++] = '\n'; } while(0)
 
     /* Copy the HTTP status message into the buffer: */
-    BUF_CPY("HTTP/1.1 ");
-    BUF_CPY(PyString_AsString(transaction->status));
-    BUF_CPY("\r\n");
+    COPY_STRING(transaction->status);
+    NEWLINE;
 
-    assert(transaction->headers);
-
-    size_t header_tuple_length = PyTuple_GET_SIZE(transaction->headers);
-    for(unsigned int i=0; i<header_tuple_length; ++i)
+    size_t number_of_headers = PyTuple_GET_SIZE(transaction->headers);
+    for(unsigned int i=0; i<number_of_headers; ++i)
     {
-        header_tuple = PyTuple_GET_ITEM(transaction->headers, i);
-        BUF_CPY(PyString_AsString(PyTuple_GetItem(header_tuple, 0)));
-        BUF_CPY(": ");
-        BUF_CPY(PyString_AsString(PyTuple_GetItem(header_tuple, 1)));
-        BUF_CPY("\r\n");
+        #define item PyTuple_GET_ITEM(transaction->headers, i)
+        COPY_STRING(PyTuple_GET_ITEM(item, 0));
+        buf[bufpos++] = ':';
+        buf[bufpos++] = ' ';
+        COPY_STRING(PyTuple_GET_ITEM(item, 1));
+        NEWLINE;
+        #undef item
     }
 
     /* Make sure a Content-Length header is set: */
-    if(!have_content_length)
-        buffer_position += sprintf(
-            buffer_position,
-            "Content-Length: %zu\r\n",
-            transaction->body_length
-        );
+    if(!have_content_length) {
+        memcpy(BUFPOS, "Content-Length: ", 16);
+        bufpos += 16;
+        bufpos += uitoa10(transaction->body_length, BUFPOS);
+        NEWLINE;
+    }
 
-    BUF_CPY("\r\n");
+    NEWLINE;
 
-    #undef BUF_CPY
+    #undef NEWLINE
+    #undef COPY_STRING
+    #undef BUFPOS
 
-    write(transaction->client_fd, header_buffer,
-          buffer_position - orig_buffer_position);
+    write(transaction->client_fd, buf, bufpos);
 
     Py_DECREF(transaction->headers);
     Py_DECREF(transaction->status);
-
-    GIL_UNLOCK();
 }
 
 static inline void

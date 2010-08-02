@@ -127,9 +127,13 @@ store_current_header(bjoern_http_parser* parser)
     header_name = PyString_FromStringAndSize(NULL /* empty string */, name_length);
     header_name_c = PyString_AS_STRING(header_name);
 
-    bjoern_strcpy(&header_name_c, "HTTP_");
-    bjoern_http_to_wsgi_header(header_name_c, parser->header_name_start,
-                                              parser->header_name_length);
+    memcpy(header_name_c, "HTTP_", 5);
+    header_name_c += 5;
+    http_to_wsgi_header(
+        header_name_c,
+        parser->header_name_start,
+        parser->header_name_length
+    );
 
     header_value = PyString_FromStringAndSize(parser->header_value_start,
                                               parser->header_value_length);

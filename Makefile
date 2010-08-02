@@ -1,4 +1,6 @@
 # vim :tabstop=8 :noexpandtab
+EXTRA_CFLAGS	=
+
 WANT_ROUTING	= yes
 WANT_SENDFILE	= yes
 
@@ -11,7 +13,7 @@ FEATURES	+= -D WANT_SENDFILE
 endif
 
 CC		= gcc
-CFLAGS_NODEBUG	= -std=c99 -pedantic -Wall -fno-strict-aliasing -shared $(FEATURES)
+CFLAGS_NODEBUG	= -std=c99 -Wall -fno-strict-aliasing -shared $(FEATURES) $(EXTRA_CFLAGS)
 CFLAGS_NODEBUGP	= $(CFLAGS_NODEBUG) -g
 CFLAGS		= $(CFLAGS_NODEBUGP) -D DEBUG
 CFLAGS_OPTDEBUG	= $(CFLAGS_NODEBUGP) -O3

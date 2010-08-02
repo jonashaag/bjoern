@@ -1,21 +1,36 @@
 #include "Python.h"
 #include "utils.h"
-/*
-    bjoern_strcpy:
-    like `strcpy`, but updates the `destination` by the number of bytes copied.
-    (thus, `destination` is a char pointer pointer / a pointer to a char array.)
-*/
-static inline void
-bjoern_strcpy(char** destination, const char* source)
+
+/* strreverse and utoa10: from  http://code.google.com/p/stringencoders */
+
+static void
+strreverse(char* begin, char* end)
 {
-    while (( **destination = *source )) {
-        source++;
-        (*destination)++;
-    };
+    char aux;
+    while (end > begin) {
+        aux = *end;
+        *end-- = *begin;
+        *begin++ = aux;
+    }
 }
 
+static size_t
+uitoa10(uint32_t value, char* str)
+{
+    char* wstr = str;
+    do {
+        *wstr++ = (char)(48 + (value % 10));
+    } while (value /= 10);
+    --wstr;
+    strreverse(str, wstr);
+    return wstr-str;
+}
+
+
 static inline void
-bjoern_http_to_wsgi_header(char* destination, const char* source, size_t length)
+http_to_wsgi_header(char* restrict destination,
+                    const char* restrict source,
+                    const size_t length)
 {
     for(unsigned int i=0; i<length; ++i)
     {
