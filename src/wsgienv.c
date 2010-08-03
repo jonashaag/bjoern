@@ -2,15 +2,12 @@
 
 static inline void
 copy_wsgi_header(char* restrict destination,
-                   const char* restrict source,
-                   const size_t length)
+                 const char* restrict source,
+                 const size_t length)
 {
-    for(unsigned int i=0; i<length; ++i)
-    {
-        if(source[i] == '-')
-            *destination++ = '_';
-        else
-            *destination++ = toupper(source[i]);
+    for(unsigned int i=0; i<length; ++i) {
+        if(source[i] == '-') *destination++ = '_';
+        else *destination++ = toupper(source[i]);
     }
     *destination++ = '\0';
 }
