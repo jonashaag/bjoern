@@ -1,6 +1,4 @@
 #include "sendfile.h"
-#include "mimetype.h"
-#include "response.h"
 
 bool
 wsgi_sendfile_init(Request* request, PyFileObject* file)
@@ -26,10 +24,10 @@ wsgi_sendfile_init(Request* request, PyFileObject* file)
     request->response_body_length = file_stat.st_size;
 
     /* Ensure the file's mime type is set. */
-    if(!PyDict_Contains(request->headers, PYSTRING(Content_Type)))
+    if(!PyDict_Contains(request->headers, _(Content_Type)))
     {
-        const char* filename = PyString_AsString(PyFile_Name((PyObject*)file));
-        const char* mimetype = get_mimetype(filename);
+        c_char* filename = PyString_AsString(PyFile_Name((PyObject*)file));
+        c_char* mimetype = get_mimetype(filename);
         if(mimetype == NULL)
             return false;
 
@@ -38,7 +36,7 @@ wsgi_sendfile_init(Request* request, PyFileObject* file)
            - Hence, it concats a tuple containing 'Content-Type' as
            item 0 and the_mimetype as item 1 to the headers tuple.
         */
-        PyObject* inner_tuple = PyTuple_Pack(/* size */ 2, PYSTRING(Content_Type), PyString_FromString(mimetype));
+        PyObject* inner_tuple = PyTuple_Pack(/* size */ 2, _(Content_Type), PyString_FromString(mimetype));
         PyObject* outer_tuple = PyTuple_Pack(/* size */ 1, inner_tuple);
         request->headers = PyNumber_Add(request->headers, outer_tuple);
         /* `PyNumber_Add` isn't restricted to numbers at all but just represents

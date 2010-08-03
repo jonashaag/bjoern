@@ -1,6 +1,3 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
 #include "mimetype.h"
 
 #include "debug.h"
@@ -18,6 +15,7 @@ get_mimetype(const char* filename_)
         return "image/png";
     else
         return "text/css";
+#if 0
 
     char* mimetype = NULL;
     char* filename = NULL;
@@ -54,4 +52,5 @@ get_mimetype(const char* filename_)
     fclose(file_output);
     DEBUG("Mimetype: %s", mimetype);
     return mimetype;
+#endif
 }

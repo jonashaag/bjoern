@@ -1,10 +1,16 @@
 #ifndef __request_h__
 #define __request_h__
 
-#include "bjoern.h"
-#include "routing.h"
+#include <Python.h>
 #include "parser.h"
-#include "http_parser.h"
+#include "bjoern.h"
+
+#ifdef WANT_ROUTING
+#include "routing.h"
+#endif
+
+ev_io_callback on_sock_read;
+ev_io_callback on_sock_accept;
 
 typedef struct _Request {
     int client_fd;
@@ -26,10 +32,12 @@ typedef struct _Request {
     bool use_sendfile;
     PyObject* response_body;
     size_t response_body_length;
-    const char* response_body_position;
+    c_char* response_body_position;
 } Request;
 
 Request* Request_new();
 void Request_free(Request*);
+
+#include "response.h"
 
 #endif

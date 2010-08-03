@@ -1,7 +1,5 @@
-#include "bjoern.h"
-#include "request.h"
+#include "bjoernmodule.h"
 #include "wsgiapp.h"
-#include "response.h"
 #include "sendfile.h"
 #include "utils.h"
 
@@ -41,7 +39,7 @@ wsgi_app(Request* request)
 #endif
 
     /* Make sure to fetch the `response_headers` attribute before anything else. */
-    request->headers = PyObject_GetAttr(wsgi_object, PYSTRING(response_headers));
+    request->headers = PyObject_GetAttr(wsgi_object, _(response_headers));
     if(!validate_header_tuple(request->headers)) {
         Py_DECREF(request->headers);
         Py_DECREF(return_value);
@@ -79,7 +77,7 @@ done:
         goto cleanup;
     }
 
-    request->status = PyObject_GetAttr(wsgi_object, PYSTRING(response_status));
+    request->status = PyObject_GetAttr(wsgi_object, _(response_status));
     if(request->status == NULL || !PyString_Check(request->status)) {
         PyErr_Format(
             PyExc_TypeError,

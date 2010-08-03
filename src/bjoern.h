@@ -24,11 +24,6 @@
 #define GIL_LOCK() PyGILState_STATE GILState = PyGILState_Ensure()
 #define GIL_UNLOCK() PyGILState_Release(GILState)
 
-typedef struct ev_loop EV_LOOP;
-
-typedef void ev_io_callback(EV_LOOP*, ev_io* watcher, const int revents);
-typedef void ev_signal_callback(EV_LOOP*, ev_signal* watcher, const int revents);
-
 /* Python 2.5 compatibility */
 #if PY_VERSION_HEX < 0x2060000
 #  define Py_TYPE(o) ((o)->ob_type)
@@ -36,9 +31,23 @@ typedef void ev_signal_callback(EV_LOOP*, ev_signal* watcher, const int revents)
 #  define PyFile_DecUseCount(file) do{}while(0)
 #endif
 
-#include "staticstrings.h"
+typedef struct ev_loop EV_LOOP;
+
+typedef void ev_io_callback(EV_LOOP*, ev_io* watcher, const int revents);
+typedef void ev_signal_callback(EV_LOOP*, ev_signal* watcher, const int revents);
+
+typedef enum {
+    HTTP_NOT_FOUND              = 404,
+    HTTP_INTERNAL_SERVER_ERROR  = 500,
+    HTTP_NOT_IMPLEMENTED        = 501
+} http_status_code;
+
+#define c_char const char
+#define c_size_t const size_t
+
+
 #include "debug.h"
-#include "bjoernmodule.h"
+#include "staticstrings.h"
 #include "config.h"
 
 #endif

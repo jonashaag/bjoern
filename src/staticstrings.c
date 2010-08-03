@@ -1,19 +1,25 @@
 #include "staticstrings.h"
 
-#define INIT_STRING(s) PYSTRING(s) = PyString_FromString(#s)
+#define init(s) _(s) = PyString_FromString(#s)
 
 void
 staticstrings_init()
 {
-    INIT_STRING(GET);
-    INIT_STRING(REQUEST_METHOD);
-    INIT_STRING(PATH_INFO);
-    INIT_STRING(QUERY_STRING);
-    INIT_STRING(CONTENT_TYPE);
-    INIT_STRING(HTTP_CONTENT_TYPE);
-    INIT_STRING(response_headers);
-    INIT_STRING(response_status);
-    INIT_STRING(groupdict);
-    PYSTRING(Content_Length) = PyString_FromString("Content-Length");
-    PYSTRING(Content_Type) = PyString_FromString("Content-Type");
+    for(short i=0; i<sizeof(py_http_methods); ++i)
+        py_http_methods[i] = PyString_FromString((const char*)py_http_methods[i]);
+
+    init(GET);
+    init(REQUEST_METHOD);
+    init(PATH_INFO);
+    init(QUERY_STRING);
+    init(CONTENT_TYPE);
+    init(HTTP_CONTENT_TYPE);
+    init(response_headers);
+    init(response_status);
+    init(groupdict);
+    _(Content_Length) = PyString_FromString("Content-Length");
+    _(Content_Type) = PyString_FromString("Content-Type");
+    _static_empty_pystring = PyString_FromString("");
 }
+
+#undef init

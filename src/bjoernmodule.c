@@ -1,6 +1,4 @@
 #include "bjoernmodule.h"
-#include "routing.h"
-#include "read.h"
 
 static PyMethodDef Bjoern_FunctionTable[] = {
     {"run", Bjoern_Run, METH_VARARGS, "Run bjoern. :-)"},
@@ -24,7 +22,7 @@ PyMODINIT_FUNC init_bjoern()
 static PyObject*
 Bjoern_Run(PyObject* self, PyObject* args)
 {
-    const char* hostaddress;
+    c_char* hostaddress;
     const int   port;
 
 #ifdef WANT_ROUTING
@@ -66,7 +64,7 @@ Bjoern_Run(PyObject* self, PyObject* args)
 }
 
 static ssize_t
-init_socket(const char* hostaddress, const int port)
+init_socket(c_char* hostaddress, const int port)
 {
     sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     if(sockfd < 0) return (size_t) "socket() failed";

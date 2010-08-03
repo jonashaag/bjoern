@@ -1,11 +1,7 @@
-#include "parser.h"
-#include "wsgiapp.h"
-#include "http_status_codes.h"
-#include "utils.h"
 #include "response.h"
 
 void
-get_response(Request* request, unsigned int parser_exit_code)
+get_response(Request* request, int parser_exit_code)
 {
     DEBUG("Parser exited with %d.", parser_exit_code);
     switch(parser_exit_code) {
@@ -135,7 +131,7 @@ wsgi_send_headers(Request* request)
 
     #define BUFPOS (((char*)buf)+bufpos)
     #define COPY_STRING(obj) do{{ \
-        const size_t s_len = PyString_GET_SIZE(obj); \
+        c_size_t s_len = PyString_GET_SIZE(obj); \
         memcpy(BUFPOS, PyString_AS_STRING(obj), s_len); \
         bufpos += s_len; \
     }}while(0)

@@ -1,17 +1,27 @@
 #include <Python.h>
 
-#define PYSTRING(s) PYSTRING_##s
+#define _(s) _static_pystring_##s
 
-PyObject* PYSTRING(GET);
-PyObject* PYSTRING(REQUEST_METHOD);
-PyObject* PYSTRING(PATH_INFO);
-PyObject* PYSTRING(QUERY_STRING);
-PyObject* PYSTRING(CONTENT_TYPE);
-PyObject* PYSTRING(HTTP_CONTENT_TYPE);
-PyObject* PYSTRING(response_headers);
-PyObject* PYSTRING(response_status);
-PyObject* PYSTRING(Content_Type);
-PyObject* PYSTRING(Content_Length);
-PyObject* PYSTRING(groupdict);
+/* those will become REAL PyObjects later in `staticstrings_init` */
+PyObject* py_http_methods[5] = {
+    (PyObject*) "DELETE",
+    (PyObject*) "GET",
+    (PyObject*) "HEAD",
+    (PyObject*) "POST",
+    (PyObject*) "PUT"
+};
+
+PyObject* _(GET);
+PyObject* _(REQUEST_METHOD);
+PyObject* _(PATH_INFO);
+PyObject* _(QUERY_STRING);
+PyObject* _(CONTENT_TYPE);
+PyObject* _(HTTP_CONTENT_TYPE);
+PyObject* _(response_headers);
+PyObject* _(response_status);
+PyObject* _(Content_Type);
+PyObject* _(Content_Length);
+PyObject* _(groupdict);
+PyObject* _static_empty_pystring;
 
 void staticstrings_init();

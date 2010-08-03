@@ -1,7 +1,4 @@
 #include "parser.h"
-#include "routing.h"
-#include "http_status_codes.h"
-#include "wsgienv.h"
 
 #define PARSER ((Parser*)parser)
 #define ENV_SETITEM(k, v) Environ_SetItem(PARSER->request->request_environ, k, v)
@@ -18,7 +15,7 @@ Parser* Parser_new()
 }
 
 void
-Parser_execute(Parser* parser, const char* input, const size_t len)
+Parser_execute(Parser* parser, c_char* input, c_size_t len)
 {
     http_parser_execute((http_parser*)parser, &parser_settings, input, len);
 }
@@ -43,33 +40,33 @@ http_on_start_parsing(http_parser* parser)
 static int
 http_on_end_parsing(http_parser* parser)
 {
+    PyObject* http_method;
     /* Set the REQUEST_METHOD: */
-    PyObject* py_request_method;
+    if(parser->method < sizeof(py_http_methods))
+        http_method = py_http_methods[parser->method];
+    else
+        http_method = PyString_FromString(http_method_str(parser->method));
 
-    switch(parser->method) {
-        case HTTP_GET:
-            py_request_method = PYSTRING(GET);
-            break;
-        case HTTP_POST:
-            py_request_method = PYSTRING(GET);
-            break;
-        default:
-            /* Currently, only POST and GET is supported. Fail here. */
-            STOP_PARSER(HTTP_NOT_IMPLEMENTED);
-    }
-
-    ENV_SETITEM(PYSTRING(REQUEST_METHOD), py_request_method);
+    ENV_SETITEM(
+        _(REQUEST_METHOD),
+        http_method
+    );
 
     /* Set the CONTENT_TYPE, which is the same as HTTP_CONTENT_TYPE. */
     PyObject* content_type = PyDict_GetItem(PARSER->request->request_environ,
-                                            PYSTRING(HTTP_CONTENT_TYPE));
-    if(content_type) {
-        ENV_SETITEM(PYSTRING(CONTENT_TYPE), content_type);
-    }
+                                            _(HTTP_CONTENT_TYPE));
+    if(content_type)
+        ENV_SETITEM(
+            _(CONTENT_TYPE),
+            content_type
+        );
 
     /* Ensure have QUERY_STRING. */
-    if(! PyDict_Contains(PARSER->request->request_environ, PYSTRING(QUERY_STRING)))
-        ENV_SETITEM(PYSTRING(QUERY_STRING), PyString_FromString(""));
+    if(! PyDict_Contains(PARSER->request->request_environ, _(QUERY_STRING)))
+        ENV_SETITEM(
+            _(QUERY_STRING),
+            _static_empty_pystring
+        );
 
     /* TODO: Set SERVER_NAME and SERVER_PORT. */
     /* TODO: wsgi.* */
@@ -81,7 +78,7 @@ http_on_end_parsing(http_parser* parser)
       * if routing is enabled, try to find the corresponding route
 */
 static int
-http_on_path(http_parser* parser, const char* path_start, size_t path_length)
+http_on_path(http_parser* parser, c_char* path_start, size_t path_length)
 {
     PyObject* py_path = PyString_FromStringAndSize(path_start, path_length);
     if(py_path == NULL)
@@ -105,7 +102,10 @@ http_on_path(http_parser* parser, const char* path_start, size_t path_length)
     if(!PARSER->request->request_environ)
         STOP_PARSER(HTTP_INTERNAL_SERVER_ERROR);
 
-    ENV_SETITEM(PYSTRING(PATH_INFO), py_path);
+    ENV_SETITEM(
+        _(PATH_INFO),
+        py_path
+    );
 
     DEBUG("*** %s %s", (parser->method == HTTP_GET ? "GET" : "POST"), PyString_AS_STRING(py_path));
 
@@ -116,16 +116,22 @@ http_on_path(http_parser* parser, const char* path_start, size_t path_length)
     Set the QUERY_STRING.
 */
 static int
-http_on_query(http_parser* parser, const char* query_start, size_t query_length)
+http_on_query(http_parser* parser, c_char* query_start, size_t query_length)
 {
-    PyObject* py_tmp = PyString_FromStringAndSize(query_start, query_length);
-    ENV_SETITEM(PYSTRING(QUERY_STRING), py_tmp);
+    PyObject* query = PyString_FromStringAndSize(query_start, query_length);
+    if(query == NULL)
+        STOP_PARSER(HTTP_INTERNAL_SERVER_ERROR);
+
+    ENV_SETITEM(
+        _(QUERY_STRING),
+        query    
+    );
 
     return PARSER_CONTINUE;
 }
 
 static int
-http_on_header_name(http_parser* parser, const char* header_start, const size_t header_length)
+http_on_header_name(http_parser* parser, c_char* header_start, c_size_t header_length)
 {
     if(PARSER->header_value_start) {
         /* We have a name/value pair to store, so do so. */
@@ -154,7 +160,7 @@ http_on_header_name(http_parser* parser, const char* header_start, const size_t 
 }
 
 static int
-http_on_header_value(http_parser* parser, const char* value_start, size_t value_length)
+http_on_header_value(http_parser* parser, c_char* value_start, size_t value_length)
 {
     if(PARSER->header_value_start) {
         /* We already have a value pointer, so update the length. */
@@ -174,20 +180,20 @@ http_on_header_value(http_parser* parser, const char* value_start, size_t value_
 
 /* TODO: Implement with StringIO or something like that. */
 static inline int
-http_on_body(http_parser* parser, const char* body, size_t body_length)
+http_on_body(http_parser* parser, c_char* body, size_t body_length)
 {
     return PARSER_CONTINUE;
 }
 
 /* TODO: Decide what to do with this one. */
 static inline int
-http_on_fragment(http_parser* parser, const char* fragment_start, size_t fragment_length)
+http_on_fragment(http_parser* parser, c_char* fragment_start, size_t fragment_length)
 {
     return PARSER_CONTINUE;
 }
 
 static inline int
-http_on_url(http_parser* parser, const char* url_start, size_t url_length)
+http_on_url(http_parser* parser, c_char* url_start, size_t url_length)
 {
     return PARSER_CONTINUE;
 }

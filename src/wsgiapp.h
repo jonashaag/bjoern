@@ -1,3 +1,4 @@
+#include "bjoern.h"
 #include "request.h"
 
 void wsgi_app(Request*);

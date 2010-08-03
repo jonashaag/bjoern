@@ -1,15 +1,13 @@
-#include "bjoern.h"
+#include "wsgienv.h"
 
 static inline void
-copy_wsgi_header(char* restrict destination,
-                 const char* restrict source,
-                 const size_t length)
+copy_wsgi_header(char* restrict dest, c_char* restrict src, c_size_t len)
 {
-    for(unsigned int i=0; i<length; ++i) {
-        if(source[i] == '-') *destination++ = '_';
-        else *destination++ = toupper(source[i]);
+    for(unsigned int i=0; i<len; ++i) {
+        if(src[i] == '-') *dest++ = '_';
+        else *dest++ = toupper(src[i]);
     }
-    *destination++ = '\0';
+    *dest++ = '\0';
 }
 
 /*
@@ -17,10 +15,11 @@ copy_wsgi_header(char* restrict destination,
         User-Agent => HTTP_USER_AGENT
     and store it in the `wsgi_environ` dictionary.
 */
-void
-Environ_SetItemWithLength(PyObject* env,
-                          const char* name, const size_t name_length_,
-                          const char* value, const size_t value_length)
+void Environ_SetItemWithLength(PyObject* env,
+                               c_char* name,
+                               c_size_t name_length_,
+                               c_char* value,
+                               c_size_t value_length)
 {
     size_t name_length = name_length_ + strlen("HTTP_");
     PyObject* header_name = PyString_FromStringAndSize(NULL /* empty string */,

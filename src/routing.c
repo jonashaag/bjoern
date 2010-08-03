@@ -1,4 +1,3 @@
-#include "bjoern.h"
 #include "routing.h"
 
 Route* first_route = NULL;
@@ -66,7 +65,7 @@ get_route_for_url(PyObject* url, Route** route_, PyObject** matchdict_)
         matchobj = PyObject_CallObject(route->pattern_match_func, args);
         if(matchobj != Py_None) {
             /* Match successful */
-            PyObject* groupdict_method = PyObject_GetAttr(matchobj, PYSTRING(groupdict));
+            PyObject* groupdict_method = PyObject_GetAttr(matchobj, _(groupdict));
             PyObject* matchdict = PyObject_CallObject(groupdict_method, NULL);
             Py_DECREF(groupdict_method);
             Py_DECREF(matchobj);

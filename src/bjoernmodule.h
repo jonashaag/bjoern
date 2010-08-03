@@ -2,6 +2,8 @@
 #define __bjoernmodule_h__
 
 #include "bjoern.h"
+#include "routing.h"
+#include "request.h"
 
 /* Public */
 bool bjoern_flush_errors();
@@ -19,7 +21,7 @@ static int sockfd;
 
 static PyObject* Bjoern_Run(PyObject* self, PyObject* args);
 static PyObject* Bjoern_Route_Add(PyObject* self, PyObject* args);
-static ssize_t init_socket(const char* addr, const int port);
+static ssize_t init_socket(c_char* addr, const int port);
 
 static ev_signal_callback on_sigint;
 
