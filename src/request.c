@@ -18,5 +18,6 @@ void Request_free(Request* request)
     Py_XDECREF(request->route_kwargs);
 #endif
     GIL_UNLOCK();
+    free(request->parser);
     free(request);
 }
