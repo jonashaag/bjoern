@@ -1,51 +1,14 @@
-static inline void
-init_routing()
-{
-    first_route = NULL;
-    last_route  = NULL;
-}
+#include "bjoern.h"
+#include "routing.h"
 
-static void
-import_re_module()
-{
-    PyObject* re_module = PyImport_ImportModule("re");
-    _re_compile = PyObject_GetAttrString(re_module, "compile");
-}
+Route* first_route = NULL;
+Route* last_route  = NULL;
+PyObject* re_module;
+PyObject* _re_compile;
 
-static PyRegex*
-re_compile(PyObject* pattern)
-{
-    PyObject* args = PyTuple_Pack(/* size */ 1, pattern);
-    PyRegex* regex = PyObject_CallObject(_re_compile, args);
-    Py_DECREF(args);
-    return regex;
-}
+static PyObject* re_compile(PyObject*);
 
-PyObject* Bjoern_Route_Add(PyObject* self, PyObject* args)
-{
-    PyObject* pattern;
-    PyObject* callback;
-
-    if(!PyArg_ParseTuple(args, "SO", &pattern, &callback))
-        return NULL;
-
-    Py_INCREF(pattern);
-    Py_INCREF(callback);
-
-    Route* new_route = Route_new(pattern, callback);
-
-    if(first_route == NULL)
-        /* The very first route defined. */
-        first_route = new_route;
-    else
-        last_route->next = new_route;
-    last_route = new_route;
-
-    Py_RETURN_NONE;
-}
-
-
-static Route*
+Route*
 Route_new(PyObject* pattern, PyObject* wsgi_callback)
 {
     Route* route = malloc(sizeof(Route));
@@ -70,8 +33,27 @@ Route_new(PyObject* pattern, PyObject* wsgi_callback)
     return route;
 }
 
+void
+Route_free(Route* route)
+{
+    Py_XDECREF(route->pattern);
+    Py_XDECREF(route->pattern_match_func);
+    Py_XDECREF(route->wsgi_callback);
+    free(route);
+}
 
-static void
+void
+Route_add(Route* route)
+{
+    if(first_route == NULL)
+        /* The very first route defined. */
+        first_route = route;
+    else
+        last_route->next = route;
+    last_route = route;
+}
+
+void
 get_route_for_url(PyObject* url, Route** route_, PyObject** matchdict_)
 {
     PyObject* args = PyTuple_Pack(1, url);
@@ -100,3 +82,20 @@ cleanup:
     Py_DECREF(args);
     GIL_UNLOCK();
 }
+
+void
+routing_init()
+{
+    PyObject* re_module = PyImport_ImportModule("re");
+    _re_compile = PyObject_GetAttrString(re_module, "compile");
+}
+
+static PyObject*
+re_compile(PyObject* pattern)
+{
+    PyObject* args = PyTuple_Pack(/* size */ 1, pattern);
+    PyObject* regex = PyObject_CallObject(_re_compile, args);
+    Py_DECREF(args);
+    return regex;
+}
+

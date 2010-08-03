@@ -1,27 +1,19 @@
-typedef PyObject
-        PyRegex;
+#ifndef __routing_h__
+#define __routing_h__
 
-typedef struct _Route Route;
-struct _Route {
-    Route* next;
-    PyRegex* pattern;
+#include "Python.h"
+
+typedef struct _Route {
+    struct _Route* next;
+    PyObject* pattern;
     PyObject* pattern_match_func; /* pattern.match */
     PyObject* wsgi_callback;
-};
+} Route;
 
-static Route* Route_new(PyObject* pattern, PyObject* wsgi_callback);
-#define Route_free(route) do { \
-                            Py_XDECREF(route->pattern); \
-                            Py_XDECREF(route->pattern_match_func); \
-                            Py_XDECREF(route->wsgi_callback); \
-                            free(route); \
-                          } while(0)
+Route* Route_new(PyObject* pattern, PyObject* wsgi_callback);
+void Route_add(Route*);
+void Route_free(Route*);
+void get_route_for_url(PyObject* url, Route** route, PyObject** matchdict);
+void routing_init();
 
-Route* first_route;
-Route* last_route;
-static PyObject* _re_compile;
-
-static PyObject* Bjoern_Route_Add(PyObject* self, PyObject* args);
-static void get_route_for_url(PyObject* url, Route** route, PyObject** matchdict);
-static void init_routing();
-static void import_re_module();
+#endif

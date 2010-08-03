@@ -1,4 +1,3 @@
-#include "Python.h"
 #include "utils.h"
 
 /* strreverse and utoa10: from  http://code.google.com/p/stringencoders */
@@ -14,36 +13,19 @@ strreverse(char* begin, char* end)
     }
 }
 
-static size_t
+size_t
 uitoa10(uint32_t value, char* str)
 {
     char* wstr = str;
     do {
         *wstr++ = (char)(48 + (value % 10));
     } while (value /= 10);
-    --wstr;
-    strreverse(str, wstr);
+    strreverse(str, wstr-1);
     return wstr-str;
 }
 
 
-static inline void
-http_to_wsgi_header(char* restrict destination,
-                    const char* restrict source,
-                    const size_t length)
-{
-    for(unsigned int i=0; i<length; ++i)
-    {
-        if(source[i] == '-')
-            *destination++ = '_';
-        else
-            *destination++ = toupper(source[i]);
-    }
-    *destination++ = '\0';
-}
-
-
-static bool
+bool
 validate_header_tuple(PyObject* tuple)
 {
     PyObject* bloedmann;

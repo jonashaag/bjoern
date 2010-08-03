@@ -1,6 +1,8 @@
+#ifndef __bjoern_h__
+#define __bjoern_h__
+
 #include <Python.h>
 #include <ev.h>
-#include <http_parser.h>
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -18,41 +20,14 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
+#define OFFSETOF(mbr_name, ptr, type)  ((type*) (((char*)ptr) - offsetof(type, mbr_name)))
+#define GIL_LOCK() PyGILState_STATE GILState = PyGILState_Ensure()
+#define GIL_UNLOCK() PyGILState_Release(GILState)
 
 typedef struct ev_loop EV_LOOP;
-typedef struct _Transaction Transaction;
-typedef struct _bjoern_http_parser bjoern_http_parser;
 
-typedef enum {
-    RESPONSE_FINISHED = 1,
-    RESPONSE_NOT_YET_FINISHED = 2,
-    RESPONSE_SOCKET_ERROR_OCCURRED = 3
-} response_status;
-
-
-#include "utils.h"
-#include "getmimetype.h"
-#include "debug.h"
-#include "stringcache.h"
-#include "http_status_codes.h"
-
-#ifdef WANT_ROUTING
-#  include "routing.h"
-#endif
-#include "parsing.h"
-#include "wsgi.h"
-
-#include "transaction.h"
-#include "config.h"
-
-
-static int sockfd;
-static bool shall_cleanup;
-static PyObject* wsgi_layer;
-#ifndef WANT_ROUTING
-  /* No routing, use one application for every request */
-static PyObject*    wsgi_application;
-#endif
+typedef void ev_io_callback(EV_LOOP*, ev_io* watcher, const int revents);
+typedef void ev_signal_callback(EV_LOOP*, ev_signal* watcher, const int revents);
 
 /* Python 2.5 compatibility */
 #if PY_VERSION_HEX < 0x2060000
@@ -61,17 +36,9 @@ static PyObject*    wsgi_application;
 #  define PyFile_DecUseCount(file) do{}while(0)
 #endif
 
-typedef void ev_io_callback(EV_LOOP*, ev_io* watcher, const int revents);
-typedef void ev_signal_callback(EV_LOOP*, ev_signal* watcher, const int revents);
+#include "staticstrings.h"
+#include "debug.h"
+#include "bjoernmodule.h"
+#include "config.h"
 
-static PyObject* Bjoern_Run(PyObject* self, PyObject* args);
-static ssize_t init_socket(const char* addr, const int port);
-static ev_io_callback on_sock_accept;
-static ev_io_callback on_sock_read;
-static ev_io_callback while_sock_canwrite;
-static ev_signal_callback on_sigint;
-static void set_http_500_response(Transaction*);
-static void set_http_404_response(Transaction*);
-static void set_http_400_response(Transaction*);
-static void bjoern_cleanup(EV_LOOP*);
-static bool bjoern_check_errors(EV_LOOP*);
+#endif

@@ -1,4 +1,9 @@
-#include "getmimetype.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include "mimetype.h"
+
+#include "debug.h"
 
 const char*
 get_mimetype(const char* filename_)

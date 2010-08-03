@@ -4,8 +4,8 @@ from distutils.core import setup, Extension
 from distutils.sysconfig import get_python_inc
 
 Popen('stuff/update-http-parser.sh').wait()
-
-CFLAGS = '-std=c99 -pedantic -Wall -fno-strict-aliasing -shared -O3'
+C_FILES = [os.path.join('src', f) for f in os.listdir('src') if f.endswith('.c')]
+CFLAGS = '-std=c99 -Wall -fno-strict-aliasing -shared -O3 '
 
 setup(
     name        = 'bjoern',
@@ -15,7 +15,7 @@ setup(
     py_modules  = ['bjoern'],
     ext_modules = [
         Extension('_bjoern',
-            sources       = ['src/bjoern.c', 'include/http-parser/http_parser.c'],
+            sources       = C_FILES + ['include/http-parser/http_parser.c'],
             include_dirs  = ['include/http-parser', '.'],
             libraries     = ['ev'],
             define_macros = [('WANT_ROUTING', True), ('WANT_SENDFILE', os.name == 'posix')],

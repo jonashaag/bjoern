@@ -1,21 +1,32 @@
-static bool
-wsgi_sendfile_init(Transaction* transaction, PyFileObject* file)
+#include "sendfile.h"
+#include "mimetype.h"
+#include "response.h"
+
+bool
+wsgi_sendfile_init(Request* request, PyFileObject* file)
 {
     int file_descriptor;
 
     PyFile_IncUseCount(file);
 
-    transaction->body = (PyObject*)file;
+    request->response_body = (PyObject*)file;
     file_descriptor = PyObject_AsFileDescriptor((PyObject*)file);
 
     struct stat file_stat;
-    if(fstat(file_descriptor, &file_stat) == -1)
+    if(fstat(file_descriptor, &file_stat) == -1) {
+        PyObject* file_str = PyObject_Str((PyObject*)file);
+        PyErr_Format(
+            PyExc_OSError,
+            "failed to fstat %s",
+            file_str ? PyString_AS_STRING(file_str) : "<open file>"
+        );
         return false;
+    }
 
-    transaction->body_length = file_stat.st_size;
+    request->response_body_length = file_stat.st_size;
 
     /* Ensure the file's mime type is set. */
-    if(!PyDict_Contains(transaction->headers, PYSTRING(Content_Type)))
+    if(!PyDict_Contains(request->headers, PYSTRING(Content_Type)))
     {
         const char* filename = PyString_AsString(PyFile_Name((PyObject*)file));
         const char* mimetype = get_mimetype(filename);
@@ -29,30 +40,30 @@ wsgi_sendfile_init(Transaction* transaction, PyFileObject* file)
         */
         PyObject* inner_tuple = PyTuple_Pack(/* size */ 2, PYSTRING(Content_Type), PyString_FromString(mimetype));
         PyObject* outer_tuple = PyTuple_Pack(/* size */ 1, inner_tuple);
-        transaction->headers = PyNumber_Add(transaction->headers, outer_tuple);
+        request->headers = PyNumber_Add(request->headers, outer_tuple);
         /* `PyNumber_Add` isn't restricted to numbers at all but just represents
            a Python '+'.  Fuck the Python C API! */
-        return transaction->headers != NULL;
+        return request->headers != NULL;
     }
 
     return true;
 }
 
-static response_status
-wsgi_sendfile(Transaction* transaction)
+int
+wsgi_sendfile(Request* request)
 {
     int file_descriptor;
-    response_status return_value;
+    int return_value;
 
     GIL_LOCK();
 
-    file_descriptor = PyObject_AsFileDescriptor(transaction->body);
-    //DEBUG("Continue sendfile() , %d bytes left to send.", transaction->body_length);
+    file_descriptor = PyObject_AsFileDescriptor(request->response_body);
+    //DEBUG("Continue sendfile() , %d bytes left to send.", request->response_body_length);
     ssize_t bytes_sent = sendfile(
-        transaction->client_fd,
+        request->client_fd,
         file_descriptor,
         NULL /* offset=NULL: let sendfile() manage the file offset */,
-        transaction->body_length
+        request->response_body_length
     );
     //DEBUG("sendfile(): sent %d bytes.", bytes_sent);
     if(bytes_sent == -1) {
@@ -67,9 +78,9 @@ wsgi_sendfile(Transaction* transaction)
         }
     }
 
-    transaction->body_length -= bytes_sent;
+    request->response_body_length -= bytes_sent;
 
-    if(bytes_sent == 0 || transaction->body_length == 0) {
+    if(bytes_sent == 0 || request->response_body_length == 0) {
         /* Everything sent */
         return_value = RESPONSE_FINISHED;
         goto close_connection;
@@ -80,7 +91,7 @@ wsgi_sendfile(Transaction* transaction)
     }
 
 close_connection:
-    PyFile_DecUseCount((PyFileObject*)transaction->body);
+    PyFile_DecUseCount((PyFileObject*)request->response_body);
     goto unlock_GIL_and_return;
 
 unlock_GIL_and_return:

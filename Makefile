@@ -35,7 +35,7 @@ OUTPUT_FILES	= _bjoern.so
 HTTP_PARSER_MODULE	= include/http-parser/http_parser_g.o
 HTTP_PARSER_SOURCE	= include/http-parser/http_parser.c
 SOURCE_FILES	= $(HTTP_PARSER_SOURCE)	\
-		  src/bjoern.c
+		  $(wildcard src/*.c)
 
 TEST		= python tests
 PAGER		= less
@@ -106,7 +106,7 @@ ab:
 	ab -c 100 -n 10000 http://127.0.0.1:8080/
 
 wget:
-	wget -O - -v http://127.0.0.1:8080/
+	wget -O - -S -q http://127.0.0.1:8080/
 
 get-http-parser:
 	stuff/update-http-parser.sh

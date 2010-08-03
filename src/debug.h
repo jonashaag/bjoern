@@ -1,3 +1,6 @@
+#ifndef __debug_h__
+#define __debug_h__
+
 #ifdef DEBUG
   #undef DEBUG
   #define DEBUG(s, ...)         fprintf(stdout, s"\n", ## __VA_ARGS__ )
@@ -11,4 +14,6 @@
   #define IF_DEBUG(statement)   __NOP__
   #define DEBUG_REFCOUNT(obj)   __NOP__
 #endif
-#define ERROR(s, ...)           fprintf(stderr, s"\n", ## __VA_ARGS__ )
+#define ERROR(s, ...)           fprintf(stderr, s "\n", ## __VA_ARGS__ )
+
+#endif
