@@ -4,7 +4,5 @@
 
 * make mimetype recognition actually work
 * no two content-length headers
-* We only need one http parser
 * refactoring
 * split code into objects
-* SIGINT doesn't work
