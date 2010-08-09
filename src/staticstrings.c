@@ -26,6 +26,7 @@ staticstrings_init()
     init(response_headers);
     init(response_status);
     init(groupdict);
+    init(close);
     #undef init
     _(Content_Length) = PyString_FromString("Content-Length");
     _(Content_Type) = PyString_FromString("Content-Type");

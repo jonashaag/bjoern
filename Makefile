@@ -10,7 +10,7 @@ HTTP_PARSER_DIR	= include/http-parser
 HTTP_PARSER_OBJ = $(HTTP_PARSER_DIR)/http_parser.o
 
 CPPFLAGS	+= -I $(PYTHON_DIR) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR) 
-CFLAGS		+= $(FEATURES) -std=c99 -Wall -Wno-unused
+CFLAGS		+= $(FEATURES) -std=c99 -Wall -Wno-unused -g
 LDFLAGS		+= -l python2.6 -l ev -shared -static
 
 ifneq ($(WANT_SENDFILE), no)
@@ -39,7 +39,7 @@ prepare-build:
 	mkdir -p _build
 
 clean:
-	rm -f $(BUILD_DIR)/*.o
+	rm -f $(BUILD_DIR)/*
 
 http_parser:
 	stuff/make-http-parser
@@ -49,3 +49,6 @@ ab:
 
 wget:
 	wget -O - -v http://127.0.0.1:8080/
+
+test:
+	cd stuff && python ~/dev/projects/wsgitest/runner.py

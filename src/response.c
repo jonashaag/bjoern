@@ -75,6 +75,7 @@ while_sock_canwrite(EV_LOOP* mainloop, ev_io* write_watcher_, int revents)
 
 finish:
     ev_io_stop(mainloop, &request->write_watcher);
+    wsgi_finalize(request);
     close(request->client_fd);
     Request_free(request);
 }
@@ -173,4 +174,19 @@ wsgi_send_headers(Request* request)
 
     Py_DECREF(request->headers);
     Py_DECREF(request->status);
+}
+
+static void
+wsgi_finalize(Request* request)
+{
+    GIL_LOCK();
+
+    PyObject* close_method = PyObject_GetAttr(request->response_body, _(close));
+    if(!close_method)
+        PyErr_Clear(); /* ignore the absence of a .close method */
+    else
+        if(!PyObject_CallObject(close_method, NULL))
+            PyErr_Print(); /* Exception in .close() */
+
+    GIL_UNLOCK();
 }

@@ -10,6 +10,7 @@
 static int wsgi_send_response(Request*);
 static void wsgi_send_headers(Request*);
 static int wsgi_send_body(Request*);
+static void wsgi_finalize(Request*);
 
 
 /* Public */
