@@ -78,15 +78,19 @@ on_sock_read(EV_LOOP* mainloop, ev_io* read_watcher_, int revents)
                             this function. TODO: Limit retries? */
         default:
             request->received_anything = true;
-            Parser_execute(
+            size_t bytes_parsed = Parser_execute(
                 request->parser,
                 read_buffer,
                 bytes_read
             );
-            get_response(
-                request,
-                /* exit code */ (int)((http_parser*)request->parser)->data
-            );
+            DEBUG("Parsed %d/%d bytes", bytes_parsed, bytes_read);
+            if(bytes_parsed != bytes_read)
+                set_http_400_response(request);
+            else
+                get_response(
+                    request,
+                    /* exit code */ (int)((http_parser*)request->parser)->data
+                );
     }
 
 read_finished:

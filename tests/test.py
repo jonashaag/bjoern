@@ -29,7 +29,7 @@ print id(PAGES['home'])
 
 @bjoern.route('/page/[a-z]+')
 def page(env, start_response):
-    start_response('200 Alles ok', (('Content-Type', 'text/plain'),))
+    start_response('200 Alles ok', [('Content-Type', 'text/plain')])
     return PAGES['foo']
 
 @bjoern.route('/files/.*')
@@ -37,14 +37,14 @@ def files(env, start_response):
     file_= env['PATH_INFO'][len('/files/'):]
     if file_:
         return open(os.path.join(os.path.expanduser('~/movies'), file_))
-    start_response('200 Alles ok', (('Content-Type', 'text/html'),))
+    start_response('200 Alles ok', [('Content-Type', 'text/html')])
     return listdir('~/movies')
 
 @bjoern.route('/')
 def home(env, start_response):
     #start_response('200 hi was geht', (('a', 1),))
     #return 'hello'
-    start_response('200 Hi was geht', (('Content-type', 'text/plain'),))
+    start_response('200 Hi was geht', [('Content-type', 'text/plain')])
     return PAGES['home']
 
 print "Defining routes..."

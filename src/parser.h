@@ -20,6 +20,6 @@ typedef struct _Parser {
 } Parser;
 
 Parser* Parser_new();
-void Parser_execute(Parser*, c_char*, c_size_t);
+size_t Parser_execute(Parser*, c_char*, c_size_t);
 
 #endif

@@ -48,7 +48,7 @@ ab:
 	ab -c 100 -n 10000 http://127.0.0.1:8080/
 
 wget:
-	wget -O - -v http://127.0.0.1:8080/
+	wget -O - -q -S http://127.0.0.1:8080/
 
 test:
 	cd stuff && python ~/dev/projects/wsgitest/runner.py

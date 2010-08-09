@@ -143,10 +143,10 @@ wsgi_send_headers(Request* request)
     COPY_STRING(request->status);
     NEWLINE;
 
-    size_t number_of_headers = PyTuple_GET_SIZE(request->headers);
+    size_t number_of_headers = PyList_GET_SIZE(request->headers);
     for(unsigned int i=0; i<number_of_headers; ++i)
     {
-        #define item PyTuple_GET_ITEM(request->headers, i)
+        #define item PyList_GET_ITEM(request->headers, i)
         COPY_STRING(PyTuple_GET_ITEM(item, 0));
         buf[bufpos++] = ':';
         buf[bufpos++] = ' ';

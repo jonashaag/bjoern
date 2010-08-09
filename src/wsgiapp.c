@@ -40,8 +40,8 @@ wsgi_app(Request* request)
 
     /* Make sure to fetch the `response_headers` attribute before anything else. */
     request->headers = PyObject_GetAttr(wsgi_object, _(response_headers));
-    if(!validate_header_tuple(request->headers)) {
-        Py_DECREF(request->headers);
+    if(!validate_header_list(request->headers)) {
+        Py_XDECREF(request->headers);
         Py_DECREF(return_value);
         goto done;
     }
@@ -86,6 +86,7 @@ done:
         );
         Py_DECREF(request->status);
         bjoern_server_error();
+        set_http_500_response(request);
         goto cleanup;
     }
 

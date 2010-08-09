@@ -26,21 +26,21 @@ uitoa10(uint32_t value, char* str)
 
 
 bool
-validate_header_tuple(PyObject* tuple)
+validate_header_list(PyObject* list)
 {
     PyObject* bloedmann;
     const char* errmsg;
 
-    if(tuple == NULL || !PyTuple_Check(tuple)) {
-       errmsg = "response_headers must be a tuple";
-       bloedmann = tuple ? tuple : Py_None;
+    if(list == NULL || !PyList_Check(list)) {
+       errmsg = "response_headers must be a list";
+       bloedmann = list ? list : Py_None;
        goto error;
     }
 
     PyObject* item;
-    size_t header_tuple_length = PyTuple_GET_SIZE(tuple);
-    for(unsigned int i=0; i<header_tuple_length; ++i) {
-        item = PyTuple_GET_ITEM(tuple, i);
+    size_t header_list_length = PyList_GET_SIZE(list);
+    for(unsigned int i=0; i<header_list_length; ++i) {
+        item = PyList_GET_ITEM(list, i);
         if(!PyTuple_Check(item)) {
             errmsg = "response_headers items must be tuples, not %.200s";
             bloedmann = item;

@@ -1,8 +1,9 @@
 import bjoern
 
 def wsgi_app(env, start_response):
-    start_response('200 alles im gruenen bereich',
-                   (('Content-Type', 'text/plain'),))
+    start_response('200 ok', [])
+    #yield 'a'
+    #yield 'b'
     return ['hello world!\n']
 
 if bjoern.HAVE_ROUTING:

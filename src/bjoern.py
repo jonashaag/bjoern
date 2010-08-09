@@ -7,9 +7,6 @@ except ImportError:
     # compiled without routing
     HAVE_ROUTING = False
 
-class WSGIError(Exception):
-    pass
-
 class Response(object):
     """
     The `Response` type functions as both the `environment` dictionary and
@@ -22,36 +19,14 @@ class Response(object):
 
     [1] http://www.python.org/dev/peps/pep-0333/#the-start-response-callable
     """
-    response_headers_sent = False
-    response_status = '200 Alles ok'
-    response_headers = ()
-
     def __init__(self, environ):
         self.environ = environ
 
-    def __call__(self, *args, **kwargs):
-        return self.start_response(*args, **kwargs)
-
     def start_response(self, response_status, response_headers, exc_info=None):
-        """
-        Implementation of the WSGI 1.0 `start_response` callback[2].
+        self.response_status  = response_status
+        self.response_headers = response_headers
 
-        [2] http://www.python.org/dev/peps/pep-0333/#the-start-response-callable
-        """
-        if self.response_headers_sent:
-            if exc_info:
-                try:
-                    raise exc_info[0], exc_info[1], exc_info[2]
-                finally:
-                    # clear the `exc_info` variable to avoid circular references
-                    # (as recommended in PEP 333)
-                    exc_info = None
-            else:
-                raise WSGIError("`start_response` called multiple times without"
-                                " `exc_info`. Forbidden according to PEP333.")
-        else:
-            self.response_status  = response_status
-            self.response_headers = response_headers
+    __call__ = start_response
 
 if HAVE_ROUTING:
     def route(pat):

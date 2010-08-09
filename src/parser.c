@@ -14,10 +14,10 @@ Parser* Parser_new()
     return parser;
 }
 
-void
+size_t
 Parser_execute(Parser* parser, c_char* input, c_size_t len)
 {
-    http_parser_execute((http_parser*)parser, &parser_settings, input, len);
+    return http_parser_execute((http_parser*)parser, &parser_settings, input, len);
 }
 
 /*
