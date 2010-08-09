@@ -40,16 +40,9 @@ http_on_start_parsing(http_parser* parser)
 static int
 http_on_end_parsing(http_parser* parser)
 {
-    PyObject* http_method;
-    /* Set the REQUEST_METHOD: */
-    if(parser->method < sizeof(py_http_methods))
-        http_method = py_http_methods[parser->method];
-    else
-        http_method = PyString_FromString(http_method_str(parser->method));
-
     ENV_SETITEM(
         _(REQUEST_METHOD),
-        http_method
+        http_method_py_str(parser->method)
     );
 
     /* Set the CONTENT_TYPE, which is the same as HTTP_CONTENT_TYPE. */

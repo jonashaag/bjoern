@@ -4,5 +4,3 @@
 
 * make mimetype recognition actually work
 * no two content-length headers
-* refactoring
-* split code into objects

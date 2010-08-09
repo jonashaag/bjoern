@@ -1,9 +1,11 @@
 #include <Python.h>
+#include "http_parser.h"
 
+#define SIZEOF(x) ((sizeof(x)/sizeof(x[0])))
 #define _(s) _static_pystring_##s
 
 /* those will become REAL PyObjects later in `staticstrings_init` */
-PyObject* py_http_methods[5] = {
+static PyObject* py_http_methods[5] = {
     (PyObject*) "DELETE",
     (PyObject*) "GET",
     (PyObject*) "HEAD",
@@ -25,3 +27,4 @@ PyObject* _(groupdict);
 PyObject* _static_empty_pystring;
 
 void staticstrings_init();
+PyObject* http_method_py_str(enum http_method m);
