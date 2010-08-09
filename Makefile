@@ -1,6 +1,6 @@
 SOURCE_DIR	= src
-OBJ_DIR		= _build
-objects		= $(patsubst $(SOURCE_DIR)/%.c, $(OBJ_DIR)/%.o, \
+BUILD_DIR	= _build
+objects		= $(patsubst $(SOURCE_DIR)/%.c, $(BUILD_DIR)/%.o, \
 			     $(wildcard $(SOURCE_DIR)/*.c))
 
 PYTHON_VERSION	= 2.6
@@ -20,26 +20,26 @@ ifneq ($(WANT_ROUTING), no)
 FEATURES	+= -D WANT_ROUTING
 endif
 
-all: $(objects) bjoernmodule
+all: prepare-build $(objects) bjoernmodule
 
 bjoernmodule:
-	$(CC) $(CPPFLAGS) $(LDFLAGS) $(objects) $(HTTP_PARSER_OBJ) -o _bjoern.so
+	$(CC) $(CPPFLAGS) $(LDFLAGS) $(objects) $(HTTP_PARSER_OBJ) -o $(BUILD_DIR)/_bjoern.so
 	python -c "import _bjoern"
 
 again: clean all
 
-$(OBJ_DIR)/%.o: $(SOURCE_DIR)/%.c prepare-build
+$(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-# foo.o: shortcut to $(OBJ_DIR)/foo.o
-%.o: $(OBJ_DIR)/%.o
+# foo.o: shortcut to $(BUILD_DIR)/foo.o
+%.o: $(BUILD_DIR)/%.o
 	
 
 prepare-build:
 	mkdir -p _build
 
 clean:
-	rm -f $(OBJ_DIR)/*.o
+	rm -f $(BUILD_DIR)/*.o
 
 http_parser:
 	stuff/make-http-parser
