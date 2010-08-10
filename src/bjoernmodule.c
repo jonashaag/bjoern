@@ -54,9 +54,11 @@ Bjoern_Run(PyObject* self, PyObject* args)
 
     shall_cleanup = true;
 
+    /* libev mainloop */
     Py_BEGIN_ALLOW_THREADS
     ev_loop(mainloop, 0);
     Py_END_ALLOW_THREADS
+    /* end of libev mainloop */
 
     bjoern_cleanup(mainloop);
 
@@ -113,6 +115,7 @@ on_sigint(EV_LOOP* loop, ev_signal* signal_watcher, const int revents)
     bjoern_cleanup(loop);
 }
 
+#ifdef WANT_ROUTING
 PyObject* Bjoern_Route_Add(PyObject* self, PyObject* args)
 {
     PyObject* pattern;
@@ -131,3 +134,4 @@ PyObject* Bjoern_Route_Add(PyObject* self, PyObject* args)
 
     Py_RETURN_NONE;
 }
+#endif
