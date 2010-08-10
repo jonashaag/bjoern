@@ -1,3 +1,5 @@
+WANT_ROUTING	= no
+
 SOURCE_DIR	= src
 BUILD_DIR	= _build
 objects		= $(patsubst $(SOURCE_DIR)/%.c, $(BUILD_DIR)/%.o, \
@@ -10,7 +12,8 @@ HTTP_PARSER_DIR	= include/http-parser
 HTTP_PARSER_OBJ = $(HTTP_PARSER_DIR)/http_parser.o
 
 CPPFLAGS	+= -I $(PYTHON_DIR) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR) 
-CFLAGS		+= $(FEATURES) -std=c99 -Wall -Wno-unused -g
+CFLAGS		+= $(FEATURES) -std=c99 -fno-strict-aliasing -Wall -Wextra \
+		   -Wno-unused
 LDFLAGS		+= -l python2.6 -l ev -shared -static
 
 ifneq ($(WANT_SENDFILE), no)
@@ -21,6 +24,12 @@ FEATURES	+= -D WANT_ROUTING
 endif
 
 all: prepare-build $(objects) bjoernmodule
+
+opt: clean
+	CFLAGS='-O3' make
+
+small: clean
+	CFLAGS='-Os' make
 
 bjoernmodule:
 	$(CC) $(CPPFLAGS) $(LDFLAGS) $(objects) $(HTTP_PARSER_OBJ) -o $(BUILD_DIR)/_bjoern.so

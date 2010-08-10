@@ -107,6 +107,8 @@ wsgi_response_send(Request* request)
 static int
 wsgi_response_send_iterable(Request* request)
 {
+    if(!request->response_body_position)
+        return RESPONSE_FINISHED;
     const char* data = PyString_AsString(request->response_body_position);
     if(data == NULL) {
         // XXX: What to do here?
