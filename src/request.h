@@ -12,6 +12,12 @@
 ev_io_callback on_sock_read;
 ev_io_callback on_sock_accept;
 
+enum response_type {
+    RT_FILE = 1,
+    RT_STRING = 2,
+    RT_ITERABLE = 3
+};
+
 typedef struct _Request {
     int client_fd;
     ev_io read_watcher;
@@ -29,10 +35,10 @@ typedef struct _Request {
     PyObject* status;
     PyObject* headers;
     bool headers_sent;
-    bool use_sendfile;
+    enum response_type response_type;
     PyObject* response_body;
     size_t response_body_length;
-    c_char* response_body_position;
+    void* response_body_position;
 } Request;
 
 Request* Request_new();

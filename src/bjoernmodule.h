@@ -6,9 +6,6 @@
 #include "request.h"
 
 /* Public */
-bool bjoern_flush_errors();
-void bjoern_server_error();
-
 PyObject* response_class;
 #ifndef WANT_ROUTING
 /* No routing, use one application for every request */

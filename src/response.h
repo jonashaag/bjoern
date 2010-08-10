@@ -7,10 +7,11 @@
 #include "utils.h"
 
 /* Internal */
-static int wsgi_send_response(Request*);
-static void wsgi_send_headers(Request*);
-static int wsgi_send_body(Request*);
-static void wsgi_finalize(Request*);
+static int wsgi_response_send(Request*);
+static int wsgi_response_send_iterable(Request*);
+static void wsgi_response_send_headers(Request*);
+static int wsgi_response_send_body(Request*);
+static void wsgi_response_finalize(Request*);
 
 
 /* Public */

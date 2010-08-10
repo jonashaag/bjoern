@@ -3,7 +3,7 @@
 #include "sendfile.h"
 #include "utils.h"
 
-#define SERVER_ERROR do { DEBUG("Error on line %d", __LINE__); goto done; } while(0)
+#define SERVER_ERROR do { DEBUG("Error on line %d", __LINE__); goto error; } while(0)
 
 void
 wsgi_app(Request* request)
@@ -38,14 +38,6 @@ wsgi_app(Request* request)
         SERVER_ERROR;
 #endif
 
-    /* Make sure to fetch the `response_headers` attribute before anything else. */
-    request->headers = PyObject_GetAttr(wsgi_object, _(response_headers));
-    if(!validate_header_list(request->headers)) {
-        Py_XDECREF(request->headers);
-        Py_DECREF(return_value);
-        goto done;
-    }
-
     if(PyFile_Check(return_value)) {
         wsgi_app_handle_file(request, return_value);
         goto done;
@@ -57,11 +49,12 @@ wsgi_app(Request* request)
         goto done;
     }
 
-    if(PySequence_Check(return_value)) {
-        wsgi_app_handle_iterable(request, return_value);
+    PyObject* iter = PyObject_GetIter(return_value);
+    if(iter) {
+        Py_DECREF(return_value);
+        wsgi_app_handle_iterable(request, iter);
         goto done;
-    }
-    /* TODO: iterators/generator */
+    } else { PyErr_Clear(); }
 
     PyErr_Format(
         PyExc_TypeError,
@@ -69,13 +62,22 @@ wsgi_app(Request* request)
         "file object, string or an iterable, not %.200s",
         Py_TYPE(return_value)->tp_name
     );
-    goto done;
+    goto error;
+
+error:
+    Py_XDECREF(return_value);
+    Py_XDECREF(request->headers);
+    Py_XDECREF(request->status);
+    PyErr_Print();
+    set_http_500_response(request);
+    goto cleanup;
 
 done:
-    if(bjoern_flush_errors()) {
-        set_http_500_response(request);
-        goto cleanup;
-    }
+    request->headers = PyObject_GetAttr(wsgi_object, _(response_headers));
+    if(!validate_header_list(request->headers))
+        goto error;
+    if(PyErr_Occurred())
+        goto error;
 
     request->status = PyObject_GetAttr(wsgi_object, _(response_status));
     if(request->status == NULL || !PyString_Check(request->status)) {
@@ -84,11 +86,10 @@ done:
             "response_status must be a string, not %.200s",
             Py_TYPE(request->status ? request->status : Py_None)->tp_name
         );
-        Py_DECREF(request->status);
-        bjoern_server_error();
-        set_http_500_response(request);
-        goto cleanup;
+        goto error;
     }
+
+    goto cleanup;
 
 cleanup:
     Py_XDECREF(args1);
@@ -104,22 +105,26 @@ wsgi_app_handle_string(Request* request, PyObject* string)
     request->response_body = string;
     request->response_body_length = PyString_GET_SIZE(string);
     request->response_body_position = PyString_AS_STRING(string);
+    request->response_type = RT_STRING;
 }
 
 static void
 wsgi_app_handle_file(Request* request, PyObject* fileobj)
 {
-    request->use_sendfile = true;
-    wsgi_sendfile_init(request, (PyFileObject*)fileobj);
+    wsgi_response_sendfile_init(request, (PyFileObject*)fileobj);
+    request->response_type = RT_FILE;
 }
 
 static void
 wsgi_app_handle_iterable(Request* request, PyObject* iterable)
 {
-    PyObject* item_at_0 = PySequence_GetItem(iterable, 0);
-    Py_INCREF(item_at_0);
-    Py_DECREF(iterable);
-    request->response_body = item_at_0;
-    request->response_body_length = PyString_Size(item_at_0);
-    request->response_body_position = PyString_AsString(item_at_0);
+    request->response_type = RT_ITERABLE;
+    request->response_body = iterable;
+    request->response_body_position = PyIter_Next(iterable);
+    PyObject* len_method = PyObject_GetAttr(iterable, _(__len__));
+    if(!len_method)
+        PyErr_Clear();
+    else
+        request->response_body_length =
+            PyInt_AsLong(PyObject_CallObject(len_method, NULL));
 }

@@ -32,7 +32,7 @@ validate_header_list(PyObject* list)
     const char* errmsg;
 
     if(list == NULL || !PyList_Check(list)) {
-       errmsg = "response_headers must be a list";
+       errmsg = "response_headers must be a list, not %.200s";
        bloedmann = list ? list : Py_None;
        goto error;
     }
@@ -64,7 +64,7 @@ error:
     PyErr_Format(
         PyExc_TypeError,
         errmsg,
-        Py_TYPE(bloedmann)->tp_name
+        bloedmann == Py_None ? "None" : Py_TYPE(bloedmann)->tp_name
     );
     return false;
 }

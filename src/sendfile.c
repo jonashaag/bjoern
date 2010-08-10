@@ -1,7 +1,7 @@
 #include "sendfile.h"
 
 bool
-wsgi_sendfile_init(Request* request, PyFileObject* file)
+wsgi_response_sendfile_init(Request* request, PyFileObject* file)
 {
     int file_descriptor;
 
@@ -48,7 +48,7 @@ wsgi_sendfile_init(Request* request, PyFileObject* file)
 }
 
 int
-wsgi_sendfile(Request* request)
+wsgi_response_sendfile(Request* request)
 {
     int file_descriptor;
     int return_value;

@@ -11,5 +11,5 @@
 #include "response.h"
 #include "mimetype.h"
 
-bool wsgi_sendfile_init(Request*, PyFileObject*);
-int wsgi_sendfile(Request*);
+bool wsgi_response_sendfile_init(Request*, PyFileObject*);
+int  wsgi_response_sendfile(Request*);

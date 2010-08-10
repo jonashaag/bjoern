@@ -25,6 +25,7 @@ PyObject* _(Content_Type);
 PyObject* _(Content_Length);
 PyObject* _(groupdict);
 PyObject* _(close);
+PyObject* _(__len__);
 PyObject* _static_empty_pystring;
 
 void staticstrings_init();

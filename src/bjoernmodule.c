@@ -131,24 +131,3 @@ PyObject* Bjoern_Route_Add(PyObject* self, PyObject* args)
 
     Py_RETURN_NONE;
 }
-
-/* Shutdown/cleanup stuff */
-inline bool
-bjoern_flush_errors()
-{
-    if(PyErr_Occurred()) {
-        bjoern_server_error();
-        /*#if DIE_ON_ERROR
-          bjoern_cleanup(loop);
-          PyErr_SetInterrupt();
-        #endif*/
-        return true;
-    }
-    return false;
-}
-
-inline void
-bjoern_server_error()
-{
-    PyErr_Print();
-}

@@ -27,6 +27,7 @@ set_http_500_response(Request* request)
     request->response_body_position = PyString_AsString(request->response_body);
     request->response_body_length = strlen(HTTP_500_MESSAGE);
     request->headers_sent = true; /* ^ contains the response_body, no additional headers needed */
+    request->response_type = RT_STRING;
 }
 
 void
@@ -36,6 +37,7 @@ set_http_404_response(Request* request)
     request->response_body_position = PyString_AsString(request->response_body);
     request->response_body_length = strlen(HTTP_404_MESSAGE);
     request->headers_sent = true; /* ^ contains the response_body, no additional headers needed */
+    request->response_type = RT_STRING;
 }
 
 void
@@ -45,6 +47,7 @@ set_http_400_response(Request* request)
     request->response_body_position = PyString_AsString(request->response_body);
     request->response_body_length = strlen(HTTP_400_MESSAGE);
     request->headers_sent = true; /* ^ contains the response_body, no additional headers needed */
+    request->response_type = RT_STRING;
 }
 
 /*
@@ -56,7 +59,7 @@ while_sock_canwrite(EV_LOOP* mainloop, ev_io* write_watcher_, int revents)
     DEBUG("Can write.");
     Request* request = OFFSETOF(write_watcher, write_watcher_, Request);
 
-    switch(wsgi_send_response(request)) {
+    switch(wsgi_response_send(request)) {
         case RESPONSE_NOT_YET_FINISHED:
             /* Please come around again. */
             DEBUG("Not yet finished.");
@@ -75,30 +78,62 @@ while_sock_canwrite(EV_LOOP* mainloop, ev_io* write_watcher_, int revents)
 
 finish:
     ev_io_stop(mainloop, &request->write_watcher);
-    wsgi_finalize(request);
+    wsgi_response_finalize(request);
     close(request->client_fd);
     Request_free(request);
 }
 
 static int
-wsgi_send_response(Request* request)
+wsgi_response_send(Request* request)
 {
     /* TODO: Maybe it's faster to write HTTP headers and response body at once? */
     if(!request->headers_sent) {
         /* First time we write to this client, send HTTP headers. */
-        wsgi_send_headers(request);
+        wsgi_response_send_headers(request);
         request->headers_sent = true;
         return RESPONSE_NOT_YET_FINISHED;
     } else {
-        if(request->use_sendfile)
-            return wsgi_sendfile(request);
-        else
-            return wsgi_send_body(request);
+        switch(request->response_type) {
+            case RT_FILE:
+                return wsgi_response_sendfile(request);
+            case RT_ITERABLE:
+                return wsgi_response_send_iterable(request);
+            default:
+                return wsgi_response_send_body(request);
+        }
     }
 }
 
 static int
-wsgi_send_body(Request* request)
+wsgi_response_send_iterable(Request* request)
+{
+    const char* data = PyString_AsString(request->response_body_position);
+    if(data == NULL) {
+        // XXX: What to do here?
+        PyErr_Print();
+        Py_DECREF(request->response_body_position);
+        return RESPONSE_FINISHED;
+    }
+
+    size_t bytes_sent;
+    size_t length = PyString_GET_SIZE(request->response_body_position);
+    while((bytes_sent = write(request->client_fd, data, length)) > 0 )
+    {
+        data += bytes_sent;
+        length -= bytes_sent;
+    }
+
+    GIL_LOCK();
+    Py_DECREF(request->response_body_position);
+    request->response_body_position = PyIter_Next(request->response_body);
+    GIL_UNLOCK();
+
+    return request->response_body_position ? RESPONSE_NOT_YET_FINISHED
+                                           : RESPONSE_FINISHED;
+}
+
+static int
+wsgi_response_send_body(Request* request)
 {
     ssize_t bytes_sent = write(
         request->client_fd,
@@ -124,7 +159,7 @@ wsgi_send_body(Request* request)
 }
 
 static void
-wsgi_send_headers(Request* request)
+wsgi_response_send_headers(Request* request)
 {
     char        buf[MAX_HEADER_SIZE]; memcpy((char*)buf, "HTTP/1.1 ", 9);
     size_t      bufpos = 9;
@@ -156,7 +191,7 @@ wsgi_send_headers(Request* request)
     }
 
     /* Make sure a Content-Length header is set: */
-    if(!have_content_length) {
+    if(!have_content_length && request->response_body_length > 0) {
         memcpy(BUFPOS, "Content-Length: ", 16);
         bufpos += 16;
         DEBUG("Body length: %d", request->response_body_length);
@@ -177,7 +212,7 @@ wsgi_send_headers(Request* request)
 }
 
 static void
-wsgi_finalize(Request* request)
+wsgi_response_finalize(Request* request)
 {
     GIL_LOCK();
 
