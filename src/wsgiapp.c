@@ -39,29 +39,30 @@ wsgi_app(Request* request)
 #endif
 
     if(PyFile_Check(return_value)) {
-        wsgi_app_handle_file(request, return_value);
-        goto done;
+        if(wsgi_app_handle_file(request, return_value))
+            goto done;
     }
 
     if(PyString_Check(return_value)) {
         /* We already have a string. That's ok, take it for the response. */
-        wsgi_app_handle_string(request, return_value);
-        goto done;
+        if(wsgi_app_handle_string(request, return_value))
+            goto done;
     }
 
     PyObject* iter = PyObject_GetIter(return_value);
     if(iter) {
         Py_DECREF(return_value);
-        wsgi_app_handle_iterable(request, iter);
-        goto done;
+        if(wsgi_app_handle_iterable(request, iter))
+            goto done;
     } else { PyErr_Clear(); }
 
-    PyErr_Format(
-        PyExc_TypeError,
-        "start_response return value must be a "
-        "file object, string or an iterable, not %.200s",
-        Py_TYPE(return_value)->tp_name
-    );
+    if(!PyErr_Occurred())
+        PyErr_Format(
+            PyExc_TypeError,
+            "start_response return value must be a "
+            "file object, string or an iterable, not %.200s",
+            Py_TYPE(return_value)->tp_name
+        );
     goto error;
 
 error:
@@ -99,32 +100,42 @@ cleanup:
     GIL_UNLOCK();
 }
 
-static void
+static bool
 wsgi_app_handle_string(Request* request, PyObject* string)
 {
     request->response_body = string;
     request->response_body_length = PyString_GET_SIZE(string);
     request->response_body_position = PyString_AS_STRING(string);
     request->response_type = RT_STRING;
+    return true;
 }
 
-static void
+static bool
 wsgi_app_handle_file(Request* request, PyObject* fileobj)
 {
-    wsgi_response_sendfile_init(request, (PyFileObject*)fileobj);
     request->response_type = RT_FILE;
+    return wsgi_response_sendfile_init(request, (PyFileObject*)fileobj);
 }
 
-static void
+static bool
 wsgi_app_handle_iterable(Request* request, PyObject* iterable)
 {
     request->response_type = RT_ITERABLE;
     request->response_body = iterable;
     request->response_body_position = PyIter_Next(iterable);
     PyObject* len_method = PyObject_GetAttr(iterable, _(__len__));
-    if(!len_method)
+    if(len_method == NULL) {
         PyErr_Clear();
-    else
-        request->response_body_length =
-            PyInt_AsLong(PyObject_CallObject(len_method, NULL));
+        return true;
+    }
+    PyObject* tmp = PyObject_CallObject(len_method, NULL);
+    if(tmp == NULL) {
+        PyErr_Print();
+        return false;
+    }
+    request->response_body_length = PyInt_AsLong(tmp);
+    Py_DECREF(tmp);
+    Py_DECREF(len_method);
+
+    return true;
 }

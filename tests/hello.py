@@ -3,6 +3,9 @@ import bjoern
 def wsgi_app(env, start_response):
     start_response('200 abc', [])
     yield 'foo'
+    yield 'foo'
+    yield 'foo'
+    yield 'foo'
     yield 'bar'
 
 if bjoern.HAVE_ROUTING:

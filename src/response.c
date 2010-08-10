@@ -217,11 +217,13 @@ wsgi_response_finalize(Request* request)
     GIL_LOCK();
 
     PyObject* close_method = PyObject_GetAttr(request->response_body, _(close));
-    if(!close_method)
+    if(!close_method) {
         PyErr_Clear(); /* ignore the absence of a .close method */
-    else
+    } else {
         if(!PyObject_CallObject(close_method, NULL))
             PyErr_Print(); /* Exception in .close() */
+        Py_DECREF(close_method);
+    }
 
     GIL_UNLOCK();
 }
