@@ -1,6 +1,6 @@
 WANT_ROUTING	= no
 
-SOURCE_DIR	= src
+SOURCE_DIR	= bjoern
 BUILD_DIR	= _build
 objects		= $(patsubst $(SOURCE_DIR)/%.c, $(BUILD_DIR)/%.o, \
 			     $(wildcard $(SOURCE_DIR)/*.c))
@@ -13,7 +13,7 @@ HTTP_PARSER_OBJ = $(HTTP_PARSER_DIR)/http_parser.o
 
 CPPFLAGS	+= -I $(PYTHON_DIR) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR) 
 CFLAGS		+= $(FEATURES) -std=c99 -fno-strict-aliasing -Wall -Wextra \
-		   -Wno-unused
+		   -Wno-unused -g
 LDFLAGS		+= -l python2.6 -l ev -shared -static
 
 ifneq ($(WANT_SENDFILE), no)
