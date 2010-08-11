@@ -11,7 +11,7 @@ PYTHON_DIR	= /usr/include/python$(PYTHON_VERSION)/
 HTTP_PARSER_DIR	= include/http-parser
 HTTP_PARSER_OBJ = $(HTTP_PARSER_DIR)/http_parser.o
 
-CPPFLAGS	+= -I $(PYTHON_DIR) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR) 
+CPPFLAGS	+= -I $(PYTHON_DIR) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR)
 CFLAGS		+= $(FEATURES) -std=c99 -fno-strict-aliasing -Wall -Wextra \
 		   -Wno-unused -g
 LDFLAGS		+= -l python2.6 -l ev -shared -static
