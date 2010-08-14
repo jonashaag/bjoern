@@ -9,7 +9,7 @@ PYTHON_VERSION	= 2.6
 PYTHON_DIR	= /usr/include/python$(PYTHON_VERSION)/
 
 HTTP_PARSER_DIR	= include/http-parser
-HTTP_PARSER_OBJ = $(HTTP_PARSER_DIR)/http_parser.o
+HTTP_PARSER_OBJ = $(HTTP_PARSER_DIR)/http_parser_g.o
 
 CPPFLAGS	+= -I $(PYTHON_DIR) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR)
 CFLAGS		+= $(FEATURES) -std=c99 -fno-strict-aliasing -Wall -Wextra \
@@ -61,3 +61,7 @@ wget:
 
 test:
 	cd stuff && python ~/dev/projects/wsgitest/runner.py
+
+callgrind:
+	cd _build
+	valgrind --tool=callgrind python -c 'import _bjoern'

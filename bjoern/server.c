@@ -10,6 +10,16 @@
 #define LISTEN_BACKLOG  1024
 #define READ_BUFFER_SIZE 1024*8
 
+#define HANDLE_IO_ERROR(n, on_fatal_err) \
+    if(n == -1 || n == 0) { \
+        if(n & EAGAIN) \
+            goto again; \
+        \
+        print_io_error(); \
+        on_fatal_err; \
+    }
+
+
 static int          sockfd;
 
 typedef void ev_io_callback(struct ev_loop*, ev_io*, const int);
@@ -17,7 +27,8 @@ static ev_io_callback ev_io_on_request;
 static ev_io_callback ev_io_on_read;
 static ev_io_callback ev_io_on_write;
 static bool server_init(const char* hostaddr, const int port);
-static void print_io_error();
+static inline void set_error(Request*, http_status);
+static inline void print_io_error();
 static inline bool set_nonblocking(int fd);
 
 bool
@@ -91,61 +102,78 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
     Request* request = ADDR_FROM_MEMBER(watcher, Request, ev_watcher);
     ssize_t read_bytes = read(request->client_fd, read_buf, READ_BUFFER_SIZE);
 
-    /* Error? */
-    if(read_bytes == -1) {
-        if(errno & EAGAIN || errno & EWOULDBLOCK) {
-            /* try again. */
-            return;
-        } else {
-            print_io_error();
-            return send_error(mainloop, request, HTTP_SERVER_ERROR);
-        }
+    request->state = REQUEST_READING;
+
+    HANDLE_IO_ERROR(read_bytes,
+        /* on fatal error */ set_error(request, HTTP_SERVER_ERROR); goto out
+    );
+
+    GIL_LOCK1();
+    Request_parse(request, read_buf, read_bytes);
+    GIL_UNLOCK1();
+    switch(request->state) {
+        case REQUEST_PARSE_ERROR:
+            set_error(request, HTTP_BAD_REQUEST);
+            break;
+        case REQUEST_PARSE_DONE:
+            if(!wsgi_call_application(request))
+                set_error(request, HTTP_SERVER_ERROR);
+            break;
+        default:
+            assert(request->state == REQUEST_READING);
+            goto again;
     }
 
-    /* Finished? */
-    if(read_bytes == 0) {
-        if(!request->headers)
-            return send_error(mainloop, request, HTTP_BAD_REQUEST);
-        if(!wsgi_call_application(request))
-            return send_error(mainloop, request, HTTP_SERVER_ERROR);
-    } else {
-        if(Request_parse(request, read_buf, read_bytes)) {
-            /* parsing succeeded, wait for more data */
-            return;
-        } else {
-            /* data could not be parsed */
-            return send_error(mainloop, request, HTTP_BAD_REQUEST);
-        }
-    }
-
+out:
     ev_io_stop(mainloop, &request->ev_watcher);
     ev_io_init(&request->ev_watcher, &ev_io_on_write,
                request->client_fd, EV_WRITE);
     ev_io_start(mainloop, &request->ev_watcher);
+
+again:
+    return;
 }
 
 static void
 ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
 {
     Request* request = ADDR_FROM_MEMBER(watcher, Request, ev_watcher);
-    if(wsgi_send_response(request)) {
-        /* if wsgi_send_response returns true, we're done */
-        ev_io_stop(mainloop, &request->ev_watcher);
-        close(request->client_fd);
-        Request_free(request);
+    if(request->state == REQUEST_WSGI_RESPONSE) {
+        /* request->response is something that the WSGI application returned */
+        wsgi_send_response(request);
+        if(request->state != REQUEST_WSGI_DONE)
+            return; /* come around again */
+    } else {
+        /* request->response is a C-string */
+        sendall(request, request->response, strlen(request->response));
     }
-}
 
-void
-send_error(struct ev_loop* mainloop, Request* request, http_status status)
-{
-    Request_write_response(request, "HTTP/1.0 500 Error Message Here", 0);
+    /* Everything done, bye client! */
     ev_io_stop(mainloop, &request->ev_watcher);
     close(request->client_fd);
     Request_free(request);
 }
 
 void
+sendall(Request* request, register const char* data, register size_t length)
+{
+again:
+    while(length) {
+        ssize_t sent = write(request->client_fd, data, length);
+        HANDLE_IO_ERROR(sent, /* on fatal error */ return);
+        data += sent;
+        length -= sent;
+    }
+}
+
+static inline void
+set_error(Request* request, http_status status)
+{
+    printf("Request %ld: error %d\n", request, status);
+    request->response = "HTTP/1.0 500 Error msg here";
+}
+
+static inline void
 print_io_error()
 {
     printf("IO error %d\n", errno);

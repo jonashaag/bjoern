@@ -2,4 +2,4 @@
 #include "request.h"
 
 bool server_run(const char* hostaddr, const int port);
-void send_error(struct ev_loop*, Request*, http_status);
+void sendall(Request*, const char*, size_t);
