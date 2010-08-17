@@ -21,9 +21,7 @@ wsgi_call_application(Request* request)
     start_response->request = request;
     PyObject* args = PyTuple_Pack(/* size */ 2, request->headers, start_response);
 
-    GIL_LOCK(0);
     PyObject* retval = PyObject_CallObject(wsgi_app, args);
-    GIL_UNLOCK(0);
 
     Py_DECREF(start_response);
     if(retval == NULL)
