@@ -10,8 +10,10 @@ typedef enum {
     REQUEST_READING,
     REQUEST_PARSE_ERROR,
     REQUEST_PARSE_DONE,
-    REQUEST_WSGI_RESPONSE,
-    REQUEST_WSGI_DONE
+    REQUEST_WSGI_GENERAL_RESPONSE,
+    REQUEST_WSGI_STRING_RESPONSE,
+    REQUEST_WSGI_FILE_RESPONSE,
+    REQUEST_WSGI_ITER_RESPONSE
 } request_state;
 
 typedef struct {
@@ -28,8 +30,12 @@ typedef struct {
     ev_io ev_watcher;
 
     bj_parser parser;
-    void* response;
     PyObject* headers;
+
+    void* response;
+    PyObject* response_headers;
+    PyObject* status;
+    PyObject* response_curiter;
 } Request;
 
 Request* Request_new(int client_fd);

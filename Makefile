@@ -32,8 +32,8 @@ small: clean
 	CFLAGS='-Os' make
 
 bjoernmodule:
-	$(CC) $(CPPFLAGS) $(LDFLAGS) $(objects) $(HTTP_PARSER_OBJ) -o $(BUILD_DIR)/_bjoern.so
-	python -c "import _bjoern"
+	$(CC) $(CPPFLAGS) $(LDFLAGS) $(objects) $(HTTP_PARSER_OBJ) -o $(BUILD_DIR)/bjoern.so
+	python -c "import bjoern"
 
 again: clean all
 
@@ -64,4 +64,4 @@ test:
 
 callgrind:
 	cd _build
-	valgrind --tool=callgrind python -c 'import _bjoern'
+	valgrind --tool=callgrind python -c 'import bjoern'

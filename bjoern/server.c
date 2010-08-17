@@ -20,7 +20,7 @@
     }
 
 
-static int          sockfd;
+static int sockfd;
 
 typedef void ev_io_callback(struct ev_loop*, ev_io*, const int);
 static ev_io_callback ev_io_on_request;
@@ -104,20 +104,25 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
 
     request->state = REQUEST_READING;
 
+    GIL_LOCK(0);
+
     HANDLE_IO_ERROR(read_bytes,
         /* on fatal error */ set_error(request, HTTP_SERVER_ERROR); goto out
     );
 
-    GIL_LOCK1();
     Request_parse(request, read_buf, read_bytes);
-    GIL_UNLOCK1();
+
     switch(request->state) {
+
         case REQUEST_PARSE_ERROR:
             set_error(request, HTTP_BAD_REQUEST);
             break;
         case REQUEST_PARSE_DONE:
-            if(!wsgi_call_application(request))
+            if(!wsgi_call_application(request)) {
+                if(PyErr_Occurred())
+                    PyErr_Print();
                 set_error(request, HTTP_SERVER_ERROR);
+            }
             break;
         default:
             assert(request->state == REQUEST_READING);
@@ -131,6 +136,7 @@ out:
     ev_io_start(mainloop, &request->ev_watcher);
 
 again:
+    GIL_UNLOCK(0);
     return;
 }
 
@@ -138,10 +144,9 @@ static void
 ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
 {
     Request* request = ADDR_FROM_MEMBER(watcher, Request, ev_watcher);
-    if(request->state == REQUEST_WSGI_RESPONSE) {
+    if(request->state > REQUEST_WSGI_GENERAL_RESPONSE) {
         /* request->response is something that the WSGI application returned */
-        wsgi_send_response(request);
-        if(request->state != REQUEST_WSGI_DONE)
+        if(!wsgi_send_response(request))
             return; /* come around again */
     } else {
         /* request->response is a C-string */
