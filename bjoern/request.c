@@ -37,22 +37,6 @@ void Request_parse(Request* request,
         request->state = REQUEST_PARSE_ERROR;
 }
 
-void Request_write_response(Request* request,
-                            const char* data,
-                            size_t data_len) {
-    if(!data_len)
-        data_len = strlen(data);
-
-    ssize_t sent;
-    while(data_len) {
-        sent = write(request->client_fd, data, data_len);
-        if(sent == -1)
-            return;
-        data += sent;
-        data_len -= sent;
-    }
-}
-
 void Request_free(Request* req)
 {
     if(req >= _preallocd &&
