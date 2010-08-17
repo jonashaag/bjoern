@@ -73,7 +73,7 @@ Request* _Request_from_prealloc()
 
 #define REQUEST ((Request*)parser->data)
 #define PARSER  ((bj_parser*)parser)
-#define UPDATE_len(name) \
+#define UPDATE_LEN(name) \
     /* Update the len of a header field/value.
 
        Short explaination of the pointer arithmetics fun used here:
@@ -161,7 +161,7 @@ static int on_header_field(http_parser* parser,
         PARSER->value_len = 0;
 
     } else if(PARSER->field_start) {
-        UPDATE_len(field);
+        UPDATE_LEN(field);
     }
     return 0;
 }
@@ -170,7 +170,7 @@ static int on_header_value(http_parser* parser,
                            const char* value_start,
                            const size_t value_len) {
     if(PARSER->value_start)
-        UPDATE_len(value);
+        UPDATE_LEN(value);
     else {
         /* Start a new value */
         PARSER->value_start = value_start;
