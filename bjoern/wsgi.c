@@ -20,10 +20,9 @@ wsgi_call_application(Request* request)
     StartResponse* start_response = PyObject_NEW(StartResponse, &StartResponse_Type);
     start_response->request = request;
     PyObject* args = PyTuple_Pack(/* size */ 2, request->headers, start_response);
-
     PyObject* retval = PyObject_CallObject(wsgi_app, args);
-
     Py_DECREF(start_response);
+
     if(retval == NULL)
         return false;
 
