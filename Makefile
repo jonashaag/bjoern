@@ -13,7 +13,7 @@ HTTP_PARSER_OBJ = $(HTTP_PARSER_DIR)/http_parser_g.o
 
 CPPFLAGS	+= -I $(PYTHON_DIR) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR)
 CFLAGS		+= $(FEATURES) -std=c99 -fno-strict-aliasing -Wall -Wextra \
-		   -Wno-unused -g
+		   -Wno-unused -g -O3
 LDFLAGS		+= -l python2.6 -l ev -shared -static
 
 ifneq ($(WANT_SENDFILE), no)
@@ -64,4 +64,4 @@ test:
 
 callgrind:
 	cd _build
-	valgrind --tool=callgrind python -c 'import bjoern'
+	valgrind --tool=callgrind python tests/hello.py

@@ -22,7 +22,9 @@
 
 static int sockfd;
 
+typedef void ev_signal_callback(struct ev_loop*, ev_signal*, const int);
 typedef void ev_io_callback(struct ev_loop*, ev_io*, const int);
+static ev_signal_callback ev_signal_on_sigint;
 static ev_io_callback ev_io_on_request;
 static ev_io_callback ev_io_on_read;
 static ev_io_callback ev_io_on_write;
@@ -43,9 +45,9 @@ server_run(const char* hostaddr, const int port)
     ev_io_init(&accept_watcher, ev_io_on_request, sockfd, EV_READ);
     ev_io_start(mainloop, &accept_watcher);
 
-    /*ev_signal signal_watcher;
-    ev_signal_init(&signal_watcher, ev_io_on_sigint, SIGINT);
-    ev_signal_start(mainloop, &signal_watcher);*/
+    ev_signal signal_watcher;
+    ev_signal_init(&signal_watcher, ev_signal_on_sigint, SIGINT);
+    ev_signal_start(mainloop, &signal_watcher);
 
     /* This is the program main loop */
     Py_BEGIN_ALLOW_THREADS
@@ -119,8 +121,8 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
             break;
         case REQUEST_PARSE_DONE:
             if(!wsgi_call_application(request)) {
-                if(PyErr_Occurred())
-                    PyErr_Print();
+                assert(PyErr_Occurred());
+                PyErr_Print();
                 set_error(request, HTTP_SERVER_ERROR);
             }
             break;
@@ -159,16 +161,17 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
     Request_free(request);
 }
 
-void
+bool
 sendall(Request* request, register const char* data, register size_t length)
 {
 again:
     while(length) {
         ssize_t sent = write(request->client_fd, data, length);
-        HANDLE_IO_ERROR(sent, /* on fatal error */ return);
+        HANDLE_IO_ERROR(sent, /* on fatal error */ return false);
         data += sent;
         length -= sent;
     }
+    return true;
 }
 
 static inline void
@@ -189,4 +192,10 @@ set_nonblocking(int fd)
 {
     int flags = fcntl(fd, F_GETFL, 0);
     return (fcntl(fd, F_SETFL, (flags < 0 ? 0 : flags) | O_NONBLOCK) != -1);
+}
+
+static void
+ev_signal_on_sigint(struct ev_loop* mainloop, ev_signal* watcher, const int events)
+{
+    ev_unloop(mainloop, EVUNLOOP_ALL);
 }

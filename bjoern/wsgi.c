@@ -4,6 +4,7 @@
 #include "wsgi.h"
 
 static PyKeywordFunc start_response;
+static bool wsgi_sendheaders(Request*);
 static bool wsgi_sendfile(Request*);
 static bool wsgi_senditer(Request*);
 
@@ -65,14 +66,19 @@ wsgi_call_application(Request* request)
 bool
 wsgi_send_response(Request* request)
 {
+    if(request->response_headers) {
+        if(wsgi_sendheaders(request))
+            return true;
+        request->response_headers = NULL;
+    }
+
     switch(request->state) {
         case REQUEST_WSGI_STRING_RESPONSE:
-            sendall(
+            return !sendall(
                 request,
                 PyString_AS_STRING(request->response),
                 PyString_GET_SIZE(request->response)
             );
-            return true;
 
         case REQUEST_WSGI_FILE_RESPONSE:
             return wsgi_sendfile(request);
@@ -83,6 +89,42 @@ wsgi_send_response(Request* request)
         default:
             assert(0);
     }
+}
+
+static bool
+wsgi_sendheaders(Request* request)
+{
+    char buf[1024*4];
+    size_t bufpos = 0;
+    #define buf_write(src, len) \
+        do { \
+            size_t n = len; \
+            const char* s = src;  \
+            while(n--) buf[bufpos++] = *s++; \
+        } while(0)
+
+    buf_write("HTTP/1.1 ", strlen("HTTP/1.1 "));
+    buf_write(PyString_AS_STRING(request->status),
+              PyString_GET_SIZE(request->status));
+
+    size_t n_headers = PyList_GET_SIZE(request->response_headers);
+    for(size_t i=0; i<n_headers; ++i) {
+        PyObject* tuple = PyList_GET_ITEM(request->response_headers, i);
+        TYPECHECK(tuple, PyTuple, "headers", true);
+
+        PyObject* field = PyTuple_GET_ITEM(tuple, 0);
+        PyObject* value = PyTuple_GET_ITEM(tuple, 1);
+        TYPECHECK(field, PyString, "header tuple items", true);
+        TYPECHECK(value, PyString, "header tuple items", true);
+
+        buf_write("\r\n", strlen("\r\n"));
+        buf_write(PyString_AS_STRING(field), PyString_GET_SIZE(field));
+        buf_write(": ", strlen(": "));
+        buf_write(PyString_AS_STRING(value), PyString_GET_SIZE(value));
+    }
+    buf_write("\r\n\r\n", strlen("\r\n\r\n"));
+
+    return !sendall(request, buf, bufpos);
 }
 
 static bool
@@ -98,11 +140,11 @@ wsgi_senditer(Request* request)
         return true;
 
     TYPECHECK(request->response_curiter, PyString, "wsgi iterable items", true);
-    sendall(
+    if(!sendall(
         request,
         PyString_AS_STRING(request->response_curiter),
         PyString_GET_SIZE(request->response_curiter)
-    );
+    )) return true;
 
     GIL_LOCK(0);
     request->response_curiter = PyIter_Next(request->response);
@@ -117,16 +159,15 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
 {
     Request* req = ((StartResponse*)self)->request;
 
-    if(!PyArg_UnpackTuple(args,
-            /* Python function name */ "start_response",
-            /* min args */ 2, /* max args */ 2,
-            &req->status,
-            &req->response_headers
-        ))
+    if(!PyArg_UnpackTuple(args, "start_response", 2, 2,
+                          &req->status, &req->response_headers))
         return NULL;
 
     TYPECHECK(req->status, PyString, "start_response argument 1", NULL);
     TYPECHECK(req->response_headers, PyList, "start_response argument 2", NULL);
+
+    Py_INCREF(req->status);
+    Py_INCREF(req->response_headers);
 
     Py_RETURN_NONE;
 }
