@@ -107,7 +107,7 @@ wsgi_senditer(Request* request)
     GIL_LOCK(0);
     request->response_curiter = PyIter_Next(request->response);
     GIL_UNLOCK(0);
-    return request->response_curiter != NULL;
+    return request->response_curiter == NULL;
 }
 
 

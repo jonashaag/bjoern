@@ -7,7 +7,7 @@ static char _preallocd_used[REQUEST_PREALLOC_N];
 
 static http_parser_settings parser_settings;
 
-static PyObject* wsgi_header(const char*, const size_t);
+static PyObject* wsgi_http_header(const char*, const size_t);
 
 
 Request* Request_new(int client_fd)
@@ -107,7 +107,7 @@ static int on_path(http_parser* parser,
     PyDict_SetItemString(
         REQUEST->headers,
         "PATH_INFO",
-        wsgi_header(path_start, path_len)
+        PyString_FromStringAndSize(path_start, path_len)
     );
     return 0;
 }
@@ -118,7 +118,7 @@ static int on_query_string(http_parser* parser,
     PyDict_SetItemString(
         REQUEST->headers,
         "QUERY_STRING",
-        wsgi_header(query_start, query_len)
+        PyString_FromStringAndSize(query_start, query_len)
     );
     return 0;
 }
@@ -129,7 +129,7 @@ static int on_url(http_parser* parser,
     PyDict_SetItemString(
         REQUEST->headers,
         "REQUEST_URI",
-        wsgi_header(url_start, url_len)
+        PyString_FromStringAndSize(url_start, url_len)
     );
     return 0;
 }
@@ -140,7 +140,7 @@ static int on_fragment(http_parser* parser,
     PyDict_SetItemString(
         REQUEST->headers,
         "HTTP_FRAGMENT",
-        wsgi_header(fragm_start, fragm_len)
+        PyString_FromStringAndSize(fragm_start, fragm_len)
     );
     return 0;
 }
@@ -152,17 +152,19 @@ static int on_header_field(http_parser* parser,
         /* Store previous header and start a new one */
         PyDict_SetItem(
             REQUEST->headers,
-            wsgi_header(PARSER->field_start, PARSER->field_len),
+            wsgi_http_header(PARSER->field_start, PARSER->field_len),
             PyString_FromStringAndSize(PARSER->value_start, PARSER->value_len)
         );
-        PARSER->field_start = field_start;
-        PARSER->field_len = field_len;
-        PARSER->value_start = NULL;
-        PARSER->value_len = 0;
-
     } else if(PARSER->field_start) {
         UPDATE_LEN(field);
+        return 0;
     }
+
+    PARSER->field_start = field_start;
+    PARSER->field_len = field_len;
+    PARSER->value_start = NULL;
+    PARSER->value_len = 0;
+
     return 0;
 }
 
@@ -182,6 +184,13 @@ static int on_header_value(http_parser* parser,
 static int
 on_headers_complete(http_parser* parser)
 {
+
+    /* one header remains. store it. */
+    PyDict_SetItem(
+        REQUEST->headers,
+        wsgi_http_header(PARSER->field_start, PARSER->field_len),
+        PyString_FromStringAndSize(PARSER->value_start, PARSER->value_len)
+    );
     return 0;
 }
 
@@ -200,22 +209,23 @@ on_message_complete(http_parser* parser)
 
 
 static PyObject*
-wsgi_header(const char* data, size_t len)
+wsgi_http_header(register const char* data, register size_t len)
 {
     PyObject* obj = PyString_FromStringAndSize(/* empty string */ NULL,
-                                               len+strlen("HTTP_")+1);
+                                               len+strlen("HTTP_"));
     char* dest = PyString_AS_STRING(obj);
     memcpy(dest, "HTTP_", 5);
-    for(size_t i=0; i<len; ++i) {
+    dest += strlen("HTTP_");
+
+    for(; len; --len, ++data, ++dest) {
         char c = *data;
         if(c == '-')
-            *dest++ = '_';
+            *dest = '_';
         else if(c >= 'a' && c <= 'z')
-            *dest++ = c - ('a' - 'A');
+            *dest = c - ('a' - 'A');
         else
-            *dest++ = c;
+            *dest = c;
     }
-    *dest++ = '\0';
     return obj;
 }
 
