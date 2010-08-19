@@ -12,7 +12,7 @@
 
 #define HANDLE_IO_ERROR(n, on_fatal_err) \
     if(n == -1 || n == 0) { \
-        if(n & EAGAIN) \
+        if(errno == EAGAIN) \
             goto again; \
         \
         print_io_error(); \
@@ -146,11 +146,21 @@ static void
 ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
 {
     Request* request = ADDR_FROM_MEMBER(watcher, Request, ev_watcher);
+
+    GIL_LOCK(0);
+
     if(request->state > REQUEST_WSGI_GENERAL_RESPONSE) {
         /* request->response is something that the WSGI application returned */
         if(!wsgi_send_response(request))
-            return; /* come around again */
-    } else {
+            goto out; /* come around again */
+        if(PyErr_Occurred()) {
+            /* Internal server error. */
+            PyErr_Print();
+            set_error(request, HTTP_SERVER_ERROR);
+        }
+    }
+
+    if(request->state == REQUEST_ERROR_RESPONSE) {
         /* request->response is a C-string */
         sendall(request, request->response, strlen(request->response));
     }
@@ -159,6 +169,9 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
     ev_io_stop(mainloop, &request->ev_watcher);
     close(request->client_fd);
     Request_free(request);
+
+out:
+    GIL_UNLOCK(0);
 }
 
 bool
@@ -177,14 +190,14 @@ again:
 static inline void
 set_error(Request* request, http_status status)
 {
-    printf("Request %ld: error %d\n", request, status);
+    request->state = REQUEST_ERROR_RESPONSE;
     request->response = "HTTP/1.0 500 Error msg here";
 }
 
 static inline void
 print_io_error()
 {
-    printf("IO error %d\n", errno);
+    fprintf(stderr, "IO error %d\n", errno);
 }
 
 static inline bool

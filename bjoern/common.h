@@ -14,7 +14,7 @@
 #define ADDR_FROM_MEMBER(ptr, strct, mem) (strct*)((size_t)ptr - (size_t)(&(((strct*)NULL)->mem)));
 
 #define TYPECHECK2(what, check_type, print_type, errmsg_name, failure_retval) \
-    if(!check_type##_Check(what)) { \
+    if(!what || !check_type##_Check(what)) { \
         PyErr_Format(\
             PyExc_TypeError, \
             errmsg_name " must be of type %s, not %s", \

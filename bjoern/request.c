@@ -19,7 +19,6 @@ Request* Request_new(int client_fd)
         return NULL;
 
     req->client_fd = client_fd;
-    req->headers = NULL;
     req->state = REQUEST_FRESH;
     http_parser_init((http_parser*)&req->parser, HTTP_REQUEST);
     req->parser.parser.data = req;

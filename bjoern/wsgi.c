@@ -20,12 +20,34 @@ wsgi_call_application(Request* request)
 {
     StartResponse* start_response = PyObject_NEW(StartResponse, &StartResponse_Type);
     start_response->request = request;
-    PyObject* args = PyTuple_Pack(/* size */ 2, request->headers, start_response);
-    PyObject* retval = PyObject_CallObject(wsgi_app, args);
-    Py_DECREF(start_response);
+
+    request->response_headers = NULL;
+    PyObject* retval = PyObject_CallFunctionObjArgs(
+        wsgi_app,
+        request->headers,
+        start_response,
+        NULL /* sentinel */
+    );
 
     if(retval == NULL)
         return false;
+
+    if(!request->response_headers) {
+        PyErr_SetString(
+            PyExc_TypeError,
+            "wsgi application returned before start_response was called"
+        );
+        return false;
+    }
+
+    /* Optimize the most common case: */
+    if(PyList_Check(retval) && PyList_GET_SIZE(retval) == 1) {
+        PyObject* tmp = retval;
+        retval = PyList_GET_ITEM(tmp, 0);
+        Py_DECREF(tmp);
+        goto string_resp; /* eeeeeevil */
+    }
+
 
     if(PyFile_Check(retval)) {
         request->state = REQUEST_WSGI_FILE_RESPONSE;
@@ -34,15 +56,16 @@ wsgi_call_application(Request* request)
     }
 
     if(PyString_Check(retval)) {
+string_resp:
         request->state = REQUEST_WSGI_STRING_RESPONSE;
         request->response = retval;
         return true;
     }
 
     PyObject* iter = PyObject_GetIter(retval);
+    Py_DECREF(retval);
     TYPECHECK2(iter, PyIter, PySeqIter, "wsgi application return value", false);
 
-    Py_DECREF(retval);
     request->state = REQUEST_WSGI_ITER_RESPONSE;
     request->response = iter;
     /* Get the first item of the iterator, because that may execute code that
@@ -112,6 +135,14 @@ wsgi_sendheaders(Request* request)
         PyObject* tuple = PyList_GET_ITEM(request->response_headers, i);
         TYPECHECK(tuple, PyTuple, "headers", true);
 
+        if(PyTuple_GET_SIZE(tuple) < 2) {
+            PyErr_Format(
+                PyExc_TypeError,
+                "headers must be tuples of length 2, not %d",
+                PyTuple_GET_SIZE(tuple)
+            );
+            return true;
+        }
         PyObject* field = PyTuple_GET_ITEM(tuple, 0);
         PyObject* value = PyTuple_GET_ITEM(tuple, 1);
         TYPECHECK(field, PyString, "header tuple items", true);
@@ -146,9 +177,7 @@ wsgi_senditer(Request* request)
         PyString_GET_SIZE(request->response_curiter)
     )) return true;
 
-    GIL_LOCK(0);
     request->response_curiter = PyIter_Next(request->response);
-    GIL_UNLOCK(0);
     return request->response_curiter == NULL;
 }
 
