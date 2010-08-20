@@ -177,9 +177,10 @@ out:
 bool
 sendall(Request* request, register const char* data, register size_t length)
 {
+    register ssize_t sent;
 again:
     while(length) {
-        ssize_t sent = write(request->client_fd, data, length);
+        sent = write(request->client_fd, data, length);
         HANDLE_IO_ERROR(sent, /* on fatal error */ return false);
         data += sent;
         length -= sent;

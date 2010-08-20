@@ -4,7 +4,9 @@
 #include "wsgi.h"
 
 static PyKeywordFunc start_response;
+static inline bool _check_start_response(Request*);
 static bool wsgi_sendheaders(Request*);
+static inline bool wsgi_sendstring(Request*);
 static bool wsgi_sendfile(Request*);
 static bool wsgi_senditer(Request*);
 
@@ -32,14 +34,6 @@ wsgi_call_application(Request* request)
     if(retval == NULL)
         return false;
 
-    if(!request->response_headers) {
-        PyErr_SetString(
-            PyExc_TypeError,
-            "wsgi application returned before start_response was called"
-        );
-        return false;
-    }
-
     /* Optimize the most common case: */
     if(PyList_Check(retval) && PyList_GET_SIZE(retval) == 1) {
         PyObject* tmp = retval;
@@ -52,14 +46,14 @@ wsgi_call_application(Request* request)
     if(PyFile_Check(retval)) {
         request->state = REQUEST_WSGI_FILE_RESPONSE;
         request->response = retval;
-        return true;
+        return _check_start_response(request);
     }
 
     if(PyString_Check(retval)) {
 string_resp:
         request->state = REQUEST_WSGI_STRING_RESPONSE;
         request->response = retval;
-        return true;
+        return _check_start_response(request);
     }
 
     PyObject* iter = PyObject_GetIter(retval);
@@ -83,6 +77,19 @@ string_resp:
      */
     request->response_curiter = PyIter_Next(iter);
 
+    return _check_start_response(request);
+}
+
+static inline bool
+_check_start_response(Request* request)
+{
+    if(!request->response_headers) {
+        PyErr_SetString(
+            PyExc_TypeError,
+            "wsgi application returned before start_response was called"
+        );
+        return false;
+    }
     return true;
 }
 
@@ -97,11 +104,7 @@ wsgi_send_response(Request* request)
 
     switch(request->state) {
         case REQUEST_WSGI_STRING_RESPONSE:
-            return !sendall(
-                request,
-                PyString_AS_STRING(request->response),
-                PyString_GET_SIZE(request->response)
-            );
+            return wsgi_sendstring(request);
 
         case REQUEST_WSGI_FILE_RESPONSE:
             return wsgi_sendfile(request);
@@ -158,6 +161,16 @@ wsgi_sendheaders(Request* request)
     return !sendall(request, buf, bufpos);
 }
 
+static inline bool
+wsgi_sendstring(Request* request)
+{
+    return !sendall(
+        request,
+        PyString_AS_STRING(request->response),
+        PyString_GET_SIZE(request->response)
+    );
+}
+
 static bool
 wsgi_sendfile(Request* request)
 {
@@ -167,18 +180,27 @@ wsgi_sendfile(Request* request)
 static bool
 wsgi_senditer(Request* request)
 {
-    if(request->response_curiter == NULL)
+#define ITER_MAXSEND 1024*4
+    register PyObject* curiter = request->response_curiter;
+    assert(curiter);
+
+    register ssize_t sent = 0;
+    while(curiter && sent < ITER_MAXSEND) {
+        TYPECHECK(curiter, PyString, "wsgi iterable items", true);
+        if(!sendall(request, PyString_AS_STRING(curiter),
+                    PyString_GET_SIZE(curiter)))
+            return true;
+        sent += PyString_GET_SIZE(curiter);
+        Py_DECREF(curiter);
+        curiter = PyIter_Next(request->response);
+    }
+
+    if(curiter) {
+        request->response_curiter = curiter;
+        return false;
+    } else {
         return true;
-
-    TYPECHECK(request->response_curiter, PyString, "wsgi iterable items", true);
-    if(!sendall(
-        request,
-        PyString_AS_STRING(request->response_curiter),
-        PyString_GET_SIZE(request->response_curiter)
-    )) return true;
-
-    request->response_curiter = PyIter_Next(request->response);
-    return request->response_curiter == NULL;
+    }
 }
 
 
