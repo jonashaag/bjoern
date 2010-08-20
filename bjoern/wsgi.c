@@ -23,7 +23,6 @@ wsgi_call_application(Request* request)
     StartResponse* start_response = PyObject_NEW(StartResponse, &StartResponse_Type);
     start_response->request = request;
 
-    request->response_headers = NULL;
     PyObject* retval = PyObject_CallFunctionObjArgs(
         wsgi_app,
         request->headers,
@@ -31,8 +30,12 @@ wsgi_call_application(Request* request)
         NULL /* sentinel */
     );
 
+    PyObject_FREE(start_response);
+
     if(retval == NULL)
         return false;
+
+    request->state |= REQUEST_RESPONSE_WSGI;
 
     /* Optimize the most common case: */
     if(PyList_Check(retval) && PyList_GET_SIZE(retval) == 1) {
@@ -44,23 +47,23 @@ wsgi_call_application(Request* request)
 
 
     if(PyFile_Check(retval)) {
-        request->state = REQUEST_WSGI_FILE_RESPONSE;
+        request->state |= REQUEST_WSGI_FILE_RESPONSE;
         request->response = retval;
-        return _check_start_response(request);
+        goto out;
     }
 
     if(PyString_Check(retval)) {
 string_resp:
-        request->state = REQUEST_WSGI_STRING_RESPONSE;
+        request->state |= REQUEST_WSGI_STRING_RESPONSE;
         request->response = retval;
-        return _check_start_response(request);
+        goto out;
     }
 
     PyObject* iter = PyObject_GetIter(retval);
     Py_DECREF(retval);
     TYPECHECK2(iter, PyIter, PySeqIter, "wsgi application return value", false);
 
-    request->state = REQUEST_WSGI_ITER_RESPONSE;
+    request->state |= REQUEST_WSGI_ITER_RESPONSE;
     request->response = iter;
     /* Get the first item of the iterator, because that may execute code that
      * invokes `start_response` (which might not have been invoked yet).
@@ -76,13 +79,10 @@ string_resp:
      * _before_ the wsgi body is sent, because it passes the HTTP headers.
      */
     request->response_curiter = PyIter_Next(iter);
+    if(PyErr_Occurred())
+        return false;
 
-    return _check_start_response(request);
-}
-
-static inline bool
-_check_start_response(Request* request)
-{
+out:
     if(!request->response_headers) {
         PyErr_SetString(
             PyExc_TypeError,
@@ -96,25 +96,18 @@ _check_start_response(Request* request)
 bool
 wsgi_send_response(Request* request)
 {
-    if(request->response_headers) {
+    if(!(request->state & REQUEST_RESPONSE_HEADERS_SENT)) {
         if(wsgi_sendheaders(request))
             return true;
-        request->response_headers = NULL;
+        request->state |= REQUEST_RESPONSE_HEADERS_SENT;
     }
 
-    switch(request->state) {
-        case REQUEST_WSGI_STRING_RESPONSE:
-            return wsgi_sendstring(request);
+    request_state state = request->state;
+    if(state & REQUEST_WSGI_STRING_RESPONSE)    return wsgi_sendstring(request);
+    else if(state & REQUEST_WSGI_FILE_RESPONSE) return wsgi_sendfile(request);
+    else if(state & REQUEST_WSGI_ITER_RESPONSE) return wsgi_senditer(request);
 
-        case REQUEST_WSGI_FILE_RESPONSE:
-            return wsgi_sendfile(request);
-
-        case REQUEST_WSGI_ITER_RESPONSE:
-            return wsgi_senditer(request);
-
-        default:
-            assert(0);
-    }
+    assert(0);
 }
 
 static bool
@@ -164,11 +157,12 @@ wsgi_sendheaders(Request* request)
 static inline bool
 wsgi_sendstring(Request* request)
 {
-    return !sendall(
+    sendall(
         request,
         PyString_AS_STRING(request->response),
         PyString_GET_SIZE(request->response)
     );
+    return true;
 }
 
 static bool
@@ -182,7 +176,7 @@ wsgi_senditer(Request* request)
 {
 #define ITER_MAXSEND 1024*4
     register PyObject* curiter = request->response_curiter;
-    assert(curiter);
+    if(!curiter) return true;
 
     register ssize_t sent = 0;
     while(curiter && sent < ITER_MAXSEND) {
@@ -193,6 +187,10 @@ wsgi_senditer(Request* request)
         sent += PyString_GET_SIZE(curiter);
         Py_DECREF(curiter);
         curiter = PyIter_Next(request->response);
+        if(PyErr_Occurred()) {
+            Py_DECREF(curiter);
+            return true;
+        }
     }
 
     if(curiter) {
@@ -210,9 +208,37 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
 {
     Request* req = ((StartResponse*)self)->request;
 
-    if(!PyArg_UnpackTuple(args, "start_response", 2, 2,
-                          &req->status, &req->response_headers))
+    if(req->state & REQUEST_RESPONSE_HEADERS_SENT) {
+        PyErr_SetString(
+            PyExc_TypeError,
+            "start_response called but headers already sent"
+        );
         return NULL;
+    }
+
+    bool first_call = !req->response_headers;
+    PyObject* exc_info = NULL;
+    if(!PyArg_UnpackTuple(args, "start_response", 2, 3,
+            &req->status, &req->response_headers, &exc_info))
+        return NULL;
+
+    if(!first_call) {
+        TYPECHECK(exc_info, PyTuple, "start_response argument 3", NULL);
+        if(PyTuple_GET_SIZE(exc_info) != 3) {
+            PyErr_Format(
+                PyExc_TypeError,
+                "start_response argument 3 must be a tuple of length 3, "
+                "not of length %d",
+                PyTuple_GET_SIZE(exc_info)
+            );
+            return NULL;
+        }
+        PyErr_Restore(
+            PyTuple_GET_ITEM(exc_info, 0),
+            PyTuple_GET_ITEM(exc_info, 1),
+            PyTuple_GET_ITEM(exc_info, 2)
+        );
+    }
 
     TYPECHECK(req->status, PyString, "start_response argument 1", NULL);
     TYPECHECK(req->response_headers, PyList, "start_response argument 2", NULL);

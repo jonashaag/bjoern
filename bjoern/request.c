@@ -23,6 +23,11 @@ Request* Request_new(int client_fd)
     http_parser_init((http_parser*)&req->parser, HTTP_REQUEST);
     req->parser.parser.data = req;
 
+    req->response = NULL;
+    req->response_headers = NULL;
+    req->status = NULL;
+    req->response_curiter = NULL;
+
     return req;
 }
 
@@ -33,7 +38,7 @@ void Request_parse(Request* request,
         http_parser_execute((http_parser*)&request->parser,
                             &parser_settings, data, data_len);
     else
-        request->state = REQUEST_PARSE_ERROR;
+        request->state |= REQUEST_PARSE_ERROR;
 }
 
 void Request_free(Request* req)
@@ -42,6 +47,15 @@ void Request_free(Request* req)
        req <= _preallocd+REQUEST_PREALLOC_N*sizeof(Request)) {
         _preallocd_used[req-_preallocd] = false;
     } else {
+        if(req->state & REQUEST_RESPONSE_WSGI)
+            Py_XDECREF(req->response);
+#if 0
+        else
+            free(req->response);
+#endif
+        Py_XDECREF(req->response_headers);
+        Py_XDECREF(req->status);
+        Py_XDECREF(req->response_curiter);
         free(req);
     }
 }

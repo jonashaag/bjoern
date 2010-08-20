@@ -6,15 +6,16 @@
 #include "common.h"
 
 typedef enum {
-    REQUEST_FRESH = 1,
-    REQUEST_READING,
-    REQUEST_PARSE_ERROR,
-    REQUEST_PARSE_DONE,
-    REQUEST_ERROR_RESPONSE,
-    REQUEST_WSGI_GENERAL_RESPONSE,
-    REQUEST_WSGI_STRING_RESPONSE,
-    REQUEST_WSGI_FILE_RESPONSE,
-    REQUEST_WSGI_ITER_RESPONSE
+    REQUEST_FRESH                   = 1<<0,
+    REQUEST_READING                 = 1<<1,
+    REQUEST_PARSE_ERROR             = 1<<2,
+    REQUEST_PARSE_DONE              = 1<<3,
+    REQUEST_RESPONSE_STATIC         = 1<<4,
+    REQUEST_RESPONSE_HEADERS_SENT   = 1<<5,
+    REQUEST_RESPONSE_WSGI           = 1<<6,
+    REQUEST_WSGI_STRING_RESPONSE    = 1<<7,
+    REQUEST_WSGI_FILE_RESPONSE      = 1<<8,
+    REQUEST_WSGI_ITER_RESPONSE      = 1<<9
 } request_state;
 
 typedef struct {

@@ -149,7 +149,7 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
 
     GIL_LOCK(0);
 
-    if(request->state > REQUEST_WSGI_GENERAL_RESPONSE) {
+    if(request->state & REQUEST_RESPONSE_WSGI) {
         /* request->response is something that the WSGI application returned */
         if(!wsgi_send_response(request))
             goto out; /* come around again */
@@ -160,7 +160,7 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
         }
     }
 
-    if(request->state == REQUEST_ERROR_RESPONSE) {
+    if(request->state & REQUEST_RESPONSE_STATIC) {
         /* request->response is a C-string */
         sendall(request, request->response, strlen(request->response));
     }
@@ -191,7 +191,9 @@ again:
 static inline void
 set_error(Request* request, http_status status)
 {
-    request->state = REQUEST_ERROR_RESPONSE;
+    request->state |= REQUEST_RESPONSE_STATIC;
+    request->state &= ~REQUEST_RESPONSE_WSGI;
+    Py_XDECREF(request->response);
     request->response = "HTTP/1.0 500 Error msg here";
 }
 
