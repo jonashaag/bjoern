@@ -62,6 +62,15 @@ wget:
 test:
 	cd stuff && python ~/dev/projects/wsgitest/runner.py
 
+valgrind:
+	valgrind --leak-check=full --show-reachable=yes python tests/hello.py
+
 callgrind:
 	cd _build
 	valgrind --tool=callgrind python tests/hello.py
+
+memwatch:
+	watch -n 0.5 \
+	  'cat /proc/$$(pidof -s python)/cmdline | tr "\0" " " | head -c -1; \
+	   echo; echo; \
+	   tail -n +25 /proc/$$(pidof -s python)/smaps | head -n 15'

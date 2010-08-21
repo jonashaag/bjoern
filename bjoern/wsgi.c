@@ -41,6 +41,7 @@ wsgi_call_application(Request* request)
     if(PyList_Check(retval) && PyList_GET_SIZE(retval) == 1) {
         PyObject* tmp = retval;
         retval = PyList_GET_ITEM(tmp, 0);
+        Py_INCREF(retval);
         Py_DECREF(tmp);
         goto string_resp; /* eeeeeevil */
     }
@@ -188,7 +189,7 @@ wsgi_senditer(Request* request)
         Py_DECREF(curiter);
         curiter = PyIter_Next(request->response);
         if(PyErr_Occurred()) {
-            Py_DECREF(curiter);
+            Py_XDECREF(curiter);
             return true;
         }
     }

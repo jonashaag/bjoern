@@ -8,6 +8,3 @@
 * Not fully WSGI compliant.
   - the `start_response` callback does not return a `write` callback.
     The `write` callback is a design mistake in WSGI and shouldn't be used at all.
-
-* Python 2.5 has no PyFile_{Inc|Dec}UseCount, so returning files from the wsgi
-  hander might not be thread-safe.
