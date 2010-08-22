@@ -2,5 +2,6 @@
         TODO/BUGS
     =================
 
-* make mimetype recognition actually work
-* no two content-length headers
+* auto-add Content-Length header
+* add WSGI-default headers
+* sendfile
