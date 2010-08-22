@@ -8,6 +8,9 @@ function update {
     git pull
 }
 
+if [ ! -d include ]; then
+    mkdir include
+fi
 cd include
 
 if [ ! -d http-parser ]; then
