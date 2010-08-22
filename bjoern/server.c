@@ -104,6 +104,8 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
     Request* request = ADDR_FROM_MEMBER(watcher, Request, ev_watcher);
     ssize_t read_bytes = read(request->client_fd, read_buf, READ_BUFFER_SIZE);
 
+    DBG(request, "read %zd bytes", read_bytes);
+
     request->state = REQUEST_READING;
 
     GIL_LOCK(0);
@@ -115,11 +117,12 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
     Request_parse(request, read_buf, read_bytes);
 
     switch(request->state) {
-
         case REQUEST_PARSE_ERROR:
+            DBG(request, "Parse error");
             set_error(request, HTTP_BAD_REQUEST);
             break;
         case REQUEST_PARSE_DONE:
+            DBG(request, "Parse done");
             if(!wsgi_call_application(request)) {
                 assert(PyErr_Occurred());
                 PyErr_Print();
@@ -127,6 +130,7 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
             }
             break;
         default:
+            DBG(request, "Waiting for more data");
             assert(request->state == REQUEST_READING);
             goto again;
     }
@@ -194,13 +198,25 @@ set_error(Request* request, http_status status)
     request->state |= REQUEST_RESPONSE_STATIC;
     request->state &= ~REQUEST_RESPONSE_WSGI;
     Py_XDECREF(request->response);
-    request->response = "HTTP/1.0 500 Error msg here";
+    switch(status) {
+        case HTTP_SERVER_ERROR:
+            request->response = "HTTP/1.0 500 Internal Server Error\r\n\r\n"
+                                "HTTP 500 Internal Server Error :(";
+            break;
+
+        case HTTP_BAD_REQUEST:
+            request->response = "HTTP/1.0 400 Bad Request\r\n\r\n"
+                                "You sent a malformed request.";
+            break;
+        default:
+            assert(0);
+    }
 }
 
 static inline void
 print_io_error()
 {
-    fprintf(stderr, "IO error %d\n", errno);
+    printf("IO error %d\n", errno);
 }
 
 static inline bool

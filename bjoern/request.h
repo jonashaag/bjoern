@@ -27,12 +27,15 @@ typedef struct {
 } bj_parser;
 
 typedef struct {
+#ifdef DEBUG
+    unsigned long id;
+#endif
     request_state state;
     int client_fd;
     ev_io ev_watcher;
 
     bj_parser parser;
-    PyObject* headers;
+    PyObject* headers; /* rm. */
 
     void* response;
     PyObject* response_headers;

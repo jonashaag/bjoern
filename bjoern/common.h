@@ -32,4 +32,15 @@ typedef enum {
     HTTP_SERVER_ERROR = 500
 } http_status;
 
+#ifdef DEBUG
+    #define DBG(request, ...) \
+        do{ \
+            printf("[DEBUG Req %ld] ", request->id); \
+            printf(__VA_ARGS__); \
+            printf("\n"); \
+        } while(0)
+#else
+    #define DBG(...) do{}while(0)
+#endif
+
 #endif

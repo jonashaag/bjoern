@@ -18,6 +18,11 @@ Request* Request_new(int client_fd)
     if(req == NULL)
         return NULL;
 
+#ifdef DEBUG
+    static unsigned long req_id = 0;
+    req->id = req_id++;
+#endif
+
     req->client_fd = client_fd;
     req->state = REQUEST_FRESH;
     http_parser_init((http_parser*)&req->parser, HTTP_REQUEST);
@@ -35,11 +40,15 @@ Request* Request_new(int client_fd)
 void Request_parse(Request* request,
                    const char* data,
                    const size_t data_len) {
-    if(data_len)
-        http_parser_execute((http_parser*)&request->parser,
-                            &parser_settings, data, data_len);
-    else
-        request->state |= REQUEST_PARSE_ERROR;
+    if(data_len) {
+        size_t nparsed = http_parser_execute((http_parser*)&request->parser,
+                                         &parser_settings, data, data_len);
+        if(nparsed == data_len)
+            /* everything fine */
+            return;
+    }
+
+    request->state = REQUEST_PARSE_ERROR;
 }
 
 void Request_free(Request* req)
