@@ -190,6 +190,7 @@ wsgi_senditer(Request* request)
         curiter = PyIter_Next(request->response);
         if(PyErr_Occurred()) {
             Py_XDECREF(curiter);
+            /* TODO: What to do here? Parts of the response are already sent */
             return true;
         }
     }
