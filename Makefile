@@ -60,7 +60,7 @@ wget:
 	wget -O - -q -S http://127.0.0.1:8080/
 
 test:
-	cd stuff && python ~/dev/projects/wsgitest/runner.py
+	cd tests && python ~/dev/projects/wsgitest/runner.py
 
 valgrind:
 	valgrind --leak-check=full --show-reachable=yes python tests/hello.py
