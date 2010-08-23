@@ -5,9 +5,9 @@ static Request* _Request_from_prealloc();
 static Request _preallocd[REQUEST_PREALLOC_N];
 static char _preallocd_used[REQUEST_PREALLOC_N];
 
-static http_parser_settings parser_settings;
-
 static PyObject* wsgi_http_header(const char*, const size_t);
+static http_parser_settings parser_settings;
+static PyObject* wsgi_base_dict;
 
 
 Request* Request_new(int client_fd)
@@ -76,13 +76,7 @@ void Request_free(Request* req)
 
 Request* _Request_from_prealloc()
 {
-    static int i = -1;
-
-    if(i < 0) {
-        memset(_preallocd_used, 0, sizeof(char)*REQUEST_PREALLOC_N);
-        i = 0;
-    }
-
+    static int i = 0;
     for(; i<REQUEST_PREALLOC_N; ++i) {
         if(!_preallocd_used[i]) {
             _preallocd_used[i] = true;
@@ -244,6 +238,12 @@ static int
 on_message_complete(http_parser* parser)
 {
     REQUEST->state = REQUEST_PARSE_DONE;
+    DICT_SETITEM_STRING(
+        REQUEST->headers,
+        "REQUEST_METHOD",
+        PyString_FromString(http_method_str(parser->method))
+    );
+    PyDict_Update(REQUEST->headers, wsgi_base_dict);
     return 0;
 }
 
@@ -287,3 +287,71 @@ parser_settings = {
     .on_body             = on_body,
     .on_message_complete = on_message_complete
 };
+
+void
+_request_module_initialize(const char* server_host, const int server_port)
+{
+    memset(_preallocd_used, 0, sizeof(char)*REQUEST_PREALLOC_N);
+    wsgi_base_dict = PyDict_New();
+
+    /* dct['wsgi.version'] = (1, 0) */
+    PyDict_SetItemString(
+        wsgi_base_dict,
+        "wsgi.version",
+        PyTuple_Pack(2, PyInt_FromLong(1), PyInt_FromLong(0))
+    );
+
+    /* dct['wsgi.url_scheme'] = 'http'
+     * (This can be hard-coded as there is no TLS support in bjoern.)
+     */
+    PyDict_SetItemString(
+        wsgi_base_dict,
+        "wsgi.url_scheme",
+        PyString_FromString("http")
+    );
+
+    /* dct['wsgi.errors'] = sys.stderr */
+    PyDict_SetItemString(
+        wsgi_base_dict,
+        "wsgi.errors",
+        PySys_GetObject("stderr")
+    );
+
+    /* dct['wsgi.multithread'] = True
+     * If I correctly interpret the WSGI specs, this means
+     * "Can the server be ran in a thread?"
+     */
+    PyDict_SetItemString(
+        wsgi_base_dict,
+        "wsgi.multithread",
+        Py_True
+    );
+
+    /* dct['wsgi.multiprocess'] = True
+     * ... and this one "Can the server process be forked?"
+     */
+    PyDict_SetItemString(
+        wsgi_base_dict,
+        "wsgi.multiprocess",
+        Py_True
+    );
+
+    /* dct['wsgi.run_once'] = False (bjoern is no CGI gateway) */
+    PyDict_SetItemString(
+        wsgi_base_dict,
+        "wsgi.run_once",
+        Py_False
+    );
+
+    PyDict_SetItemString(
+        wsgi_base_dict,
+        "SERVER_NAME",
+        PyString_FromString(server_host)
+    );
+
+    PyDict_SetItemString(
+        wsgi_base_dict,
+        "SERVER_PORT",
+        PyInt_FromLong(server_port)
+    );
+}

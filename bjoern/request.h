@@ -5,6 +5,8 @@
 #include "http_parser.h"
 #include "common.h"
 
+void _request_module_initialize(const char* host, const int port);
+
 typedef enum {
     REQUEST_FRESH                   = 1<<0,
     REQUEST_READING                 = 1<<1,

@@ -6,10 +6,12 @@ static PyObject*
 run(PyObject* self, PyObject* args)
 {
     const char* host;
-    size_t port;
+    int port;
 
     if(!PyArg_ParseTuple(args, "Osi", &wsgi_app, &host, &port))
         return NULL;
+
+    _request_module_initialize(host, port);
 
     server_run(host, port);
     Py_RETURN_NONE;
