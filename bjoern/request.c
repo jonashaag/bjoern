@@ -237,20 +237,50 @@ static int on_body(http_parser* parser,
 static int
 on_message_complete(http_parser* parser)
 {
-    REQUEST->state = REQUEST_PARSE_DONE;
     DICT_SETITEM_STRING(
         REQUEST->headers,
         "REQUEST_METHOD",
         PyString_FromString(http_method_str(parser->method))
     );
+
+    if(parser->http_minor == 1)
+        DICT_SETITEM_STRING(
+            REQUEST->headers,
+            "SERVER_PROTOCOL",
+            PyString_FromString("HTTP/1.1")
+        );
+    else
+        DICT_SETITEM_STRING(
+            REQUEST->headers,
+            "SERVER_PROTOCOL",
+            PyString_FromString("HTTP/1.0")
+        );
+
     PyDict_Update(REQUEST->headers, wsgi_base_dict);
+
+    REQUEST->state = REQUEST_PARSE_DONE;
     return 0;
 }
 
 
+/* Case insensitive strcmp */
+static inline bool
+string_iequal(const char* a, size_t len, const char* b)
+{
+    for(size_t i=0; i<len; ++i)
+        if(a[i] != b[i] && a[i] - ('a'-'A') != b[i])
+            return false;
+    return true;
+}
+
 static PyObject*
 wsgi_http_header(register const char* data, register size_t len)
 {
+    if(string_iequal(data, len, "Content-Length"))
+        return PyString_FromString("CONTENT_LENGTH");
+    if(string_iequal(data, len, "Content-Type"))
+        return PyString_FromString("CONTENT_TYPE");
+
     PyObject* obj = PyString_FromStringAndSize(/* empty string */ NULL,
                                                len+strlen("HTTP_"));
     char* dest = PyString_AS_STRING(obj);
@@ -266,7 +296,7 @@ wsgi_http_header(register const char* data, register size_t len)
         if(c == '-')
             *dest = '_';
         else if(c >= 'a' && c <= 'z')
-            *dest = c - ('a' - 'A');
+            *dest = c - ('a'-'A');
         else
             *dest = c;
     }
@@ -352,6 +382,6 @@ _request_module_initialize(const char* server_host, const int server_port)
     PyDict_SetItemString(
         wsgi_base_dict,
         "SERVER_PORT",
-        PyInt_FromLong(server_port)
+        PyString_FromFormat("%d", server_port)
     );
 }
