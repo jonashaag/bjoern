@@ -1,3 +1,5 @@
+#include <Python.h>
+#include <cStringIO.h>
 #include "request.h"
 
 #define REQUEST_PREALLOC_N 100
@@ -29,10 +31,9 @@ Request* Request_new(int client_fd)
     req->parser.parser.data = req;
 
     req->headers = NULL;
+    req->body = NULL;
     req->response = NULL;
-    req->response_headers = NULL;
     req->status = NULL;
-    req->response_curiter = NULL;
 
     return req;
 }
@@ -48,7 +49,7 @@ void Request_parse(Request* request,
             return;
     }
 
-    request->state = REQUEST_PARSE_ERROR;
+    request->state = REQUEST_PARSE_ERROR | HTTP_BAD_REQUEST;
 }
 
 void Request_free(Request* req)
@@ -62,8 +63,8 @@ void Request_free(Request* req)
         free(req->response);
 #endif
 
+    Py_XDECREF(req->body);
     Py_XDECREF(req->headers);
-    Py_XDECREF(req->response_headers);
     Py_XDECREF(req->status);
 
     if(req >= _preallocd &&
@@ -231,6 +232,19 @@ on_headers_complete(http_parser* parser)
 static int on_body(http_parser* parser,
                    const char* body_start,
                    const size_t body_len) {
+    if(!REQUEST->body) {
+        if(!parser->content_length) {
+            REQUEST->state = REQUEST_PARSE_ERROR | HTTP_LENGTH_REQUIRED;
+            return 1;
+        }
+        REQUEST->body = PycStringIO->NewOutput(parser->content_length);
+    }
+
+    if(PycStringIO->cwrite(REQUEST->body, body_start, body_len) < 0) {
+        REQUEST->state = REQUEST_PARSE_ERROR | HTTP_SERVER_ERROR;
+        return 1;
+    }
+
     return 0;
 }
 
@@ -241,6 +255,15 @@ on_message_complete(http_parser* parser)
         REQUEST->headers,
         "REQUEST_METHOD",
         PyString_FromString(http_method_str(parser->method))
+    );
+
+    DICT_SETITEM_STRING(
+        REQUEST->headers,
+        "wsgi.input",
+        PycStringIO->NewInput(
+            REQUEST->body ? PycStringIO->cgetvalue(REQUEST->body)
+                          : PyString_FromStringAndSize("", 0)
+        )
     );
 
     if(parser->http_minor == 1)
@@ -258,7 +281,7 @@ on_message_complete(http_parser* parser)
 
     PyDict_Update(REQUEST->headers, wsgi_base_dict);
 
-    REQUEST->state = REQUEST_PARSE_DONE;
+    REQUEST->state |= REQUEST_PARSE_DONE;
     return 0;
 }
 
@@ -322,6 +345,9 @@ void
 _request_module_initialize(const char* server_host, const int server_port)
 {
     memset(_preallocd_used, 0, sizeof(char)*REQUEST_PREALLOC_N);
+
+    PycString_IMPORT;
+
     wsgi_base_dict = PyDict_New();
 
     /* dct['wsgi.version'] = (1, 0) */

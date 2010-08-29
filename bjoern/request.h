@@ -8,16 +8,16 @@
 void _request_module_initialize(const char* host, const int port);
 
 typedef enum {
-    REQUEST_FRESH                   = 1<<0,
-    REQUEST_READING                 = 1<<1,
-    REQUEST_PARSE_ERROR             = 1<<2,
-    REQUEST_PARSE_DONE              = 1<<3,
-    REQUEST_RESPONSE_STATIC         = 1<<4,
-    REQUEST_RESPONSE_HEADERS_SENT   = 1<<5,
-    REQUEST_RESPONSE_WSGI           = 1<<6,
-    REQUEST_WSGI_STRING_RESPONSE    = 1<<7,
-    REQUEST_WSGI_FILE_RESPONSE      = 1<<8,
-    REQUEST_WSGI_ITER_RESPONSE      = 1<<9
+    REQUEST_FRESH                   = 1<<10,
+    REQUEST_READING                 = 1<<11,
+    REQUEST_PARSE_ERROR             = 1<<12,
+    REQUEST_PARSE_DONE              = 1<<13,
+    REQUEST_RESPONSE_STATIC         = 1<<14,
+    REQUEST_RESPONSE_HEADERS_SENT   = 1<<15,
+    REQUEST_RESPONSE_WSGI           = 1<<16,
+    REQUEST_WSGI_STRING_RESPONSE    = 1<<17,
+    REQUEST_WSGI_FILE_RESPONSE      = 1<<18,
+    REQUEST_WSGI_ITER_RESPONSE      = 1<<19
 } request_state;
 
 typedef struct {
@@ -38,11 +38,11 @@ typedef struct {
 
     bj_parser parser;
     PyObject* headers; /* rm. */
+    PyObject* body;
 
     void* response;
-    PyObject* response_headers;
     PyObject* status;
-    PyObject* response_curiter;
+    PyObject* iterable_next;
 } Request;
 
 Request* Request_new(int client_fd);

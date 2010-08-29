@@ -116,23 +116,23 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
 
     Request_parse(request, read_buf, read_bytes);
 
-    switch(request->state) {
-        case REQUEST_PARSE_ERROR:
-            DBG(request, "Parse error");
-            set_error(request, HTTP_BAD_REQUEST);
-            break;
-        case REQUEST_PARSE_DONE:
-            DBG(request, "Parse done");
-            if(!wsgi_call_application(request)) {
-                assert(PyErr_Occurred());
-                PyErr_Print();
-                set_error(request, HTTP_SERVER_ERROR);
-            }
-            break;
-        default:
-            DBG(request, "Waiting for more data");
-            assert(request->state == REQUEST_READING);
-            goto again;
+    if(request->state & REQUEST_PARSE_ERROR) {
+        DBG(request, "Parse error");
+        set_error(request, request->state ^ REQUEST_PARSE_ERROR);
+        goto out;
+    }
+
+    if(request->state & REQUEST_PARSE_DONE) {
+        DBG(request, "Parse done");
+        if(!wsgi_call_application(request)) {
+            assert(PyErr_Occurred());
+            PyErr_Print();
+            set_error(request, HTTP_SERVER_ERROR);
+        }
+    } else {
+        DBG(request, "Waiting for more data");
+        assert(request->state == REQUEST_READING);
+        goto again;
     }
 
 out:
@@ -208,6 +208,11 @@ set_error(Request* request, http_status status)
             request->response = "HTTP/1.0 400 Bad Request\r\n\r\n"
                                 "You sent a malformed request.";
             break;
+
+        case HTTP_LENGTH_REQUIRED:
+            request->response = "HTTP/1.0 411 Length Required\r\n";
+            break;
+
         default:
             assert(0);
     }

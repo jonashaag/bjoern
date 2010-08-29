@@ -29,6 +29,7 @@ typedef PyObject* PyKeywordFunc(PyObject* self, PyObject* args, PyObject *kwargs
 
 typedef enum {
     HTTP_BAD_REQUEST = 400,
+    HTTP_LENGTH_REQUIRED = 411,
     HTTP_SERVER_ERROR = 500
 } http_status;
 

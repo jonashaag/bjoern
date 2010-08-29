@@ -23,13 +23,21 @@ wsgi_call_application(Request* request)
     StartResponse* start_response = PyObject_NEW(StartResponse, &StartResponse_Type);
     start_response->request = request;
 
+    /* From now on, `headers` stores the _response_ headers
+     * (passed by the WSGI app) rather than the _request_ headers
+     */
+    PyObject* request_headers = request->headers;
+    request->headers = NULL;
+
+    /* application(environ, start_response) call */
     PyObject* retval = PyObject_CallFunctionObjArgs(
         wsgi_app,
-        request->headers,
+        request_headers,
         start_response,
         NULL /* sentinel */
     );
 
+    Py_DECREF(request_headers);
     PyObject_FREE(start_response);
 
     if(retval == NULL)
@@ -79,12 +87,12 @@ string_resp:
      * of that iterator is requested; `start_response` however has to be called
      * _before_ the wsgi body is sent, because it passes the HTTP headers.
      */
-    request->response_curiter = PyIter_Next(iter);
+    request->iterable_next = PyIter_Next(iter);
     if(PyErr_Occurred())
         return false;
 
 out:
-    if(!request->response_headers) {
+    if(!request->headers) {
         PyErr_SetString(
             PyExc_TypeError,
             "wsgi application returned before start_response was called"
@@ -127,9 +135,9 @@ wsgi_sendheaders(Request* request)
     buf_write(PyString_AS_STRING(request->status),
               PyString_GET_SIZE(request->status));
 
-    size_t n_headers = PyList_GET_SIZE(request->response_headers);
+    size_t n_headers = PyList_GET_SIZE(request->headers);
     for(size_t i=0; i<n_headers; ++i) {
-        PyObject* tuple = PyList_GET_ITEM(request->response_headers, i);
+        PyObject* tuple = PyList_GET_ITEM(request->headers, i);
         TYPECHECK(tuple, PyTuple, "headers", true);
 
         if(PyTuple_GET_SIZE(tuple) < 2) {
@@ -176,27 +184,26 @@ static bool
 wsgi_senditer(Request* request)
 {
 #define ITER_MAXSEND 1024*4
-    register PyObject* curiter = request->response_curiter;
-    if(!curiter) return true;
+    register PyObject* item = request->iterable_next;
+    if(!item) return true;
 
     register ssize_t sent = 0;
-    while(curiter && sent < ITER_MAXSEND) {
-        TYPECHECK(curiter, PyString, "wsgi iterable items", true);
-        if(!sendall(request, PyString_AS_STRING(curiter),
-                    PyString_GET_SIZE(curiter)))
+    while(item && sent < ITER_MAXSEND) {
+        TYPECHECK(item, PyString, "wsgi iterable items", true);
+        if(!sendall(request, PyString_AS_STRING(item),
+                    PyString_GET_SIZE(item)))
             return true;
-        sent += PyString_GET_SIZE(curiter);
-        Py_DECREF(curiter);
-        curiter = PyIter_Next(request->response);
+        sent += PyString_GET_SIZE(item);
+        Py_DECREF(item);
+        item = PyIter_Next(request->response);
         if(PyErr_Occurred()) {
-            Py_XDECREF(curiter);
             /* TODO: What to do here? Parts of the response are already sent */
             return true;
         }
     }
 
-    if(curiter) {
-        request->response_curiter = curiter;
+    if(item) {
+        request->iterable_next = item;
         return false;
     } else {
         return true;
@@ -218,10 +225,10 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
         return NULL;
     }
 
-    bool first_call = !req->response_headers;
+    bool first_call = !req->headers;
     PyObject* exc_info = NULL;
     if(!PyArg_UnpackTuple(args, "start_response", 2, 3,
-            &req->status, &req->response_headers, &exc_info))
+            &req->status, &req->headers, &exc_info))
         return NULL;
 
     if(!first_call) {
@@ -243,10 +250,10 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
     }
 
     TYPECHECK(req->status, PyString, "start_response argument 1", NULL);
-    TYPECHECK(req->response_headers, PyList, "start_response argument 2", NULL);
+    TYPECHECK(req->headers, PyList, "start_response argument 2", NULL);
 
     Py_INCREF(req->status);
-    Py_INCREF(req->response_headers);
+    Py_INCREF(req->headers);
 
     Py_RETURN_NONE;
 }
