@@ -15,7 +15,7 @@ bjoern aims to be *small*, *lightweight* and *very fast*.
 
 .. _WSGI:         http://www.python.org/dev/peps/pep-0333/
 .. _libev:        http://software.schmorp.de/pkg/libev.html
-.. _http_parser:  http://github.com/ry/http_parser
+.. _http_parser:  http://github.com/ry/http-parser
 .. _write callback design mistake:
                   http://www.python.org/dev/peps/pep-0333/#the-write-callable
 
