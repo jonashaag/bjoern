@@ -95,7 +95,7 @@ Request* _Request_from_prealloc()
 
 #define REQUEST ((Request*)parser->data)
 #define PARSER  ((bj_parser*)parser)
-#define UPDATE_LEN(name) \
+#define _update_length(name) \
     /* Update the len of a header field/value.
 
        Short explaination of the pointer arithmetics fun used here:
@@ -112,17 +112,17 @@ Request* _Request_from_prealloc()
                                 + name##_len; \
     } while(0)
 
-#define DICT_SETITEM(d, k, v) \
+#define _set_header(k, v) \
     do { \
         PyObject *key = k, *val = v; \
-        PyDict_SetItem(d, key, val); \
+        PyDict_SetItem(REQUEST->headers, key, val); \
         Py_DECREF(key); \
         Py_DECREF(val); \
     } while(0)
-#define DICT_SETITEM_STRING(d, k, v) \
+#define _set_header_string(k, v) \
     do { \
         PyObject* val = v; \
-        PyDict_SetItemString(d, k, val); \
+        PyDict_SetItemString(REQUEST->headers, k, val); \
         Py_DECREF(val); \
     } while(0)
 
@@ -140,8 +140,7 @@ on_message_begin(http_parser* parser)
 static int on_path(http_parser* parser,
                    const char* path_start,
                    const size_t path_len) {
-    DICT_SETITEM_STRING(
-        REQUEST->headers,
+    _set_header_string(
         "PATH_INFO",
         PyString_FromStringAndSize(path_start, path_len)
     );
@@ -151,8 +150,7 @@ static int on_path(http_parser* parser,
 static int on_query_string(http_parser* parser,
                            const char* query_start,
                            const size_t query_len) {
-    DICT_SETITEM_STRING(
-        REQUEST->headers,
+    _set_header_string(
         "QUERY_STRING",
         PyString_FromStringAndSize(query_start, query_len)
     );
@@ -162,8 +160,7 @@ static int on_query_string(http_parser* parser,
 static int on_url(http_parser* parser,
                   const char* url_start,
                   const size_t url_len) {
-    DICT_SETITEM_STRING(
-        REQUEST->headers,
+    _set_header_string(
         "REQUEST_URI",
         PyString_FromStringAndSize(url_start, url_len)
     );
@@ -173,8 +170,7 @@ static int on_url(http_parser* parser,
 static int on_fragment(http_parser* parser,
                        const char* fragm_start,
                        const size_t fragm_len) {
-    DICT_SETITEM_STRING(
-        REQUEST->headers,
+    _set_header_string(
         "HTTP_FRAGMENT",
         PyString_FromStringAndSize(fragm_start, fragm_len)
     );
@@ -186,13 +182,12 @@ static int on_header_field(http_parser* parser,
                            const size_t field_len) {
     if(PARSER->value_start) {
         /* Store previous header and start a new one */
-        DICT_SETITEM(
-            REQUEST->headers,
+        _set_header(
             wsgi_http_header(PARSER->field_start, PARSER->field_len),
             PyString_FromStringAndSize(PARSER->value_start, PARSER->value_len);
         );
     } else if(PARSER->field_start) {
-        UPDATE_LEN(field);
+        _update_length(field);
         return 0;
     }
 
@@ -208,7 +203,7 @@ static int on_header_value(http_parser* parser,
                            const char* value_start,
                            const size_t value_len) {
     if(PARSER->value_start)
-        UPDATE_LEN(value);
+        _update_length(value);
     else {
         /* Start a new value */
         PARSER->value_start = value_start;
@@ -221,8 +216,7 @@ static int
 on_headers_complete(http_parser* parser)
 {
     if(PARSER->field_start)
-        DICT_SETITEM(
-            REQUEST->headers,
+        _set_header(
             wsgi_http_header(PARSER->field_start, PARSER->field_len),
             PyString_FromStringAndSize(PARSER->value_start, PARSER->value_len);
         );
@@ -251,14 +245,12 @@ static int on_body(http_parser* parser,
 static int
 on_message_complete(http_parser* parser)
 {
-    DICT_SETITEM_STRING(
-        REQUEST->headers,
+    _set_header_string(
         "REQUEST_METHOD",
         PyString_FromString(http_method_str(parser->method))
     );
 
-    DICT_SETITEM_STRING(
-        REQUEST->headers,
+    _set_header_string(
         "wsgi.input",
         PycStringIO->NewInput(
             REQUEST->body ? PycStringIO->cgetvalue(REQUEST->body)
@@ -266,18 +258,10 @@ on_message_complete(http_parser* parser)
         )
     );
 
-    if(parser->http_minor == 1)
-        DICT_SETITEM_STRING(
-            REQUEST->headers,
-            "SERVER_PROTOCOL",
-            PyString_FromString("HTTP/1.1")
-        );
-    else
-        DICT_SETITEM_STRING(
-            REQUEST->headers,
-            "SERVER_PROTOCOL",
-            PyString_FromString("HTTP/1.0")
-        );
+    _set_header_string(
+        "SERVER_PROTOCOL",
+        PyString_FromString(parser->http_minor == 1 ? "HTTP/1.1" : "HTTP/1.0")
+    );
 
     PyDict_Update(REQUEST->headers, wsgi_base_dict);
 
