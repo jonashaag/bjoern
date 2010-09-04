@@ -54,10 +54,10 @@ http_parser:
 	stuff/make-http-parser
 
 ab:
-	ab -c 100 -n 10000 http://127.0.0.1:8080/
+	ab -c 100 -n 10000 'http://127.0.0.1:8080/a/b/c?k=v&k2=v2#fragment'
 
 wget:
-	wget -O - -q -S http://127.0.0.1:8080/
+	wget -O - -q -S 'http://127.0.0.1:8080/a/b/c?k=v&k2=v2#fragment'
 
 test:
 	cd tests && python ~/dev/projects/wsgitest/runner.py
