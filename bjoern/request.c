@@ -73,6 +73,21 @@ void Request_free(Request* req)
     } else {
         free(req);
     }
+
+    DBG_REFCOUNT(req, _PATH_INFO);
+    DBG_REFCOUNT(req, _QUERY_STRING);
+    DBG_REFCOUNT(req, _REQUEST_URI);
+    DBG_REFCOUNT(req, _HTTP_FRAGMENT);
+    DBG_REFCOUNT(req, _REQUEST_METHOD);
+    DBG_REFCOUNT(req, _wsgi_input);
+    DBG_REFCOUNT(req, _SERVER_PROTOCOL);
+    DBG_REFCOUNT(req, _GET);
+    DBG_REFCOUNT(req, _POST);
+    DBG_REFCOUNT(req, _CONTENT_LENGTH);
+    DBG_REFCOUNT(req, _CONTENT_TYPE);
+    DBG_REFCOUNT(req, _HTTP_1_1);
+    DBG_REFCOUNT(req, _HTTP_1_0);
+    DBG_REFCOUNT(req, _empty_string);
 }
 
 Request* _Request_from_prealloc()
@@ -112,17 +127,19 @@ Request* _Request_from_prealloc()
                                 + name##_len; \
     } while(0)
 
-#define _set_header(k, v) \
+#define _set_header(k, v) PyDict_SetItem(REQUEST->headers, k, v);
+#define _set_header_free_value(k, v) \
     do { \
-        PyObject *key = k, *val = v; \
-        PyDict_SetItem(REQUEST->headers, key, val); \
-        Py_DECREF(key); \
+        PyObject* val = (v); \
+        _set_header(k, val); \
         Py_DECREF(val); \
     } while(0)
-#define _set_header_string(k, v) \
+#define _set_header_free_both(k, v) \
     do { \
-        PyObject* val = v; \
-        PyDict_SetItemString(REQUEST->headers, k, val); \
+        PyObject* key = (k); \
+        PyObject* val = (v); \
+        _set_header(key, val); \
+        Py_DECREF(key); \
         Py_DECREF(val); \
     } while(0)
 
@@ -140,8 +157,8 @@ on_message_begin(http_parser* parser)
 static int on_path(http_parser* parser,
                    const char* path_start,
                    const size_t path_len) {
-    _set_header_string(
-        "PATH_INFO",
+    _set_header_free_value(
+        _PATH_INFO,
         PyString_FromStringAndSize(path_start, path_len)
     );
     return 0;
@@ -150,8 +167,8 @@ static int on_path(http_parser* parser,
 static int on_query_string(http_parser* parser,
                            const char* query_start,
                            const size_t query_len) {
-    _set_header_string(
-        "QUERY_STRING",
+    _set_header_free_value(
+        _QUERY_STRING,
         PyString_FromStringAndSize(query_start, query_len)
     );
     return 0;
@@ -160,8 +177,8 @@ static int on_query_string(http_parser* parser,
 static int on_url(http_parser* parser,
                   const char* url_start,
                   const size_t url_len) {
-    _set_header_string(
-        "REQUEST_URI",
+    _set_header_free_value(
+        _REQUEST_URI,
         PyString_FromStringAndSize(url_start, url_len)
     );
     return 0;
@@ -170,8 +187,8 @@ static int on_url(http_parser* parser,
 static int on_fragment(http_parser* parser,
                        const char* fragm_start,
                        const size_t fragm_len) {
-    _set_header_string(
-        "HTTP_FRAGMENT",
+    _set_header_free_value(
+        _HTTP_FRAGMENT,
         PyString_FromStringAndSize(fragm_start, fragm_len)
     );
     return 0;
@@ -182,10 +199,11 @@ static int on_header_field(http_parser* parser,
                            const size_t field_len) {
     if(PARSER->value_start) {
         /* Store previous header and start a new one */
-        _set_header(
+        _set_header_free_both(
             wsgi_http_header(PARSER->field_start, PARSER->field_len),
-            PyString_FromStringAndSize(PARSER->value_start, PARSER->value_len);
+            PyString_FromStringAndSize(PARSER->value_start, PARSER->value_len)
         );
+
     } else if(PARSER->field_start) {
         _update_length(field);
         return 0;
@@ -215,11 +233,12 @@ static int on_header_value(http_parser* parser,
 static int
 on_headers_complete(http_parser* parser)
 {
-    if(PARSER->field_start)
-        _set_header(
+    if(PARSER->field_start) {
+        _set_header_free_both(
             wsgi_http_header(PARSER->field_start, PARSER->field_len),
-            PyString_FromStringAndSize(PARSER->value_start, PARSER->value_len);
+            PyString_FromStringAndSize(PARSER->value_start, PARSER->value_len)
         );
+    }
     return 0;
 }
 
@@ -245,22 +264,31 @@ static int on_body(http_parser* parser,
 static int
 on_message_complete(http_parser* parser)
 {
-    _set_header_string(
-        "REQUEST_METHOD",
-        PyString_FromString(http_method_str(parser->method))
-    );
+    switch(parser->method) {
+        case HTTP_GET:
+            _set_header(_REQUEST_METHOD, _GET);
+            break;
+        case HTTP_POST:
+            _set_header(_REQUEST_METHOD, _POST);
+            break;
+        default:
+            _set_header_free_value(
+                _REQUEST_METHOD,
+                PyString_FromString(http_method_str(parser->method))
+            );
+    }
 
-    _set_header_string(
-        "wsgi.input",
+    _set_header_free_value(
+        _wsgi_input,
         PycStringIO->NewInput(
             REQUEST->body ? PycStringIO->cgetvalue(REQUEST->body)
-                          : PyString_FromStringAndSize("", 0)
+                          : _empty_string
         )
     );
 
-    _set_header_string(
-        "SERVER_PROTOCOL",
-        PyString_FromString(parser->http_minor == 1 ? "HTTP/1.1" : "HTTP/1.0")
+    _set_header(
+        _SERVER_PROTOCOL,
+        parser->http_minor == 1 ? _HTTP_1_1 : _HTTP_1_0
     );
 
     PyDict_Update(REQUEST->headers, wsgi_base_dict);
@@ -270,7 +298,7 @@ on_message_complete(http_parser* parser)
 }
 
 
-/* Case insensitive strcmp */
+/* Case insensitive string comparison */
 static inline bool
 string_iequal(const char* a, size_t len, const char* b)
 {
@@ -283,10 +311,14 @@ string_iequal(const char* a, size_t len, const char* b)
 static PyObject*
 wsgi_http_header(register const char* data, register size_t len)
 {
-    if(string_iequal(data, len, "Content-Length"))
-        return PyString_FromString("CONTENT_LENGTH");
-    if(string_iequal(data, len, "Content-Type"))
-        return PyString_FromString("CONTENT_TYPE");
+    if(string_iequal(data, len, "Content-Length")) {
+        Py_INCREF(_CONTENT_LENGTH);
+        return _CONTENT_LENGTH;
+    }
+    if(string_iequal(data, len, "Content-Type")) {
+        Py_INCREF(_CONTENT_TYPE);
+        return _CONTENT_TYPE;
+    }
 
     PyObject* obj = PyString_FromStringAndSize(/* empty string */ NULL,
                                                len+strlen("HTTP_"));
@@ -329,6 +361,22 @@ void
 _request_module_initialize(const char* server_host, const int server_port)
 {
     memset(_preallocd_used, 0, sizeof(char)*REQUEST_PREALLOC_N);
+
+    #define _(name) _##name = PyString_FromString(#name)
+    _(PATH_INFO);
+    _(QUERY_STRING);
+    _(REQUEST_URI);
+    _(HTTP_FRAGMENT);
+    _(REQUEST_METHOD);
+    _(SERVER_PROTOCOL);
+    _(GET);
+    _(POST);
+    _(CONTENT_LENGTH);
+    _(CONTENT_TYPE);
+    _HTTP_1_1 = PyString_FromString("HTTP/1.1");
+    _HTTP_1_0 = PyString_FromString("HTTP/1.0");
+    _wsgi_input = PyString_FromString("wsgi.input");
+    _empty_string = PyString_FromString("");
 
     PycString_IMPORT;
 

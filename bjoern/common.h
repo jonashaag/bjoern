@@ -44,4 +44,7 @@ typedef enum {
     #define DBG(...) do{}while(0)
 #endif
 
+#define DBG_REFCOUNT(request, obj) \
+    DBG(request, #obj "->ob_refcnt: %d", obj->ob_refcnt)
+
 #endif

@@ -49,4 +49,22 @@ Request* Request_new(int client_fd);
 void Request_parse(Request*, const char*, const size_t);
 void Request_free(Request*);
 
+
+static PyObject
+    * _PATH_INFO,
+    * _QUERY_STRING,
+    * _REQUEST_URI,
+    * _HTTP_FRAGMENT,
+    * _REQUEST_METHOD,
+    * _wsgi_input,
+    * _SERVER_PROTOCOL,
+    * _GET,
+    * _POST,
+    * _CONTENT_LENGTH,
+    * _CONTENT_TYPE,
+    * _HTTP_1_1,
+    * _HTTP_1_0,
+    * _empty_string
+;
+
 #endif
