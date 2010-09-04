@@ -2,7 +2,5 @@
         TODO/BUGS
     =================
 
-* auto-add Content-Length header
-* add WSGI-default headers
 * sendfile
 * body -> tempfile for large requests
