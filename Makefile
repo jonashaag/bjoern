@@ -32,7 +32,7 @@ small: clean
 	CFLAGS='-Os' make
 
 bjoernmodule:
-	$(CC) $(CPPFLAGS) $(LDFLAGS) $(objects) $(HTTP_PARSER_OBJ) -o $(BUILD_DIR)/bjoern.so
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(objects) $(HTTP_PARSER_OBJ) -o $(BUILD_DIR)/bjoern.so
 	python -c "import bjoern"
 
 again: clean all
@@ -60,7 +60,7 @@ wget:
 	wget -O - -q -S 'http://127.0.0.1:8080/a/b/c?k=v&k2=v2#fragment'
 
 test:
-	cd tests && python ~/dev/projects/wsgitest/runner.py
+	cd tests && python ~/dev/wsgitest/runner.py
 
 valgrind:
 	valgrind --leak-check=full --show-reachable=yes python tests/hello.py
