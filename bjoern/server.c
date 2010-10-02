@@ -39,6 +39,8 @@ server_run(const char* hostaddr, const int port)
     if(!server_init(hostaddr, port))
         return false;
 
+    DBG("Listening on %s:%d...", hostaddr, port);
+
     struct ev_loop* mainloop = ev_loop_new(0);
 
     ev_io accept_watcher;
@@ -104,7 +106,7 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
     Request* request = ADDR_FROM_MEMBER(watcher, Request, ev_watcher);
     ssize_t read_bytes = read(request->client_fd, read_buf, READ_BUFFER_SIZE);
 
-    DBG(request, "read %zd bytes", read_bytes);
+    DBG_REQ(request, "read %zd bytes", read_bytes);
 
     request->state = REQUEST_READING;
 
@@ -117,20 +119,20 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
     Request_parse(request, read_buf, read_bytes);
 
     if(request->state & REQUEST_PARSE_ERROR) {
-        DBG(request, "Parse error");
+        DBG_REQ(request, "Parse error");
         set_error(request, request->state ^ REQUEST_PARSE_ERROR);
         goto out;
     }
 
     if(request->state & REQUEST_PARSE_DONE) {
-        DBG(request, "Parse done");
+        DBG_REQ(request, "Parse done");
         if(!wsgi_call_application(request)) {
             assert(PyErr_Occurred());
             PyErr_Print();
             set_error(request, HTTP_SERVER_ERROR);
         }
     } else {
-        DBG(request, "Waiting for more data");
+        DBG_REQ(request, "Waiting for more data");
         assert(request->state == REQUEST_READING);
         goto again;
     }

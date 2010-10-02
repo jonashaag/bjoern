@@ -74,20 +74,20 @@ void Request_free(Request* req)
         free(req);
     }
 
-    DBG_REFCOUNT(req, _PATH_INFO);
-    DBG_REFCOUNT(req, _QUERY_STRING);
-    DBG_REFCOUNT(req, _REQUEST_URI);
-    DBG_REFCOUNT(req, _HTTP_FRAGMENT);
-    DBG_REFCOUNT(req, _REQUEST_METHOD);
-    DBG_REFCOUNT(req, _wsgi_input);
-    DBG_REFCOUNT(req, _SERVER_PROTOCOL);
-    DBG_REFCOUNT(req, _GET);
-    DBG_REFCOUNT(req, _POST);
-    DBG_REFCOUNT(req, _CONTENT_LENGTH);
-    DBG_REFCOUNT(req, _CONTENT_TYPE);
-    DBG_REFCOUNT(req, _HTTP_1_1);
-    DBG_REFCOUNT(req, _HTTP_1_0);
-    DBG_REFCOUNT(req, _empty_string);
+    DBG_REFCOUNT_REQ(req, _PATH_INFO);
+    DBG_REFCOUNT_REQ(req, _QUERY_STRING);
+    DBG_REFCOUNT_REQ(req, _REQUEST_URI);
+    DBG_REFCOUNT_REQ(req, _HTTP_FRAGMENT);
+    DBG_REFCOUNT_REQ(req, _REQUEST_METHOD);
+    DBG_REFCOUNT_REQ(req, _wsgi_input);
+    DBG_REFCOUNT_REQ(req, _SERVER_PROTOCOL);
+    DBG_REFCOUNT_REQ(req, _GET);
+    DBG_REFCOUNT_REQ(req, _POST);
+    DBG_REFCOUNT_REQ(req, _CONTENT_LENGTH);
+    DBG_REFCOUNT_REQ(req, _CONTENT_TYPE);
+    DBG_REFCOUNT_REQ(req, _HTTP_1_1);
+    DBG_REFCOUNT_REQ(req, _HTTP_1_0);
+    DBG_REFCOUNT_REQ(req, _empty_string);
 }
 
 Request* _Request_from_prealloc()
