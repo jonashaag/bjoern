@@ -210,28 +210,39 @@ wsgi_senditer(Request* request)
     }
 }
 
-
+static inline void
+restore_exception_tuple(PyObject* exc_info, bool incref_items)
+{
+    if(incref_items) {
+        Py_INCREF(PyTuple_GET_ITEM(exc_info, 0));
+        Py_INCREF(PyTuple_GET_ITEM(exc_info, 1));
+        Py_INCREF(PyTuple_GET_ITEM(exc_info, 2));
+    }
+    PyErr_Restore(
+        PyTuple_GET_ITEM(exc_info, 0),
+        PyTuple_GET_ITEM(exc_info, 1),
+        PyTuple_GET_ITEM(exc_info, 2)
+    );
+}
 
 static PyObject*
 start_response(PyObject* self, PyObject* args, PyObject* kwargs)
 {
     Request* req = ((StartResponse*)self)->request;
 
-    if(req->state & REQUEST_RESPONSE_HEADERS_SENT) {
-        PyErr_SetString(
-            PyExc_TypeError,
-            "start_response called but headers already sent"
-        );
-        return NULL;
+    if(req->state & REQUEST_START_RESPONSE_CALLED) {
+        /* not the first call of start_response --
+           throw away any previous status and headers. */
+        Py_DECREF(req->status);
+        Py_DECREF(req->headers);
     }
 
-    bool first_call = !req->headers;
     PyObject* exc_info = NULL;
     if(!PyArg_UnpackTuple(args, "start_response", 2, 3,
             &req->status, &req->headers, &exc_info))
         return NULL;
 
-    if(!first_call) {
+    if(exc_info) {
         TYPECHECK(exc_info, PyTuple, "start_response argument 3", NULL);
         if(PyTuple_GET_SIZE(exc_info) != 3) {
             PyErr_Format(
@@ -242,11 +253,23 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
             );
             return NULL;
         }
-        PyErr_Restore(
-            PyTuple_GET_ITEM(exc_info, 0),
-            PyTuple_GET_ITEM(exc_info, 1),
-            PyTuple_GET_ITEM(exc_info, 2)
-        );
+
+        restore_exception_tuple(exc_info, /* incref items? */ true);
+
+        if(req->state & REQUEST_RESPONSE_HEADERS_SENT)
+            /* Headers already sent. According to PEP 333, we should
+             * let the exception propagate in this case. */
+            return NULL;
+
+        /* Headers not yet sent; handle this start_response call if 'exc_info'
+           would not be passed, but print the exception and 'sys.exc_clear()' */
+        PyErr_Print();
+    }
+
+    if(req->state & REQUEST_START_RESPONSE_CALLED && exc_info == NULL) {
+        PyErr_SetString(PyExc_TypeError, "'start_response' called twice without "
+                                         "passing 'exc_info' the second time");
+        return NULL;
     }
 
     TYPECHECK(req->status, PyString, "start_response argument 1", NULL);
@@ -254,6 +277,8 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
 
     Py_INCREF(req->status);
     Py_INCREF(req->headers);
+
+    req->state |= REQUEST_START_RESPONSE_CALLED;
 
     Py_RETURN_NONE;
 }

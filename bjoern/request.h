@@ -12,12 +12,13 @@ typedef enum {
     REQUEST_READING                 = 1<<11,
     REQUEST_PARSE_ERROR             = 1<<12,
     REQUEST_PARSE_DONE              = 1<<13,
-    REQUEST_RESPONSE_STATIC         = 1<<14,
-    REQUEST_RESPONSE_HEADERS_SENT   = 1<<15,
-    REQUEST_RESPONSE_WSGI           = 1<<16,
-    REQUEST_WSGI_STRING_RESPONSE    = 1<<17,
-    REQUEST_WSGI_FILE_RESPONSE      = 1<<18,
-    REQUEST_WSGI_ITER_RESPONSE      = 1<<19
+    REQUEST_START_RESPONSE_CALLED   = 1<<14,
+    REQUEST_RESPONSE_STATIC         = 1<<15,
+    REQUEST_RESPONSE_HEADERS_SENT   = 1<<16,
+    REQUEST_RESPONSE_WSGI           = 1<<17,
+    REQUEST_WSGI_STRING_RESPONSE    = 1<<18,
+    REQUEST_WSGI_FILE_RESPONSE      = 1<<19,
+    REQUEST_WSGI_ITER_RESPONSE      = 1<<20
 } request_state;
 
 typedef struct {
