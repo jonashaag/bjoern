@@ -1,5 +1,6 @@
 #include <Python.h>
 #include "server.h"
+#include "wsgi.h"
 #include "bjoernmodule.h"
 
 static PyObject*
@@ -25,5 +26,7 @@ static PyMethodDef Bjoern_FunctionTable[] = {
 
 PyMODINIT_FUNC initbjoern()
 {
+    int ready = PyType_Ready(&StartResponse_Type);
+    assert(ready >= 0);
     Py_InitModule("bjoern", Bjoern_FunctionTable);
 }

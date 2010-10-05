@@ -38,7 +38,7 @@ wsgi_call_application(Request* request)
     );
 
     Py_DECREF(request_headers);
-    PyObject_FREE(start_response);
+    Py_DECREF(start_response);
 
     if(retval == NULL)
         return false;
@@ -259,9 +259,12 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
 }
 
 static PyTypeObject StartResponse_Type = {
-    PyVarObject_HEAD_INIT(NULL, 0)
-    "start_response",
-    sizeof(StartResponse),
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    start_response /* __call__ */
+    PyObject_HEAD_INIT(&PyType_Type)
+    0,                          /* ob_size (deprecated)                     */
+    "start_response",           /* tp_name (__name__)                       */
+    sizeof(StartResponse),      /* tp_basicsize                             */
+    0,                          /* tp_itemsize                              */
+    (destructor)PyObject_FREE,  /* tp_dealloc                               */
+    0, 0, 0, 0, 0, 0, 0, 0, 0,  /* tp_{print,getattr,setattr,compare,...}   */
+    start_response              /* tp_call (__call__)                       */
 };
