@@ -73,4 +73,4 @@ memwatch:
 	watch -n 0.5 \
 	  'cat /proc/$$(pidof -s python)/cmdline | tr "\0" " " | head -c -1; \
 	   echo; echo; \
-	   tail -n +25 /proc/$$(pidof -s python)/smaps | head -n 15'
+	   tail -n +25 /proc/$$(pidof -s python)/smaps'
