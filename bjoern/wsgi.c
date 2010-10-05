@@ -131,7 +131,7 @@ wsgi_sendheaders(Request* request)
             while(n--) buf[bufpos++] = *s++; \
         } while(0)
 
-    buf_write("HTTP/1.1 ", strlen("HTTP/1.1 "));
+    buf_write("HTTP/1.0 ", strlen("HTTP/1.0 "));
     buf_write(PyString_AS_STRING(request->status),
               PyString_GET_SIZE(request->status));
 
@@ -265,8 +265,7 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
            would not be passed, but print the exception and 'sys.exc_clear()' */
         PyErr_Print();
     }
-
-    if(req->state & REQUEST_START_RESPONSE_CALLED && exc_info == NULL) {
+    else if(req->state & REQUEST_START_RESPONSE_CALLED) {
         PyErr_SetString(PyExc_TypeError, "'start_response' called twice without "
                                          "passing 'exc_info' the second time");
         return NULL;
