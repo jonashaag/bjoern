@@ -47,10 +47,10 @@ wsgi_call_application(Request* request)
 
     /* Optimize the most common case: */
     if(PyList_Check(retval) && PyList_GET_SIZE(retval) == 1) {
-        PyObject* tmp = retval;
-        retval = PyList_GET_ITEM(tmp, 0);
+        PyObject* list = retval;
+        retval = PyList_GET_ITEM(list, 0);
         Py_INCREF(retval);
-        Py_DECREF(tmp);
+        Py_DECREF(list);
         goto string_resp; /* eeeeeevil */
     }
 
