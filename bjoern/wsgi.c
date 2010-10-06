@@ -14,12 +14,13 @@ typedef struct {
     PyObject_HEAD
     Request* request;
 } StartResponse;
-static PyTypeObject StartResponse_Type;
+PyTypeObject StartResponse_Type;
 
 
 bool
 wsgi_call_application(Request* request)
 {
+    assert(StartResponse_Type.tp_flags & Py_TPFLAGS_READY);
     StartResponse* start_response = PyObject_NEW(StartResponse, &StartResponse_Type);
     start_response->request = request;
 
@@ -282,8 +283,8 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
     Py_RETURN_NONE;
 }
 
-static PyTypeObject StartResponse_Type = {
-    PyObject_HEAD_INIT(&PyType_Type)
+PyTypeObject StartResponse_Type = {
+    PyObject_HEAD_INIT(NULL)
     0,                          /* ob_size (deprecated)                     */
     "start_response",           /* tp_name (__name__)                       */
     sizeof(StartResponse),      /* tp_basicsize                             */

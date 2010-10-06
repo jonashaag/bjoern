@@ -23,10 +23,10 @@ static PyMethodDef Bjoern_FunctionTable[] = {
     {NULL,  NULL, 0, NULL}
 };
 
-
 PyMODINIT_FUNC initbjoern()
 {
     int ready = PyType_Ready(&StartResponse_Type);
-    assert(ready >= 0);
+    assert(ready == 0);
+    assert(StartResponse_Type.tp_flags & Py_TPFLAGS_READY);
     Py_InitModule("bjoern", Bjoern_FunctionTable);
 }
