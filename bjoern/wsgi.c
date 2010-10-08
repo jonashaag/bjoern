@@ -55,12 +55,13 @@ wsgi_call_application(Request* request)
         goto string_resp; /* eeeeeevil */
     }
 
-
+#if 0
     if(PyFile_Check(retval)) {
         request->state |= REQUEST_WSGI_FILE_RESPONSE;
         request->response = retval;
         goto out;
     }
+#endif
 
     if(PyString_Check(retval)) {
 string_resp:
