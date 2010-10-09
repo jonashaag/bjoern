@@ -7,7 +7,10 @@ if not os.path.isdir('http-parser'):
 
 make = Popen(['make', 'print-env'], stdout=PIPE)
 make.wait()
-env = dict(line.split('=', 1) for line in make.stdout.read().strip().split('\n'))
+
+stdout = make.stdout.read().split('\n')
+env = dict(line.split('=', 1) for line in stdout if len(line.split('=',1)) > 1)
+
 source_files = env.pop('args').split()
 
 os.environ.update(env)
