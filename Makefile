@@ -1,5 +1,3 @@
-WANT_ROUTING	= no
-
 SOURCE_DIR	= bjoern
 BUILD_DIR	= _build
 objects		= $(patsubst $(SOURCE_DIR)/%.c, $(BUILD_DIR)/%.o, \
@@ -8,8 +6,9 @@ objects		= $(patsubst $(SOURCE_DIR)/%.c, $(BUILD_DIR)/%.o, \
 PYTHON_VERSION	= 2.6
 PYTHON_DIR	= /usr/include/python$(PYTHON_VERSION)/
 
-HTTP_PARSER_DIR	= include/http-parser
+HTTP_PARSER_DIR	= http-parser
 HTTP_PARSER_OBJ = $(HTTP_PARSER_DIR)/http_parser.o
+HTTP_PARSER_SRC = $(HTTP_PARSER_DIR)/http_parser.c
 
 CPPFLAGS	+= -I $(PYTHON_DIR) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR)
 CFLAGS		+= $(FEATURES) -std=c99 -fno-strict-aliasing -Wall -Wextra \
@@ -19,11 +18,14 @@ LDFLAGS		+= -l python2.6 -l ev -shared -static
 ifneq ($(WANT_SENDFILE), no)
 FEATURES	+= -D WANT_SENDFILE
 endif
-ifneq ($(WANT_ROUTING), no)
-FEATURES	+= -D WANT_ROUTING
-endif
 
 all: prepare-build $(objects) bjoernmodule
+
+print-env:
+	@echo CFLAGS=$(CFLAGS)
+	@echo CPPFLAGS=$(CPPFLAGS)
+	@echo LDFLAGS=$(LDFLAGS)
+	@echo args=$(HTTP_PARSER_SRC) $(wildcard $(SOURCE_DIR)/*.c)
 
 opt: clean
 	CFLAGS='-O3' make

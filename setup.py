@@ -1,25 +1,22 @@
 import os
-from subprocess import Popen
+from subprocess import Popen, PIPE
 from distutils.core import setup, Extension
 
-Popen('./.make-http-parser').wait()
+if not os.path.isdir('http-parser'):
+    Popen('git clone git://github.com/ry/http-parser'.split()).wait()
 
-C_FILES = [os.path.join('bjoern', f) for f in os.listdir('bjoern') if f.endswith('.c')]
-CFLAGS = '-std=c99 -Wall -Wextra -Wno-unused -fno-strict-aliasing -shared -O3 '
+make = Popen(['make', 'print-env'], stdout=PIPE)
+make.wait()
+env = dict(line.split('=', 1) for line in make.stdout.read().strip().split('\n'))
+source_files = env.pop('args').split()
+
+os.environ.update(env)
 
 setup(
     name        = 'bjoern',
     description = 'A screamingly fast Python WSGI server written in C.',
-    version     = '0.2',
-    package_dir = {'': 'bjoern'},
+    version     = '0.3',
     ext_modules = [
-        Extension('bjoern',
-            sources       = C_FILES + ['include/http-parser/http_parser.c'],
-            include_dirs  = ['include/http-parser', '.'],
-            libraries     = ['ev'],
-            define_macros = [('WANT_ROUTING', True), ('WANT_SENDFILE', os.name == 'posix')],
-            extra_link_args = ['-static', '-g'],
-            extra_compile_args = CFLAGS.split()
-        )
+        Extension('bjoern', sources=source_files, libraries=['ev'])
     ]
 )
