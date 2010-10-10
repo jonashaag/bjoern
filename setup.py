@@ -9,7 +9,7 @@ make = Popen(['make', 'print-env'], stdout=PIPE)
 make.wait()
 
 stdout = make.stdout.read().split('\n')
-env = dict(line.split('=', 1) for line in stdout if len(line.split('=',1)) > 1)
+env = dict(line.split('=', 1) for line in stdout if '=' in line)
 
 source_files = env.pop('args').split()
 
