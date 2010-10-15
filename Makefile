@@ -3,7 +3,7 @@ BUILD_DIR	= _build
 objects		= $(patsubst $(SOURCE_DIR)/%.c, $(BUILD_DIR)/%.o, \
 			     $(wildcard $(SOURCE_DIR)/*.c))
 
-PYTHON_VERSION	= 2.6
+PYTHON_VERSION	= 2.7
 PYTHON_DIR	= /usr/include/python$(PYTHON_VERSION)/
 
 HTTP_PARSER_DIR	= http-parser
@@ -13,7 +13,7 @@ HTTP_PARSER_SRC = $(HTTP_PARSER_DIR)/http_parser.c
 CPPFLAGS	+= -I $(PYTHON_DIR) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR)
 CFLAGS		+= $(FEATURES) -std=c99 -fno-strict-aliasing -Wall -Wextra \
 		   -Wno-unused -g -O3
-LDFLAGS		+= -l python2.6 -l ev -shared -static
+LDFLAGS		+= -l python$(PYTHON_VERSION) -l ev -shared -static
 
 ifneq ($(WANT_SENDFILE), no)
 FEATURES	+= -D WANT_SENDFILE
