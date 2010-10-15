@@ -18,6 +18,7 @@ run(PyObject* self, PyObject* args)
 
     const char* host;
     int port;
+    bool success;
 
     if(!PyArg_ParseTuple(args, "Osi", &wsgi_app, &host, &port))
         return NULL;
@@ -25,8 +26,16 @@ run(PyObject* self, PyObject* args)
     _request_module_initialize(host, port);
 
     server_runs = true;
-    server_run(host, port);
+    success = server_run(host, port);
     server_runs = false;
+
+    if(!success) {
+        PyErr_Format(
+            PyExc_RuntimeError,
+            "Could not start server on %s:%d", host, port
+        );
+        return NULL;
+    }
 
     Py_RETURN_NONE;
 }
