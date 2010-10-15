@@ -236,5 +236,8 @@ set_nonblocking(int fd)
 static void
 ev_signal_on_sigint(struct ev_loop* mainloop, ev_signal* watcher, const int events)
 {
+    /* Clean up and shut down this thread.
+       (Shuts down the Python interpreter if this is the main thread) */
     ev_unloop(mainloop, EVUNLOOP_ALL);
+    PyErr_SetInterrupt();
 }

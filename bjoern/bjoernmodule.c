@@ -6,6 +6,16 @@
 static PyObject*
 run(PyObject* self, PyObject* args)
 {
+    static bool server_runs = false;
+
+    if(server_runs) {
+        PyErr_SetString(
+            PyExc_RuntimeError,
+            "Only one bjoern server per Python interpreter is allowed"
+        );
+        return NULL;
+    }
+
     const char* host;
     int port;
 
@@ -14,7 +24,10 @@ run(PyObject* self, PyObject* args)
 
     _request_module_initialize(host, port);
 
+    server_runs = true;
     server_run(host, port);
+    server_runs = false;
+
     Py_RETURN_NONE;
 }
 
