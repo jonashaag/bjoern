@@ -27,7 +27,7 @@ Sucks. Really, the code is an incredible mess. It likes to segfault.
 
 I tried to patch Fapws so that it would support threading,
 but after about two hours of brain slime feeling, I decided
-to write my own WSGI server -- "Fawps done right".
+to write my own WSGI server -- "Fapws done right".
 
 gunicorn?
 ---------

@@ -41,7 +41,7 @@ run(PyObject* self, PyObject* args)
 }
 
 static PyMethodDef Bjoern_FunctionTable[] = {
-    {"run", run, METH_VARARGS, NULL},
+    {"run", run, METH_VARARGS, "bjoern.run(application, host, port)"},
     {NULL,  NULL, 0, NULL}
 };
 
