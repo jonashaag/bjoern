@@ -119,6 +119,7 @@ wsgi_send_response(Request* request)
     else if(state & REQUEST_WSGI_ITER_RESPONSE) return wsgi_senditer(request);
 
     assert(0);
+    return 0; /* make gcc happy */
 }
 
 static bool
@@ -145,7 +146,7 @@ wsgi_sendheaders(Request* request)
         if(PyTuple_GET_SIZE(tuple) < 2) {
             PyErr_Format(
                 PyExc_TypeError,
-                "headers must be tuples of length 2, not %d",
+                "headers must be tuples of length 2, not %zd",
                 PyTuple_GET_SIZE(tuple)
             );
             return true;
@@ -180,6 +181,7 @@ static bool
 wsgi_sendfile(Request* request)
 {
     assert(0);
+    return 0; /* make gcc happy */
 }
 
 static bool
@@ -250,7 +252,7 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
             PyErr_Format(
                 PyExc_TypeError,
                 "start_response argument 3 must be a tuple of length 3, "
-                "not of length %d",
+                "not of length %zd",
                 PyTuple_GET_SIZE(exc_info)
             );
             return NULL;
