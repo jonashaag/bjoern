@@ -196,12 +196,12 @@ set_error(Request* request, http_status status)
     Py_XDECREF(request->response);
     switch(status) {
         case HTTP_SERVER_ERROR:
-            request->response = "HTTP/1.0 500 Internal Server Error\r\n\r\n"
+            request->response = "HTTP/1.0 500 Internal Server Error\r\n\r\n" \
                                 "HTTP 500 Internal Server Error :(";
             break;
 
         case HTTP_BAD_REQUEST:
-            request->response = "HTTP/1.0 400 Bad Request\r\n\r\n"
+            request->response = "HTTP/1.0 400 Bad Request\r\n\r\n" \
                                 "You sent a malformed request.";
             break;
 
