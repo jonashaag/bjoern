@@ -6,9 +6,10 @@
 static PyObject*
 run(PyObject* self, PyObject* args)
 {
-    static bool server_runs = false;
+    const char* host;
+    int port;
 
-    if(server_runs) {
+    if(wsgi_app) {
         PyErr_SetString(
             PyExc_RuntimeError,
             "Only one bjoern server per Python interpreter is allowed"
@@ -16,28 +17,22 @@ run(PyObject* self, PyObject* args)
         return NULL;
     }
 
-    const char* host;
-    int port;
-    bool success;
-
     if(!PyArg_ParseTuple(args, "Osi", &wsgi_app, &host, &port))
         return NULL;
 
     _request_module_initialize(host, port);
 
-    server_runs = true;
-    success = server_run(host, port);
-    server_runs = false;
-
-    if(!success) {
+    if(server_init(host, port)) {
+        server_run();
+        wsgi_app = NULL;
+        Py_RETURN_NONE;
+    } else {
         PyErr_Format(
             PyExc_RuntimeError,
             "Could not start server on %s:%d", host, port
         );
         return NULL;
     }
-
-    Py_RETURN_NONE;
 }
 
 static PyMethodDef Bjoern_FunctionTable[] = {

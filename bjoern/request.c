@@ -43,7 +43,7 @@ void Request_parse(Request* request,
                    const size_t data_len) {
     if(data_len) {
         size_t nparsed = http_parser_execute((http_parser*)&request->parser,
-                                         &parser_settings, data, data_len);
+                                             &parser_settings, data, data_len);
         if(nparsed == data_len)
             /* everything fine */
             return;

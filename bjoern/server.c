@@ -3,6 +3,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
+#include <ev.h>
 #include "common.h"
 #include "wsgi.h"
 #include "server.h"
@@ -28,19 +29,13 @@ static ev_signal_callback ev_signal_on_sigint;
 static ev_io_callback ev_io_on_request;
 static ev_io_callback ev_io_on_read;
 static ev_io_callback ev_io_on_write;
-static bool server_init(const char* hostaddr, const int port);
 static inline void set_error(Request*, http_status);
 static inline void print_io_error();
 static inline bool set_nonblocking(int fd);
 
-bool
+void
 server_run(const char* hostaddr, const int port)
 {
-    if(!server_init(hostaddr, port))
-        return false;
-
-    DBG("Listening on %s:%d...", hostaddr, port);
-
     struct ev_loop* mainloop = ev_loop_new(0);
 
     ev_io accept_watcher;
@@ -55,11 +50,9 @@ server_run(const char* hostaddr, const int port)
     Py_BEGIN_ALLOW_THREADS
     ev_loop(mainloop, 0);
     Py_END_ALLOW_THREADS
-
-    return true;
 }
 
-static bool
+bool
 server_init(const char* hostaddr, const int port)
 {
     if((sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
@@ -80,6 +73,7 @@ server_init(const char* hostaddr, const int port)
     if(listen(sockfd, LISTEN_BACKLOG) < 0)
         return false;
 
+    DBG("Listening on %s:%d...", hostaddr, port);
     return true;
 }
 

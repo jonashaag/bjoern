@@ -10,7 +10,6 @@
 #define GIL_LOCK(n) PyGILState_STATE _gilstate_##n = PyGILState_Ensure()
 #define GIL_UNLOCK(n) PyGILState_Release(_gilstate_##n)
 
-#define LENGTH(array) (sizeof(array)/sizeof(array[0]))
 #define ADDR_FROM_MEMBER(ptr, strct, mem) (strct*)((size_t)ptr - (size_t)(&(((strct*)NULL)->mem)));
 
 #define TYPECHECK2(what, check_type, print_type, errmsg_name, failure_retval) \
