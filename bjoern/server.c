@@ -175,9 +175,9 @@ out:
 }
 
 bool
-sendall(Request* request, register const char* data, register size_t length)
+sendall(Request* request, const char* data, size_t length)
 {
-    register ssize_t sent;
+    ssize_t sent;
 again:
     while(length) {
         sent = write(request->client_fd, data, length);

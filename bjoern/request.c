@@ -308,6 +308,8 @@ on_message_complete(http_parser* parser)
 static inline bool
 string_iequal(const char* a, size_t len, const char* b)
 {
+    if(len != strlen(b))
+        return false;
     for(size_t i=0; i<len; ++i)
         if(a[i] != b[i] && a[i] - ('a'-'A') != b[i])
             return false;
@@ -315,7 +317,7 @@ string_iequal(const char* a, size_t len, const char* b)
 }
 
 static PyObject*
-wsgi_http_header(register const char* data, register size_t len)
+wsgi_http_header(const char* data, size_t len)
 {
     if(string_iequal(data, len, "Content-Length")) {
         Py_INCREF(_CONTENT_LENGTH);

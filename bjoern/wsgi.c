@@ -189,10 +189,10 @@ static bool
 wsgi_senditer(Request* request)
 {
 #define ITER_MAXSEND 1024*4
-    register PyObject* item = request->iterable_next;
+    PyObject* item = request->iterable_next;
     if(!item) return true;
 
-    register ssize_t sent = 0;
+    ssize_t sent = 0;
     while(item && sent < ITER_MAXSEND) {
         TYPECHECK(item, PyString, "wsgi iterable items", true);
         if(!sendall(request, PyString_AS_STRING(item),
