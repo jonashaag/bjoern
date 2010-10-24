@@ -78,6 +78,7 @@ void Request_free(Request* req)
         free(req);
     }
 
+#if 0
     DBG_REFCOUNT_REQ(req, _PATH_INFO);
     DBG_REFCOUNT_REQ(req, _QUERY_STRING);
     DBG_REFCOUNT_REQ(req, _REQUEST_URI);
@@ -92,6 +93,7 @@ void Request_free(Request* req)
     DBG_REFCOUNT_REQ(req, _HTTP_1_1);
     DBG_REFCOUNT_REQ(req, _HTTP_1_0);
     DBG_REFCOUNT_REQ(req, _empty_string);
+#endif
 }
 
 Request* _Request_from_prealloc()

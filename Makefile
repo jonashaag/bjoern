@@ -68,8 +68,7 @@ valgrind:
 	valgrind --leak-check=full --show-reachable=yes python tests/hello.py
 
 callgrind:
-	cd _build
-	valgrind --tool=callgrind python tests/hello.py
+	valgrind --tool=callgrind python tests/wsgitest-round-robin.py
 
 memwatch:
 	watch -n 0.5 \
