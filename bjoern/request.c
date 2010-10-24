@@ -64,6 +64,10 @@ void Request_free(Request* req)
 #endif
 
     Py_XDECREF(req->body);
+    if(req->headers)
+        assert(req->headers->ob_refcnt >= 1);
+    if(req->status)
+        assert(req->status->ob_refcnt >= 1);
     Py_XDECREF(req->headers);
     Py_XDECREF(req->status);
 

@@ -14,6 +14,7 @@
 
 #define TYPECHECK2(what, check_type, print_type, errmsg_name, failure_retval) \
     if(!what || !check_type##_Check(what)) { \
+        assert(Py_TYPE(what ? what : Py_None)->tp_name); \
         PyErr_Format(\
             PyExc_TypeError, \
             errmsg_name " must be of type %s, not %s", \
