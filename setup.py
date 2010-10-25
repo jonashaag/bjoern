@@ -3,7 +3,7 @@ from subprocess import Popen, PIPE
 from distutils.core import setup, Extension
 
 if not os.path.isdir('http-parser'):
-    Popen('git clone git://github.com/ry/http-parser'.split()).wait()
+    Popen('git submodule init'.split()).wait()
 
 make = Popen(['make', 'print-env'], stdout=PIPE)
 make.wait()
