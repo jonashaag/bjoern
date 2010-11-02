@@ -2,8 +2,8 @@ import os
 from subprocess import Popen, PIPE
 from distutils.core import setup, Extension
 
-if not os.path.isdir('http-parser'):
-    Popen('git submodule init'.split()).wait()
+if not os.listdir('./http-parser'):
+    Popen('git submodule update --init'.split()).wait()
 
 make = Popen(['make', 'print-env'], stdout=PIPE)
 make.wait()
