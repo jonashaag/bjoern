@@ -40,7 +40,7 @@ static inline bool set_nonblocking(int fd);
 void
 server_run(const char* hostaddr, const int port)
 {
-    struct ev_loop* mainloop = ev_loop_new(0);
+    struct ev_loop* mainloop = ev_default_loop(0);
 
     ev_io accept_watcher;
     ev_io_init(&accept_watcher, ev_io_on_request, sockfd, EV_READ);
