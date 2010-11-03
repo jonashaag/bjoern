@@ -52,9 +52,6 @@ prepare-build:
 clean:
 	rm -f $(BUILD_DIR)/*
 
-http-parser:
-	./.make-http-parser
-
 ab:
 	ab -c 100 -n 10000 'http://127.0.0.1:8080/a/b/c?k=v&k2=v2#fragment'
 
