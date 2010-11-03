@@ -1,8 +1,10 @@
 #include <sys/socket.h>
-#include <sys/signal.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
+#ifdef WANT_SIGINT_HANDLING
+# include <sys/signal.h>
+#endif
 #include <ev.h>
 #include "common.h"
 #include "wsgi.h"
@@ -23,9 +25,11 @@
 
 static int sockfd;
 
-typedef void ev_signal_callback(struct ev_loop*, ev_signal*, const int);
 typedef void ev_io_callback(struct ev_loop*, ev_io*, const int);
+#if WANT_SIGINT_HANDLING
+typedef void ev_signal_callback(struct ev_loop*, ev_signal*, const int);
 static ev_signal_callback ev_signal_on_sigint;
+#endif
 static ev_io_callback ev_io_on_request;
 static ev_io_callback ev_io_on_read;
 static ev_io_callback ev_io_on_write;
@@ -42,9 +46,11 @@ server_run(const char* hostaddr, const int port)
     ev_io_init(&accept_watcher, ev_io_on_request, sockfd, EV_READ);
     ev_io_start(mainloop, &accept_watcher);
 
+#if WANT_SIGINT_HANDLING
     ev_signal signal_watcher;
     ev_signal_init(&signal_watcher, ev_signal_on_sigint, SIGINT);
     ev_signal_start(mainloop, &signal_watcher);
+#endif
 
     /* This is the program main loop */
     Py_BEGIN_ALLOW_THREADS
@@ -227,6 +233,7 @@ set_nonblocking(int fd)
     return (fcntl(fd, F_SETFL, (flags < 0 ? 0 : flags) | O_NONBLOCK) != -1);
 }
 
+#if WANT_SIGINT_HANDLING
 static void
 ev_signal_on_sigint(struct ev_loop* mainloop, ev_signal* watcher, const int events)
 {
@@ -235,3 +242,4 @@ ev_signal_on_sigint(struct ev_loop* mainloop, ev_signal* watcher, const int even
     ev_unloop(mainloop, EVUNLOOP_ALL);
     PyErr_SetInterrupt();
 }
+#endif

@@ -1,7 +1,7 @@
 SOURCE_DIR	= bjoern
 BUILD_DIR	= _build
 objects		= $(patsubst $(SOURCE_DIR)/%.c, $(BUILD_DIR)/%.o, \
-			     $(wildcard $(SOURCE_DIR)/*.c))
+		             $(wildcard $(SOURCE_DIR)/*.c))
 
 PYTHON_VERSION	= 2.7
 PYTHON_DIR	= /usr/include/python$(PYTHON_VERSION)/
@@ -17,6 +17,10 @@ LDFLAGS		+= -l python$(PYTHON_VERSION) -l ev -shared -static
 
 ifneq ($(WANT_SENDFILE), no)
 FEATURES	+= -D WANT_SENDFILE
+endif
+
+ifneq ($(WANT_SIGINT_HANDLING), no)
+FEATURES	+= -D WANT_SIGINT_HANDLING
 endif
 
 all: prepare-build $(objects) bjoernmodule
@@ -44,7 +48,7 @@ $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.c
 
 # foo.o: shortcut to $(BUILD_DIR)/foo.o
 %.o: $(BUILD_DIR)/%.o
-	
+
 
 prepare-build:
 	mkdir -p _build
