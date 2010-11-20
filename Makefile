@@ -13,7 +13,7 @@ HTTP_PARSER_SRC = $(HTTP_PARSER_DIR)/http_parser.c
 CPPFLAGS	+= -I $(PYTHON_DIR) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR)
 CFLAGS		+= $(FEATURES) -std=c99 -fno-strict-aliasing -Wall -Wextra \
 		   -Wno-unused -g -O3 -fPIC
-LDFLAGS		+= -l python$(PYTHON_VERSION) -l ev -shared -static
+LDFLAGS		+= -l python$(PYTHON_VERSION) -l ev -shared
 
 ifneq ($(WANT_SENDFILE), no)
 FEATURES	+= -D WANT_SENDFILE
