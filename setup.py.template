@@ -15,10 +15,12 @@ source_files = env.pop('args').split()
 os.environ.update(env)
 
 setup(
-    name        = 'bjoern',
-    description = 'A screamingly fast Python WSGI server written in C.',
-    version     = '0.3',
-    ext_modules = [
-        Extension('bjoern', sources=source_files, libraries=['ev'])
-    ]
+    name         = 'bjoern',
+    author       = 'Jonas Haag',
+    author_email = 'jonas@lophus.org',
+    license      = '2-clause BSD',
+    url          = 'https://github.com/jonashaag/bjoern',
+    description  = 'A screamingly fast Python WSGI server written in C.',
+    version      = '1.0',
+    ext_modules  = [Extension('bjoern', sources=source_files, libraries=['ev'])]
 )
