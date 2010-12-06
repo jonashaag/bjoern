@@ -13,7 +13,7 @@ HTTP_PARSER_SRC = $(HTTP_PARSER_DIR)/http_parser.c
 CPPFLAGS	+= -I $(PYTHON_DIR) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR)
 CFLAGS		+= $(FEATURES) -std=c99 -fno-strict-aliasing -Wall -Wextra \
 		   -Wno-unused -g -O3 -fPIC
-LDFLAGS		+= -l python$(PYTHON_VERSION) -l ev -shared
+LDFLAGS		+= -l python$(PYTHON_VERSION) -l ev -shared --as-needed
 
 ifneq ($(WANT_SENDFILE), no)
 FEATURES	+= -D WANT_SENDFILE
@@ -76,3 +76,7 @@ memwatch:
 	  'cat /proc/$$(pidof -s python)/cmdline | tr "\0" " " | head -c -1; \
 	   echo; echo; \
 	   tail -n +25 /proc/$$(pidof -s python)/smaps'
+
+release:
+	@mkdir -p _release
+	cp http-parser/http_parser.{c,h} bjoern/* setup.py LICENSE _release

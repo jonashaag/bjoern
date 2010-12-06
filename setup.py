@@ -1,15 +1,14 @@
 import os
-from subprocess import Popen, PIPE
 from distutils.core import setup, Extension
 
-if not os.listdir('./http-parser'):
-    Popen('git submodule update --init'.split()).wait()
+# make print-env
+stdout = '''
+CFLAGS=-D WANT_SENDFILE -D WANT_SIGINT_HANDLING -std=c99 -fno-strict-aliasing -Wall -Wextra -Wno-unused -g -O3 -fPIC
+CPPFLAGS=-I /usr/include/python2.7/ -I . -I bjoern -I http-parser
+LDFLAGS=-l python2.7 -l ev -shared --as-needed
+args=http_parser.c request.c bjoernmodule.c server.c wsgi.c'''
 
-make = Popen(['make', 'print-env'], stdout=PIPE)
-make.wait()
-
-stdout = make.stdout.read().split('\n')
-env = dict(line.split('=', 1) for line in stdout if '=' in line)
+env = dict(line.split('=', 1) for line in stdout.split('\n') if '=' in line)
 
 source_files = env.pop('args').split()
 
