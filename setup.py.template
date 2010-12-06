@@ -22,5 +22,9 @@ setup(
     url          = 'https://github.com/jonashaag/bjoern',
     description  = 'A screamingly fast Python WSGI server written in C.',
     version      = '1.0',
+    classifiers  = ['Development Status :: 4 - Beta',
+                    'License :: OSI Approved :: BSD License',
+                    'Programming Language :: C',
+                    'Topic :: Internet :: WWW/HTTP :: WSGI :: Server'],
     ext_modules  = [Extension('bjoern', sources=source_files, libraries=['ev'])]
 )
