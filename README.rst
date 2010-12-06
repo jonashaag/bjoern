@@ -1,9 +1,13 @@
-bjoern
-======
+bjoern: Fast And Ultra Lightweight Asynchronous WSGI Server
+===========================================================
 
-A screamingly fast CPython `WSGI`_ server for CPython, written in C
-using Marc Lehmann's high performance `libev`_ event loop
-and Ryan Dahl's `http_parser`_.
+::
+
+   sudo pip install bjoern
+
+A screamingly fast, ultra-lightweight asynchronous `WSGI`_ server for CPython,
+written in C using Marc Lehmann's high performance `libev`_ event loop and
+Ryan Dahl's `http_parser`_.
 
 bjoern aims to be *small*, *lightweight* and *very fast*.
 
