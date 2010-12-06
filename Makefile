@@ -79,4 +79,5 @@ memwatch:
 
 release:
 	@mkdir -p _release
-	cp http-parser/http_parser.{c,h} bjoern/* setup.py LICENSE _release
+	cp http-parser/http_parser.{c,h} bjoern/* LICENSE _release
+	cp setup.py.template _release/setup.py
