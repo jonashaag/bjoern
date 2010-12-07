@@ -51,7 +51,7 @@ $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.c
 
 
 prepare-build:
-	mkdir -p _build
+	mkdir -p $(BUILD_DIR)
 
 clean:
 	rm -f $(BUILD_DIR)/*
