@@ -1,18 +1,10 @@
 import os
 from distutils.core import setup, Extension
 
-# make print-env
-stdout = '''
-CFLAGS=-D WANT_SENDFILE -D WANT_SIGINT_HANDLING -std=c99 -fno-strict-aliasing -Wall -Wextra -Wno-unused -g -O3 -fPIC
-CPPFLAGS=-I /usr/include/python2.7/ -I . -I bjoern -I http-parser
-LDFLAGS=-l python2.7 -l ev -shared --as-needed
-args=http_parser.c request.c bjoernmodule.c server.c wsgi.c'''
-
-env = dict(line.split('=', 1) for line in stdout.split('\n') if '=' in line)
-
-source_files = env.pop('args').split()
-
-os.environ.update(env)
+SOURCE_FILES = [
+    'http-parser/http_parser.c', 'bjoern/request.c', 'bjoern/bjoernmodule.c',
+    'bjoern/server.c', 'bjoern/wsgi.c'
+]
 
 setup(
     name         = 'bjoern',
@@ -26,5 +18,14 @@ setup(
                     'License :: OSI Approved :: BSD License',
                     'Programming Language :: C',
                     'Topic :: Internet :: WWW/HTTP :: WSGI :: Server'],
-    ext_modules  = [Extension('bjoern', sources=source_files, libraries=['ev'])]
+    ext_modules  = [
+        Extension(
+            'bjoern',
+            sources=SOURCE_FILES,
+            libraries=['ev'],
+            include_dirs=['http-parser'],
+            define_macros=[('WANT_SENDFILE', '1'), ('WANT_SIGINT_HANDLING', '1')],
+            extra_compile_args='-std=c99 -fno-strict-aliasing -Wall -Wextra -Wno-unused -g -fPIC'.split()
+        )
+    ]
 )

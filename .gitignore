@@ -1,3 +1,4 @@
 *.pyc
-_build/
 build/
+dist/
+MANIFEST

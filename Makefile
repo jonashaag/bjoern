@@ -1,5 +1,5 @@
 SOURCE_DIR	= bjoern
-BUILD_DIR	= _build
+BUILD_DIR	= build
 objects		= $(patsubst $(SOURCE_DIR)/%.c, $(BUILD_DIR)/%.o, \
 		             $(wildcard $(SOURCE_DIR)/*.c))
 
@@ -78,5 +78,7 @@ memwatch:
 	   tail -n +25 /proc/$$(pidof -s python)/smaps'
 
 release:
-	@mkdir -p _release
-	cp http-parser/http_parser.{c,h} bjoern/* setup.py LICENSE _release
+	python setup.py sdist
+
+upload:
+	python setup.py sdist upload
