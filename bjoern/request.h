@@ -10,7 +10,7 @@ void _request_module_initialize(const char* host, const int port);
 typedef enum {
     REQUEST_FRESH                   = 1<<10,
     REQUEST_READING                 = 1<<11,
-    REQUEST_PARSE_ERROR             = 1<<12,
+    REQUEST_ERROR                   = 1<<12,
     REQUEST_PARSE_DONE              = 1<<13,
     REQUEST_START_RESPONSE_CALLED   = 1<<14,
     REQUEST_RESPONSE_STATIC         = 1<<15,

@@ -118,9 +118,9 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
 
     Request_parse(request, read_buf, read_bytes);
 
-    if(request->state & REQUEST_PARSE_ERROR) {
+    if(request->state & REQUEST_ERROR) {
         DBG_REQ(request, "Parse error");
-        set_error(request, request->state ^ REQUEST_PARSE_ERROR);
+        set_error(request, request->state ^ REQUEST_ERROR);
         goto out;
     }
 
@@ -170,6 +170,8 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
         /* request->response is a C-string */
         sendall(request, request->response, strlen(request->response));
     }
+
+    DBG_REQ(request, "Done");
 
     /* Everything done, bye client! */
     ev_io_stop(mainloop, &request->ev_watcher);

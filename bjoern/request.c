@@ -49,7 +49,7 @@ void Request_parse(Request* request,
             return;
     }
 
-    request->state = REQUEST_PARSE_ERROR | HTTP_BAD_REQUEST;
+    request->state = REQUEST_ERROR | HTTP_BAD_REQUEST;
 }
 
 void Request_free(Request* req)
@@ -253,14 +253,14 @@ static int on_body(http_parser* parser,
                    const size_t body_len) {
     if(!REQUEST->body) {
         if(!parser->content_length) {
-            REQUEST->state = REQUEST_PARSE_ERROR | HTTP_LENGTH_REQUIRED;
+            REQUEST->state = REQUEST_ERROR | HTTP_LENGTH_REQUIRED;
             return 1;
         }
         REQUEST->body = PycStringIO->NewOutput(parser->content_length);
     }
 
     if(PycStringIO->cwrite(REQUEST->body, body_start, body_len) < 0) {
-        REQUEST->state = REQUEST_PARSE_ERROR | HTTP_SERVER_ERROR;
+        REQUEST->state = REQUEST_ERROR | HTTP_SERVER_ERROR;
         return 1;
     }
 
