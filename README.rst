@@ -23,6 +23,15 @@ bjoern aims to be *small*, *lightweight* and *very fast*.
 .. _write callback design mistake:
                   http://www.python.org/dev/peps/pep-0333/#the-write-callable
 
+Usage
+~~~~~
+::
+   bjoern.run(wsgi_application, host, port)
+
+   # alternatively, the mainloop can be run separately:
+   bjoern.listen(wsgi_application, host, port)
+   bjoern.run()
+
 But what about...
 ~~~~~~~~~~~~~~~~~
 Fapws3?
