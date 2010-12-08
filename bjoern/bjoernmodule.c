@@ -4,6 +4,11 @@
 #include "bjoernmodule.h"
 
 
+PyDoc_STRVAR(listen_doc,
+"listen(application, host, port) -> None\n\n \
+\
+Makes bjoern listen to host:port and use application as WSGI callback. \
+(This does not run the server mainloop.)");
 static PyObject*
 listen(PyObject* self, PyObject* args)
 {
@@ -18,7 +23,7 @@ listen(PyObject* self, PyObject* args)
         return NULL;
     }
 
-    if(!PyArg_ParseTuple(args, "Osi", &wsgi_app, &host, &port))
+    if(!PyArg_ParseTuple(args, "Osi:run/listen", &wsgi_app, &host, &port))
         return NULL;
 
     _request_module_initialize(host, port);
@@ -34,6 +39,13 @@ listen(PyObject* self, PyObject* args)
     Py_RETURN_NONE;
 }
 
+PyDoc_STRVAR(run_doc,
+"run(application, host, port) -> None\n \
+Calls listen(application, host, port) and starts the server mainloop.\n \
+\n\
+run() -> None\n \
+Starts the server mainloop. listen(...) has to be called before calling \
+run() without arguments.");
 static PyObject*
 run(PyObject* self, PyObject* args)
 {
@@ -59,8 +71,8 @@ run(PyObject* self, PyObject* args)
 }
 
 static PyMethodDef Bjoern_FunctionTable[] = {
-    {"listen", listen, METH_VARARGS, "bjoern.listen(application, host, port)"},
-    {"run", run, METH_VARARGS, "bjoern.run([application, host, port])"},
+    {"run", run, METH_VARARGS, run_doc},
+    {"listen", listen, METH_VARARGS, listen_doc},
     {NULL,  NULL, 0, NULL}
 };
 
