@@ -3,17 +3,17 @@ BUILD_DIR	= build
 objects		= $(patsubst $(SOURCE_DIR)/%.c, $(BUILD_DIR)/%.o, \
 		             $(wildcard $(SOURCE_DIR)/*.c))
 
-python_include = $(shell python-config --include)
-python_ldflags = $(shell python-config --ldflags)
+PYTHON_INCLUDE	= $(shell python-config --include)
+PYTHON_LDFLAGS	= $(shell python-config --ldflags)
 
 HTTP_PARSER_DIR	= http-parser
 HTTP_PARSER_OBJ = $(HTTP_PARSER_DIR)/http_parser.o
 HTTP_PARSER_SRC = $(HTTP_PARSER_DIR)/http_parser.c
 
-CPPFLAGS	+= $(python_include) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR)
+CPPFLAGS	+= $(PYTHON_INCLUDE) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR)
 CFLAGS		+= $(FEATURES) -std=c99 -fno-strict-aliasing -Wall -Wextra \
 		   -Wno-unused -g -O3 -fPIC
-LDFLAGS		+= $(python_ldflags) -l ev -shared --as-needed
+LDFLAGS		+= $(PYTHON_LDFLAGS) -l ev -shared --as-needed
 
 ifneq ($(WANT_SENDFILE), no)
 FEATURES	+= -D WANT_SENDFILE
