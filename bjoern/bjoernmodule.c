@@ -37,12 +37,13 @@ listen(PyObject* self, PyObject* args)
 static PyObject*
 run(PyObject* self, PyObject* args)
 {
-    if(PyArg_ParseTuple(args, "")) {
+    if(PyTuple_GET_SIZE(args) == 0) {
         // bjoern.run()
         if(!wsgi_app) {
             PyErr_SetString(
                 PyExc_RuntimeError,
-                "Must call bjoern.listen(app, host, port) before calling bjoern.run() w/o arguments."
+                "Must call bjoern.listen(app, host, port) before "
+                "calling bjoern.run() without arguments."
             );
             return NULL;
         }

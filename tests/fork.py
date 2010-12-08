@@ -8,7 +8,7 @@ worker_pids = []
 
 def app(environ, start_response):
     start_response('200 OK', [])
-    yield 'Hello world'
+    yield 'Hello world from worker %d' % os.getpid()
 
 
 bjoern.listen(app, '0.0.0.0', 8080)
