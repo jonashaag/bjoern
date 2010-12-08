@@ -39,7 +39,7 @@ small: clean
 
 bjoernmodule:
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(objects) $(HTTP_PARSER_OBJ) -o $(BUILD_DIR)/bjoern.so
-	python -c "import bjoern"
+	PYTHONPATH=$$PYTHONPATH:$(BUILD_DIR) python -c "import bjoern"
 
 again: clean all
 
