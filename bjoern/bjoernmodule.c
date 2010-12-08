@@ -3,8 +3,9 @@
 #include "wsgi.h"
 #include "bjoernmodule.h"
 
+
 static PyObject*
-run(PyObject* self, PyObject* args)
+listen(PyObject* self, PyObject* args)
 {
     const char* host;
     int port;
@@ -22,21 +23,43 @@ run(PyObject* self, PyObject* args)
 
     _request_module_initialize(host, port);
 
-    if(server_init(host, port)) {
-        server_run();
-        wsgi_app = NULL;
-        Py_RETURN_NONE;
-    } else {
+    if(!server_init(host, port)) {
         PyErr_Format(
             PyExc_RuntimeError,
             "Could not start server on %s:%d", host, port
         );
         return NULL;
     }
+
+    Py_RETURN_NONE;
+}
+
+static PyObject*
+run(PyObject* self, PyObject* args)
+{
+    if(PyArg_ParseTuple(args, "")) {
+        // bjoern.run()
+        if(!wsgi_app) {
+            PyErr_SetString(
+                PyExc_RuntimeError,
+                "Must call bjoern.listen(app, host, port) before calling bjoern.run() w/o arguments."
+            );
+            return NULL;
+        }
+    } else {
+        // bjoern.run(app, host, port)
+        if(!listen(self, args))
+            return NULL;
+    }
+
+    server_run();
+    wsgi_app = NULL;
+    Py_RETURN_NONE;
 }
 
 static PyMethodDef Bjoern_FunctionTable[] = {
-    {"run", run, METH_VARARGS, "bjoern.run(application, host, port)"},
+    {"listen", listen, METH_VARARGS, "bjoern.listen(application, host, port)"},
+    {"run", run, METH_VARARGS, "bjoern.run([application, host, port])"},
     {NULL,  NULL, 0, NULL}
 };
 
