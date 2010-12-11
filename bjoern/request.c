@@ -20,20 +20,16 @@ Request* Request_new(int client_fd)
     if(req == NULL)
         return NULL;
 
+    memset(req, 0, sizeof(Request));
+
 #ifdef DEBUG
     static unsigned long req_id = 0;
     req->id = req_id++;
 #endif
 
     req->client_fd = client_fd;
-    req->state = REQUEST_FRESH;
     http_parser_init((http_parser*)&req->parser, HTTP_REQUEST);
     req->parser.parser.data = req;
-
-    req->headers = NULL;
-    req->body = NULL;
-    req->response = NULL;
-    req->status = NULL;
 
     return req;
 }
@@ -49,20 +45,13 @@ void Request_parse(Request* request,
             return;
     }
 
-    request->state = REQUEST_ERROR | HTTP_BAD_REQUEST;
+    request->state.error = true;
+    request->state.error_code = HTTP_BAD_REQUEST;
 }
 
 void Request_free(Request* req)
 {
-    if(req->state & REQUEST_RESPONSE_WSGI) {
-        Py_XDECREF(req->response);
-    }
-
-#if 0
-    else
-        free(req->response);
-#endif
-
+    Py_XDECREF(req->iterable);
     Py_XDECREF(req->body);
     if(req->headers)
         assert(req->headers->ob_refcnt >= 1);
@@ -253,14 +242,16 @@ static int on_body(http_parser* parser,
                    const size_t body_len) {
     if(!REQUEST->body) {
         if(!parser->content_length) {
-            REQUEST->state = REQUEST_ERROR | HTTP_LENGTH_REQUIRED;
+            REQUEST->state.error = true;
+            REQUEST->state.error_code = HTTP_LENGTH_REQUIRED;
             return 1;
         }
         REQUEST->body = PycStringIO->NewOutput(parser->content_length);
     }
 
     if(PycStringIO->cwrite(REQUEST->body, body_start, body_len) < 0) {
-        REQUEST->state = REQUEST_ERROR | HTTP_SERVER_ERROR;
+        REQUEST->state.error = true;
+        REQUEST->state.error_code = HTTP_SERVER_ERROR;
         return 1;
     }
 
@@ -299,7 +290,7 @@ on_message_complete(http_parser* parser)
 
     PyDict_Update(REQUEST->headers, wsgi_base_dict);
 
-    REQUEST->state |= REQUEST_PARSE_DONE;
+    REQUEST->state.parse_finished = true;
     return 0;
 }
 

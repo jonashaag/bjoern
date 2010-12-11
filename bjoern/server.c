@@ -13,16 +13,6 @@
 #define LISTEN_BACKLOG  1024
 #define READ_BUFFER_SIZE 1024*8
 
-#define HANDLE_IO_ERROR(n, on_fatal_err) \
-    if(n == -1 || n == 0) { \
-        if(errno == EAGAIN) \
-            goto again; \
-        \
-        print_io_error(); \
-        on_fatal_err; \
-    }
-
-
 static int sockfd;
 
 typedef void ev_io_callback(struct ev_loop*, ev_io*, const int);
@@ -34,8 +24,8 @@ static ev_io_callback ev_io_on_request;
 static ev_io_callback ev_io_on_read;
 static ev_io_callback ev_io_on_write;
 static inline void set_error(Request*, http_status);
-static inline void print_io_error();
 static inline bool set_nonblocking(int fd);
+static bool send_chunk(Request*);
 
 void
 server_run(const char* hostaddr, const int port)
@@ -87,11 +77,15 @@ static void
 ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
 {
     int client_fd;
-    if((client_fd = accept(watcher->fd, NULL, NULL)) < 0)
-        return print_io_error();
+    if((client_fd = accept(watcher->fd, NULL, NULL)) < 0) {
+        DBG("Could not accept() client: errno %d", errno);
+        return;
+    }
 
-    if(!set_nonblocking(client_fd))
-        return print_io_error();
+    if(!set_nonblocking(client_fd)) {
+        DBG("Could not set_nonnblocking() client: errno %d", errno);
+        return;
+    }
 
     Request* request = Request_new(client_fd);
 
@@ -108,23 +102,24 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
 
     DBG_REQ(request, "read %zd bytes", read_bytes);
 
-    request->state = REQUEST_READING;
-
     GIL_LOCK(0);
 
-    HANDLE_IO_ERROR(read_bytes,
-        /* on fatal error */ set_error(request, HTTP_SERVER_ERROR); goto out
-    );
-
-    Request_parse(request, read_buf, read_bytes);
-
-    if(request->state & REQUEST_ERROR) {
-        DBG_REQ(request, "Parse error");
-        set_error(request, request->state ^ REQUEST_ERROR);
+    if(read_bytes == -1) {
+        if(errno != EAGAIN && errno != EWOULDBLOCK) {
+            close(request->client_fd);
+            Request_free(request);
+            ev_io_stop(mainloop, &request->ev_watcher);
+        }
         goto out;
     }
 
-    if(request->state & REQUEST_PARSE_DONE) {
+    Request_parse(request, read_buf, read_bytes);
+
+    if(request->state.error) {
+        DBG_REQ(request, "Parse error");
+        set_error(request, request->state.error_code);
+    }
+    else if(request->state.parse_finished) {
         DBG_REQ(request, "Parse done");
         if(!wsgi_call_application(request)) {
             assert(PyErr_Occurred());
@@ -133,17 +128,15 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
         }
     } else {
         DBG_REQ(request, "Waiting for more data");
-        assert(request->state == REQUEST_READING);
-        goto again;
+        goto out;
     }
 
-out:
     ev_io_stop(mainloop, &request->ev_watcher);
     ev_io_init(&request->ev_watcher, &ev_io_on_write,
                request->client_fd, EV_WRITE);
     ev_io_start(mainloop, &request->ev_watcher);
 
-again:
+out:
     GIL_UNLOCK(0);
     return;
 }
@@ -151,26 +144,34 @@ again:
 static void
 ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
 {
-    Request* request = ADDR_FROM_MEMBER(watcher, Request, ev_watcher);
-
     GIL_LOCK(0);
 
-    if(request->state & REQUEST_RESPONSE_WSGI) {
-        /* request->response is something that the WSGI application returned */
-        if(!wsgi_send_response(request))
-            goto out; /* come around again */
-        if(PyErr_Occurred()) {
-            /* Internal server error. */
-            PyErr_Print();
-            set_error(request, HTTP_SERVER_ERROR);
+    Request* request = ADDR_FROM_MEMBER(watcher, Request, ev_watcher);
+    assert(request->current_chunk);
+
+    if(send_chunk(request))
+        goto notfinished;
+
+    if(request->iterable) {
+        PyObject* next_chunk;
+        DBG_REQ(request, "Getting next iterable chunk.");
+        next_chunk = wsgi_iterable_get_next_chunk(request);
+        if(next_chunk == NULL) {
+            if(PyErr_Occurred()) {
+                /* Internal server error. */
+                PyErr_Print();
+                set_error(request, HTTP_SERVER_ERROR);
+                goto notfinished;
+            }
+            DBG_REQ(request, "Iterable exhausted");
+            goto bye;
         }
+        request->current_chunk = next_chunk;
+        assert(request->current_chunk_p == 0);
+        goto notfinished;
     }
 
-    if(request->state & REQUEST_RESPONSE_STATIC) {
-        /* request->response is a C-string */
-        sendall(request, request->response, strlen(request->response));
-    }
-
+bye:
     DBG_REQ(request, "Done");
 
     /* Everything done, bye client! */
@@ -178,54 +179,76 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
     close(request->client_fd);
     Request_free(request);
 
-out:
+notfinished:
     GIL_UNLOCK(0);
 }
 
-bool
-sendall(Request* request, const char* data, size_t length)
+static bool
+send_chunk(Request* request)
 {
-    ssize_t sent;
-again:
-    while(length) {
-        sent = write(request->client_fd, data, length);
-        HANDLE_IO_ERROR(sent, /* on fatal error */ return false);
-        data += sent;
-        length -= sent;
+    ssize_t sent_bytes;
+
+    assert(request->current_chunk != NULL);
+    assert(request->current_chunk_p != PyString_GET_SIZE(request->current_chunk));
+
+    DBG_REQ(request, "Sending next chunk");
+    sent_bytes = write(
+        request->client_fd,
+        PyString_AS_STRING(request->current_chunk) + request->current_chunk_p,
+        PyString_GET_SIZE(request->current_chunk) - request->current_chunk_p
+    );
+
+    if(sent_bytes == -1) {
+        if(errno == EAGAIN || errno == EWOULDBLOCK) {
+            /* Try again later */
+            return 1;
+        } else {
+            /* Serious transmission failure. Hang up. */
+            fprintf(stderr, "Client %d hit errno %d\n", request->client_fd, errno);
+            Py_DECREF(request->current_chunk);
+            Py_XDECREF(request->iterable);
+            request->iterable = NULL; /* to make ev_io_on_write jump right into 'bye' */
+            return 0;
+        }
     }
-    return true;
+
+    DBG_REQ(request, "Sent %zd bytes from %p", sent_bytes, request->current_chunk);
+    request->current_chunk_p += sent_bytes;
+    if(request->current_chunk_p == PyString_GET_SIZE(request->current_chunk)) {
+        DBG_REQ(request, "Done with string %p", request->current_chunk);
+        Py_DECREF(request->current_chunk);
+        request->current_chunk = NULL;
+        request->current_chunk_p = 0;
+        return 0;
+    }
+    return 1;
 }
 
 static inline void
 set_error(Request* request, http_status status)
 {
-    request->state |= REQUEST_RESPONSE_STATIC;
-    request->state &= ~REQUEST_RESPONSE_WSGI;
-    Py_XDECREF(request->response);
+    const char* msg;
     switch(status) {
         case HTTP_SERVER_ERROR:
-            request->response = "HTTP/1.0 500 Internal Server Error\r\n\r\n" \
-                                "HTTP 500 Internal Server Error :(";
+            msg = "HTTP/1.0 500 Internal Server Error\r\n\r\n" \
+                  "HTTP 500 Internal Server Error :(";
             break;
-
         case HTTP_BAD_REQUEST:
-            request->response = "HTTP/1.0 400 Bad Request\r\n\r\n" \
-                                "You sent a malformed request.";
+            msg = "HTTP/1.0 400 Bad Request\r\n\r\n" \
+                  "You sent a malformed request.";
             break;
-
         case HTTP_LENGTH_REQUIRED:
-            request->response = "HTTP/1.0 411 Length Required\r\n";
+            msg =  "HTTP/1.0 411 Length Required\r\n";
             break;
-
         default:
             assert(0);
     }
-}
+    request->current_chunk = PyString_FromString(msg);
 
-static inline void
-print_io_error()
-{
-    printf("IO error %d\n", errno);
+    if(request->iterable != NULL) {
+        Py_DECREF(request->iterable);
+        request->iterable = NULL;
+    }
 }
 
 static inline bool

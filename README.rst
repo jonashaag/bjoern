@@ -11,7 +11,7 @@ Ryan Dahl's `http_parser`_.
 
 bjoern aims to be *small*, *lightweight* and *very fast*.
 
-* less than 800 SLOC (Source Lines Of Code)
+* less than 1000 SLOC (Source Lines Of Code)
 * memory footprint smaller than a megabyte
 * no threads, coroutines or other crap
 * apparently the fastest WSGI server out there

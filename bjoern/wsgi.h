@@ -1,5 +1,5 @@
 #include "request.h"
 
 bool wsgi_call_application(Request*);
-bool wsgi_send_response(Request*);
+PyObject* wsgi_iterable_get_next_chunk(Request*);
 PyTypeObject StartResponse_Type;

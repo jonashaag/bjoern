@@ -54,10 +54,10 @@ $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.c
 
 
 prepare-build:
-	mkdir -p $(BUILD_DIR)
+	@mkdir -p $(BUILD_DIR)
 
 clean:
-	rm -f $(BUILD_DIR)/*
+	@rm -f $(BUILD_DIR)/*
 
 ab:
 	ab -c 100 -n 10000 'http://127.0.0.1:8080/a/b/c?k=v&k2=v2#fragment'
