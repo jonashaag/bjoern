@@ -16,6 +16,11 @@ there featuring:
 * 100% WSGI compliance (except for the `write callback design mistake`_)
 
 
+What's not Cool
+---------------
+* Not HTTP/1.1 capable (yet).
+
+
 Installing Dependencies
 -----------------------
 Arch Linux::
@@ -24,7 +29,7 @@ Arch Linux::
 
 Ubuntu Linux::
 
-    apt-get install libev
+    sudo aptitude install libev-dev
 
 Mac OS X (using homebrew_)::
 
