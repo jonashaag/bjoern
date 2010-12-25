@@ -1,5 +1,5 @@
-#ifndef __request_h__
-#define __request_h__
+#ifndef BJOERN_REQUEST_H_
+#define BJOERN_REQUEST_H_ 1
 
 #include <ev.h>
 #include "http_parser.h"
@@ -63,4 +63,4 @@ static PyObject
     * _empty_string
 ;
 
-#endif
+#endif /* !BJOERN_REQUEST_H_ */

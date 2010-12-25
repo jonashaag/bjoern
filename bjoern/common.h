@@ -1,5 +1,5 @@
-#ifndef __common_h__
-#define __common_h__
+#ifndef BJOERN_COMMON_H_
+#define BJOERN_COMMON_H_ 1
 
 #include <Python.h>
 #include <stdlib.h>
@@ -53,4 +53,4 @@ typedef enum {
 #define DBG_REFCOUNT_REQ(request, obj) \
     DBG_REQ(request, #obj "->ob_refcnt: %d", obj->ob_refcnt)
 
-#endif
+#endif /* !BJOERN_COMMON_H_ */
