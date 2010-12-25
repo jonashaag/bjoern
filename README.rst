@@ -1,27 +1,36 @@
 bjoern: Fast And Ultra Lightweight Asynchronous WSGI Server
 ===========================================================
 
-::
-
-   sudo pip install bjoern
-
 A screamingly fast, ultra-lightweight asynchronous `WSGI`_ server for CPython,
 written in C using Marc Lehmann's high performance `libev`_ event loop and
 Ryan Dahl's `http_parser`_.
 
-bjoern aims to be *small*, *lightweight* and *very fast*.
+Why It's Cool
+~~~~~~~~~~~~~
+bjoern is the *fastest*, *smallest* and *most lightweight* WSGI server out there,
+featuring
 
-* less than 1000 SLOC (Source Lines Of Code)
-* memory footprint smaller than a megabyte
-* no threads, coroutines or other crap
-* apparently the fastest WSGI server out there
-* 100% WSGI compliant (except for the `write callback design mistake`_)
+* < 1000 Lines of Code
+* Memory footprint ~ 600KB
+* Single-threaded and without coroutines or other crap
+* 100% WSGI compliancy (except for the `write callback design mistake`_)
 
 .. _WSGI:         http://www.python.org/dev/peps/pep-0333/
 .. _libev:        http://software.schmorp.de/pkg/libev.html
 .. _http_parser:  http://github.com/ry/http-parser
 .. _write callback design mistake:
                   http://www.python.org/dev/peps/pep-0333/#the-write-callable
+
+Installation
+~~~~~~~~~~~~
+* *libev* needs to be installed.
+  Arch Linux
+    ``pacman -S libev``
+  Ubuntu
+    ``apt-get install libev``
+  Your Contribution Here
+    Fork me and send a pull request
+* Then ``pip install bjoern`` (or with ``easy_install`` or whatever.)
 
 Usage
 ~~~~~
@@ -33,7 +42,7 @@ Usage
    bjoern.listen(wsgi_application, host, port)
    bjoern.run()
 
-But what about...
+But What About...
 ~~~~~~~~~~~~~~~~~
 Fapws3?
 -------
