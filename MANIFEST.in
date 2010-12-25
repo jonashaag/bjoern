@@ -1,3 +1,5 @@
 include http-parser/http_parser.[ch]
 include bjoern/*
 include LICENSE
+include README
+include AUTHORS
