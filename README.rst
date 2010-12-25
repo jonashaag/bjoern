@@ -82,7 +82,7 @@ Probably too much bloat, too slow, does not scale, buggy, ...
 .. _http_parser:  http://github.com/ry/http-parser
 .. _write callback design mistake:
                   http://www.python.org/dev/peps/pep-0333/#the-write-callable
-.. _homebrew: https://mxcl.github.com/homebrew/
+.. _homebrew: http://mxcl.github.com/homebrew/
 .. _meinheld: https://github.com/mopemope/meinheld/
 .. _uWSGI: http://projects.unbit.it/uwsgi/
 .. _gunicorn: http://gunicorn.org
