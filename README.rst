@@ -21,6 +21,10 @@ featuring
 .. _write callback design mistake:
                   http://www.python.org/dev/peps/pep-0333/#the-write-callable
 
+What's Not So Cool
+------------------
+* Not HTTP/1.1 capable (yet).
+
 Installation
 ~~~~~~~~~~~~
 libev
