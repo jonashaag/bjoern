@@ -23,14 +23,20 @@ featuring
 
 Installation
 ~~~~~~~~~~~~
-* *libev* needs to be installed.
-  Arch Linux
-    ``pacman -S libev``
-  Ubuntu
-    ``apt-get install libev``
-  Your Contribution Here
-    Fork me and send a pull request
-* Then ``pip install bjoern`` (or with ``easy_install`` or whatever.)
+libev
+-----
+Arch Linux
+   ``pacman -S libev``
+Ubuntu
+   ``apt-get install libev``
+Your Contribution Here
+   Fork me and send a pull request
+
+bjoern
+------
+Make sure *libev* is installed and then::
+
+   pip install bjoern
 
 Usage
 ~~~~~
