@@ -1,10 +1,20 @@
 import os
+import glob
 from distutils.core import setup, Extension
 
-SOURCE_FILES = [
-    'http-parser/http_parser.c', 'bjoern/request.c', 'bjoern/bjoernmodule.c',
-    'bjoern/server.c', 'bjoern/wsgi.c'
-]
+SOURCE_FILES = [os.path.join('http-parser', 'http_parser.c')] + \
+               glob.glob(os.path.join('bjoern', '*.c'))
+
+bjoern_extension = Extension(
+    'bjoern',
+    sources       = SOURCE_FILES,
+    libraries     = ['ev'],
+    include_dirs  = ['http-parser'],
+    define_macros = [('WANT_SENDFILE', '1'),
+                     ('WANT_SIGINT_HANDLING', '1')],
+    extra_compile_args = ['-std=c99', '-fno-strict-aliasing', '-Wall',
+                          '-Wextra', '-Wno-unused', '-g', '-fPIC']
+)
 
 setup(
     name         = 'bjoern',
@@ -17,15 +27,7 @@ setup(
     classifiers  = ['Development Status :: 4 - Beta',
                     'License :: OSI Approved :: BSD License',
                     'Programming Language :: C',
+                    'Programming Language :: Python',
                     'Topic :: Internet :: WWW/HTTP :: WSGI :: Server'],
-    ext_modules  = [
-        Extension(
-            'bjoern',
-            sources=SOURCE_FILES,
-            libraries=['ev'],
-            include_dirs=['http-parser'],
-            define_macros=[('WANT_SENDFILE', '1'), ('WANT_SIGINT_HANDLING', '1')],
-            extra_compile_args='-std=c99 -fno-strict-aliasing -Wall -Wextra -Wno-unused -g -fPIC'.split()
-        )
-    ]
+    ext_modules  = [bjoern_extension]
 )
