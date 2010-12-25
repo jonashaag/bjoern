@@ -1,4 +1,21 @@
-*.pyc
+# Ignore temporary files.
+*.bak
+*.bkp
+*.log
+*.py[co]
+*.swp
+*~
+.DS_Store
+.\#*
+._*
+*.o
+*.so
+Desktop.ini
+Thumbs.db
+\#*\#
+__MACOSX__
+
+# Ignore generated directories.
 build/
 dist/
 MANIFEST
