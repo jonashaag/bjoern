@@ -1,5 +1,5 @@
-include http-parser/http_parser.[ch]
-include bjoern/*
+include AUTHORS
 include LICENSE
 include README
-include AUTHORS
+include http-parser/http_parser.[ch]
+recursive-include bjoern *.py *.c *.h
