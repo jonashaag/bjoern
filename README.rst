@@ -16,6 +16,11 @@ there featuring:
 * 100% WSGI compliance (except for the `write callback design mistake`_)
 
 
+What's not Cool
+---------------
+* Not HTTP/1.1 capable (yet).
+
+
 Installing Dependencies
 -----------------------
 Arch Linux::
