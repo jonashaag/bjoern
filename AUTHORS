@@ -1,4 +1,6 @@
 # generated with `git log --pretty="format: %aN <%aE>" | sort | uniq`
+# Maintained manually.
+
 Jonas Haag <jonas@lophus.org>
 Alexander Shigin <shigin@msiu.ru>
 Alice Zoë Bevan–McGregor <alice.mcgregor@me.com>
@@ -6,4 +8,4 @@ Friedrich Weber <fred@reichbier.de>
 Gora Khargosh <gora.khargosh@gmail.com>
 Sebastian Billaudelle <stein@cream-project.org>
 Sergey Shepelev <temotor@gmail.com>
-kkris <kris.kleine@yahoo.de>
+Kristoffer Kleine <kris.kleine@yahoo.de>
