@@ -1,3 +1,5 @@
 [submodule "http-parser"]
 	path = http-parser
-	url = git://github.com/ry/http-parser
+    # url = git://github.com/ry/http-parser
+    # use my branch until the -fPIC pull request has been accepted
+    url = git://github.com/jonashaag/http-parser
