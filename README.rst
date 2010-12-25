@@ -26,7 +26,7 @@ libev
 Arch Linux
    ``pacman -S libev``
 Ubuntu
-   ``apt-get install libev-ev``
+   ``apt-get install libev-dev``
 Mac OS X (using homebrew_)
    ``brew install libev``
 Your Contribution Here
