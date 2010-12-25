@@ -21,6 +21,13 @@ featuring
 .. _write callback design mistake:
                   http://www.python.org/dev/peps/pep-0333/#the-write-callable
 
+Why It's Not Cool
+~~~~~~~~~~~~~~~~~
+
+* Entirely written as a C extension, so portability may be a concern.
+* Not HTTP/1.1 capable (yet).
+
+
 Installation
 ~~~~~~~~~~~~
 libev
