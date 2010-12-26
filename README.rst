@@ -49,41 +49,9 @@ Alternatively, the mainloop can be run separately::
    bjoern.listen(wsgi_application, host, port)
    bjoern.run()
 
-But What About...
-~~~~~~~~~~~~~~~~~
-Fapws3_?
--------
-Sucks. Really, the code is an incredible mess. It likes to segfault.
-
-I tried to patch Fapws so that it would support threading,
-but after about two hours of brain slime feeling, I decided
-to write my own WSGI server -- "Fapws done right".
-
-gunicorn_?
----------
-bjoern is about 5 times faster. Plus gunicorn is too much bloated.
-
-uWSGI_?
-------
-Awesome project, but way too much bloat.
-
-meinheld_?
----------
-Unfortunately now bloated with gunicorn and coroutine/greenlet crap,
-seemed to be a very nice server at first.
-
-$SERVER?
---------
-Probably too much bloat, too slow, does not scale, buggy, ...
-
-
 .. _WSGI:         http://www.python.org/dev/peps/pep-0333/
 .. _libev:        http://software.schmorp.de/pkg/libev.html
 .. _http_parser:  http://github.com/ry/http-parser
 .. _write callback design mistake:
                   http://www.python.org/dev/peps/pep-0333/#the-write-callable
 .. _homebrew: http://mxcl.github.com/homebrew/
-.. _meinheld: https://github.com/mopemope/meinheld/
-.. _uWSGI: http://projects.unbit.it/uwsgi/
-.. _gunicorn: http://gunicorn.org
-.. _Fapws3: http://fapws.org
