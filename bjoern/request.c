@@ -12,7 +12,7 @@ static http_parser_settings parser_settings;
 static PyObject* wsgi_base_dict;
 
 
-Request* Request_new(int client_fd)
+Request* Request_new(int client_fd, const char* client_addr)
 {
     Request* req = _Request_from_prealloc();
     if(req == NULL)
@@ -28,6 +28,8 @@ Request* Request_new(int client_fd)
 #endif
 
     req->client_fd = client_fd;
+    req->headers = PyDict_New();
+    PyDict_SetItem(req->headers, _REMOTE_ADDR, PyString_FromString(client_addr));
     http_parser_init((http_parser*)&req->parser, HTTP_REQUEST);
     req->parser.parser.data = req;
 
@@ -141,7 +143,6 @@ Request* _Request_from_prealloc()
 static int
 on_message_begin(http_parser* parser)
 {
-    REQUEST->headers = PyDict_New();
     PARSER->field_start = NULL;
     PARSER->field_len = 0;
     PARSER->value_start = NULL;
@@ -362,6 +363,7 @@ _request_module_initialize(const char* server_host, const int server_port)
     memset(_preallocd_used, 0, sizeof(char)*REQUEST_PREALLOC_N);
 
     #define _(name) _##name = PyString_FromString(#name)
+    _(REMOTE_ADDR);
     _(PATH_INFO);
     _(QUERY_STRING);
     _(REQUEST_URI);

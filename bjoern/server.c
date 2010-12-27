@@ -77,7 +77,11 @@ static void
 ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
 {
     int client_fd;
-    if((client_fd = accept(watcher->fd, NULL, NULL)) < 0) {
+    struct sockaddr_in sockaddr;
+    socklen_t addrlen;
+
+    addrlen = sizeof(struct sockaddr_in);
+    if((client_fd = accept(watcher->fd, &sockaddr, &addrlen)) < 0) {
         DBG("Could not accept() client: errno %d", errno);
         return;
     }
@@ -87,7 +91,12 @@ ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
         return;
     }
 
-    Request* request = Request_new(client_fd);
+    GIL_LOCK(0);
+    Request* request = Request_new(client_fd, inet_ntoa(sockaddr.sin_addr));
+    GIL_UNLOCK(0);
+
+    DBG_REQ(request, "Accepted client %s:%d on fd %d",
+            inet_ntoa(sockaddr.sin_addr), ntohs(sockaddr.sin_port), client_fd);
 
     ev_io_init(&request->ev_watcher, &ev_io_on_read, client_fd, EV_READ);
     ev_io_start(mainloop, &request->ev_watcher);

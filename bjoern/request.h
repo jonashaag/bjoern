@@ -32,7 +32,7 @@ typedef struct {
     ev_io ev_watcher;
 
     bj_parser parser;
-    PyObject* headers; /* rm. */
+    PyObject* headers;
     PyObject* body;
 
     PyObject* current_chunk;
@@ -41,12 +41,13 @@ typedef struct {
     PyObject* status;
 } Request;
 
-Request* Request_new(int client_fd);
+Request* Request_new(int client_fd, const char* client_addr);
 void Request_parse(Request*, const char*, const size_t);
 void Request_free(Request*);
 
 
 static PyObject
+    * _REMOTE_ADDR,
     * _PATH_INFO,
     * _QUERY_STRING,
     * _REQUEST_URI,
