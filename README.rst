@@ -27,7 +27,7 @@ Arch Linux
    ``pacman -S libev``
 Ubuntu
    ``apt-get install libev-dev``
-Mac OS X (using homebrew_; don't use MacPorts_, see #11)
+Mac OS X (using homebrew_; don't use MacPorts_, see #11_)
    ``brew install libev``
 Your Contribution Here
    Fork me and send a pull request
@@ -54,4 +54,6 @@ Alternatively, the mainloop can be run separately::
 .. _http_parser:  http://github.com/ry/http-parser
 .. _write callback design mistake:
                   http://www.python.org/dev/peps/pep-0333/#the-write-callable
+.. _MacPorts: https://macports.org
+.. _11: https://github.com/jonashaag/bjoern/issues/11/find
 .. _homebrew: http://mxcl.github.com/homebrew/
