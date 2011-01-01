@@ -198,7 +198,8 @@ send_chunk(Request* request)
     ssize_t sent_bytes;
 
     assert(request->current_chunk != NULL);
-    assert(request->current_chunk_p != PyString_GET_SIZE(request->current_chunk));
+    assert(!(request->current_chunk_p == PyString_GET_SIZE(request->current_chunk)
+             && PyString_GET_SIZE(request->current_chunk) != 0));
 
     DBG_REQ(request, "Sending next chunk");
     sent_bytes = write(
