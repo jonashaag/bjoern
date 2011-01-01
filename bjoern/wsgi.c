@@ -1,10 +1,11 @@
 #include "common.h"
-#include "server.h"
 #include "bjoernmodule.h"
 #include "wsgi.h"
 
 static PyKeywordFunc start_response;
 static Py_ssize_t wsgi_getheaders(Request*, PyObject* buf);
+static inline bool inspect_headers(Request*);
+static inline bool should_keep_alive(Request*);
 
 typedef struct {
     PyObject_HEAD
@@ -12,6 +13,13 @@ typedef struct {
 } StartResponse;
 PyTypeObject StartResponse_Type;
 
+#define APPEND_HEADER(request, name, value) \
+    do { \
+        PyObject *n = PyString_FromString(name), *v = (value); \
+        PyObject* tpl = PyTuple_Pack(2, n, v); \
+        PyList_Append(request->headers, tpl); \
+        Py_DECREF(tpl); Py_DECREF(n); Py_DECREF(v); \
+    } while(0)
 
 bool
 wsgi_call_application(Request* request)
@@ -67,17 +75,18 @@ wsgi_call_application(Request* request)
      */
     PyObject* first_chunk = NULL;
 
-    if(PyString_Check(retval)) {
-        /* According to PEP 333 strings should be handled like any other iterable,
-           i.e. sending the response item for item. "item for item" means
-           "char for char" if you have a string. -- I'm not that stupid. */
-        first_chunk = retval;
-    }
-    else if(PyList_Check(retval) && PyList_GET_SIZE(retval) == 1) {
+    if(PyList_Check(retval) && PyList_GET_SIZE(retval) == 1 &&
+       PyString_Check(PyList_GET_ITEM(retval, 0)))
+    {
         /* Optimize the most common case, a single string in a list: */
         first_chunk = PyList_GET_ITEM(retval, 0);
         Py_INCREF(first_chunk);
         Py_DECREF(retval);
+    } else if(PyString_Check(retval)) {
+        /* According to PEP 333 strings should be handled like any other iterable,
+           i.e. sending the response item for item. "item for item" means
+           "char for char" if you have a string. -- I'm not that stupid. */
+        first_chunk = retval;
     } else {
         /* Generic iterable (list of length != 1, generator, ...) */
         PyObject* iter = PyObject_GetIter(retval);
@@ -102,6 +111,23 @@ wsgi_call_application(Request* request)
         return false;
     }
 
+    if(!inspect_headers(request))
+        return NULL;
+
+    if(first_chunk == NULL && request->state.response_length_unknown) {
+        /* No body because the iterator was empty. In case of keep-alive we have
+           to do some extra foo to let the client know there's no body. */
+        request->state.response_length_unknown = false;
+        APPEND_HEADER(request, "Content-Length", PyString_FromString("0"));
+    }
+
+    if(should_keep_alive(request)) {
+        request->state.chunked_response = request->state.response_length_unknown;
+        request->state.keep_alive = true;
+    } else {
+        request->state.keep_alive = false;
+    }
+
     /* Get the headers and concatenate the first body chunk to them.
        In the first place this makes the code more simple because afterwards
        we can throw away the first chunk PyObject; but it also is an optimization:
@@ -117,13 +143,22 @@ wsgi_call_application(Request* request)
     }
 
     if(first_chunk == NULL) {
-        /* The iterator returned by the application was empty. No body. */
         _PyString_Resize(&buf, length);
         goto out;
     }
 
-    assert(first_chunk);
+
+    if(request->state.chunked_response) {
+        DBG_REQ(request, "Chunk chunk is of size %zd", PyString_GET_SIZE(first_chunk));
+        PyObject* new_chunk = wrap_http_chunk_cruft_around(first_chunk);
+        Py_DECREF(first_chunk);
+        assert(PyString_GET_SIZE(new_chunk) >= PyString_GET_SIZE(first_chunk) + 5);
+        first_chunk = new_chunk;
+    }
+
     assert(buf);
+    DBG_REQ(request, "Resize chunk is of size %zd", PyString_GET_SIZE(first_chunk));
+    DBG_REQ(request, "Resizing buffer to %zd bytes", length+PyString_GET_SIZE(first_chunk));
     _PyString_Resize(&buf, length + PyString_GET_SIZE(first_chunk));
     memcpy(PyString_AS_STRING(buf)+length, PyString_AS_STRING(first_chunk),
            PyString_GET_SIZE(first_chunk));
@@ -131,9 +166,38 @@ wsgi_call_application(Request* request)
     Py_DECREF(first_chunk);
 
 out:
-    request->state.headers_sent = true;
+    request->state.wsgi_call_done = true;
     request->current_chunk = buf;
     request->current_chunk_p = 0;
+    return true;
+}
+
+static inline bool
+inspect_headers(Request* request)
+{
+    for(Py_ssize_t i=0; i<PyList_GET_SIZE(request->headers); ++i) {
+        PyObject* tuple = PyList_GET_ITEM(request->headers, i);
+        assert(tuple);
+        TYPECHECK(tuple, PyTuple, "headers", false);
+
+        if(PyTuple_GET_SIZE(tuple) != 2) {
+            PyErr_Format(
+                PyExc_TypeError,
+                "headers must be tuples of length 2, not %zd",
+                PyTuple_GET_SIZE(tuple)
+            );
+            return false;
+        }
+
+        PyObject* field = PyTuple_GET_ITEM(tuple, 0);
+        PyObject* value = PyTuple_GET_ITEM(tuple, 1);
+
+        TYPECHECK(field, PyString, "header tuple items", false);
+        TYPECHECK(value, PyString, "header tuple items", false);
+
+        if(!strcasecmp(PyString_AS_STRING(field), "Content-Length"))
+            request->state.response_length_unknown = false;
+    }
     return true;
 }
 
@@ -148,49 +212,43 @@ wsgi_getheaders(Request* request, PyObject* buf)
             const char* s = src;  \
             while(n--) *bufp++ = *s++; \
         } while(0)
+    #define buf_write2(src) buf_write(src, strlen(src))
 
-    buf_write("HTTP/1.0 ", strlen("HTTP/1.0 "));
+    buf_write("HTTP/1.1 ", strlen("HTTP/1.1 "));
     buf_write(PyString_AS_STRING(request->status),
               PyString_GET_SIZE(request->status));
 
-    PyObject *tuple, *field, *value;
     for(Py_ssize_t i=0; i<PyList_GET_SIZE(request->headers); ++i) {
-        tuple = PyList_GET_ITEM(request->headers, i);
-        assert(tuple);
-        TYPECHECK(tuple, PyTuple, "headers", 0);
-
-        if(PyTuple_GET_SIZE(tuple) != 2) {
-            PyErr_Format(
-                PyExc_TypeError,
-                "headers must be tuples of length 2, not %zd",
-                PyTuple_GET_SIZE(tuple)
-            );
-            return 0;
-        }
-
-        field = PyTuple_GET_ITEM(tuple, 0);
-        value = PyTuple_GET_ITEM(tuple, 1);
-
-        TYPECHECK(field, PyString, "header tuple items", 0);
-        TYPECHECK(value, PyString, "header tuple items", 0);
-
-        buf_write("\r\n", strlen("\r\n"));
+        PyObject *tuple = PyList_GET_ITEM(request->headers, i);
+        PyObject *field = PyTuple_GET_ITEM(tuple, 0),
+                 *value = PyTuple_GET_ITEM(tuple, 1);
+        buf_write2("\r\n");
         buf_write(PyString_AS_STRING(field), PyString_GET_SIZE(field));
-        buf_write(": ", strlen(": "));
+        buf_write2(": ");
         buf_write(PyString_AS_STRING(value), PyString_GET_SIZE(value));
     }
-    buf_write("\r\n\r\n", strlen("\r\n\r\n"));
+    if(request->state.chunked_response)
+        buf_write2("\r\nTransfer-Encoding: chunked");
+    buf_write2("\r\n\r\n");
 
+    assert(bufp - PyString_AS_STRING(buf) > strlen("HTTP/X.X nnn R\r\n\r\n"));
     return bufp - PyString_AS_STRING(buf);
 }
 
 inline PyObject*
 wsgi_iterable_get_next_chunk(Request* request)
 {
-    PyObject* next = PyIter_Next(request->iterable);
-    if(next)
+    /* Get the next item out of ``request->iterable``, skipping empty ones. */
+    PyObject* next;
+    while(true) {
+        next = PyIter_Next(request->iterable);
+        if(next == NULL)
+            return NULL;
         TYPECHECK(next, PyString, "wsgi iterable items", NULL);
-    return next;
+        DBG_REQ(request, "Next chunk is of size %zd", PyString_GET_SIZE(next));
+        if(PyString_GET_SIZE(next))
+            return next;
+    }
 }
 
 static inline void
@@ -242,9 +300,9 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
 
         restore_exception_tuple(exc_info, /* incref items? */ true);
 
-        if(request->state.headers_sent) {
-            /* Headers already sent. According to PEP 333, we should
-             * let the exception propagate in this case. */
+        if(request->state.wsgi_call_done) {
+            /* Too late to change headers. According to PEP 333, we should let
+               the exception propagate in this case. */
             return NULL;
         }
 
@@ -281,3 +339,44 @@ PyTypeObject StartResponse_Type = {
     0, 0, 0, 0, 0, 0, 0, 0, 0,  /* tp_{print,getattr,setattr,compare,...}   */
     start_response              /* tp_call (__call__)                       */
 };
+
+#define F_KEEP_ALIVE 1<<1
+#define have_http11(parser) (parser.http_major > 0 && parser.http_minor > 0)
+
+static inline bool
+should_keep_alive(Request* request)
+{
+    if(!(request->parser.parser.flags & F_KEEP_ALIVE)) {
+        /* Only keep-alive if the client requested it explicitly */
+        return false;
+    }
+    if(request->state.response_length_unknown) {
+      /* If the client wants to keep-alive the connection but we don't know
+         the response length, we can use Transfer-Encoding: chunked on HTTP/1.1.
+         On HTTP/1.0 no such thing exists so there's no other option than closing
+         the connection to indicate the response end. */
+        return have_http11(request->parser.parser);
+    } else {
+        /* If the response length is known we can keep-alive for both 1.0 and 1.1 */
+        return true;
+    }
+}
+
+PyObject*
+wrap_http_chunk_cruft_around(PyObject* chunk) {
+    /* Who the hell decided to use decimal representation for Content-Length
+       but hexadecimal representation for chunk lengths btw!?! Fuck W3C */
+    size_t chunklen = PyString_GET_SIZE(chunk);
+    char buf[strlen("ffffffffffffffff") + 2];
+    size_t n = sprintf(buf, "%x\r\n", chunklen);
+    PyObject* new_chunk = PyString_FromStringAndSize(NULL, n + chunklen + 2);
+    char* new_chunk_p = PyString_AS_STRING(new_chunk);
+    memcpy(new_chunk_p, buf, n);
+    new_chunk_p += n;
+    memcpy(new_chunk_p, PyString_AS_STRING(chunk), chunklen);
+    new_chunk_p += chunklen;
+    *new_chunk_p++ = '\r'; *new_chunk_p = '\n';
+    assert(new_chunk_p == PyString_AS_STRING(new_chunk) + n + chunklen + 1);
+    return new_chunk;
+}
+

@@ -17,7 +17,7 @@ def start():
     def return_404(environ, start_response):
         start_response('404 Not Found', (('Content-Type','text/plain'), ))
         return "URL %s not found" % environ.get('PATH_INFO', 'UNKNOWN')
-        
+
     dispatch = {
         '/tuple': return_tuple,
         '/huge': return_huge_answer,

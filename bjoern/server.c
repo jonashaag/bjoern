@@ -98,7 +98,8 @@ ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
     DBG_REQ(request, "Accepted client %s:%d on fd %d",
             inet_ntoa(sockaddr.sin_addr), ntohs(sockaddr.sin_port), client_fd);
 
-    ev_io_init(&request->ev_watcher, &ev_io_on_read, client_fd, EV_READ);
+    ev_io_init(&request->ev_watcher, &ev_io_on_read,
+               client_fd, EV_READ);
     ev_io_start(mainloop, &request->ev_watcher);
 }
 
@@ -107,14 +108,21 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
 {
     char read_buf[READ_BUFFER_SIZE];
     Request* request = ADDR_FROM_MEMBER(watcher, Request, ev_watcher);
-    ssize_t read_bytes = read(request->client_fd, read_buf, READ_BUFFER_SIZE);
 
-    DBG_REQ(request, "read %zd bytes", read_bytes);
+    ssize_t read_bytes = read(
+        request->client_fd,
+        read_buf,
+        READ_BUFFER_SIZE
+    );
 
     GIL_LOCK(0);
 
-    if(read_bytes == -1) {
+    if(read_bytes <= 0) {
         if(errno != EAGAIN && errno != EWOULDBLOCK) {
+            if(read_bytes == 0)
+                DBG_REQ(request, "Client disconnected");
+            else
+                DBG_REQ(request, "Hit errno %d while read()ing", errno);
             close(request->client_fd);
             Request_free(request);
             ev_io_stop(mainloop, &request->ev_watcher);
@@ -122,9 +130,11 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
         goto out;
     }
 
+    DBG_REQ(request, "read %zd bytes", read_bytes);
+
     Request_parse(request, read_buf, read_bytes);
 
-    if(request->state.error) {
+    if(request->state.error_code) {
         DBG_REQ(request, "Parse error");
         set_error(request, request->state.error_code);
     }
@@ -159,42 +169,66 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
     assert(request->current_chunk);
 
     if(send_chunk(request))
-        goto notfinished;
+        goto out;
 
     if(request->iterable) {
         PyObject* next_chunk;
         DBG_REQ(request, "Getting next iterable chunk.");
         next_chunk = wsgi_iterable_get_next_chunk(request);
-        if(next_chunk == NULL) {
+        if(next_chunk) {
+            if(request->state.chunked_response) {
+                request->current_chunk = wrap_http_chunk_cruft_around(next_chunk);
+                Py_DECREF(next_chunk);
+            } else {
+                request->current_chunk = next_chunk;
+            }
+            assert(request->current_chunk_p == 0);
+            goto out;
+        } else {
             if(PyErr_Occurred()) {
-                /* Internal server error. */
                 PyErr_Print();
-                set_error(request, HTTP_SERVER_ERROR);
-                goto notfinished;
+                /* We can't do anything graceful here because at least one
+                   chunk is already sent... just close the connection */
+                DBG_REQ(request, "Exception in iterator, can not recover");
+                ev_io_stop(mainloop, &request->ev_watcher);
+                close(request->client_fd);
+                Request_free(request);
+                goto out;
             }
             DBG_REQ(request, "Iterable exhausted");
-            goto bye;
+            Py_DECREF(request->iterable);
+            request->iterable = NULL;
+            if(request->state.chunked_response) {
+                /* We have to send a terminating empty chunk + \r\n */
+                DBG_REQ(request, "Sentinel chunk");
+                request->current_chunk = PyString_FromString("0\r\n\r\n");
+                assert(request->current_chunk_p == 0);
+                goto out;
+            }
         }
-        request->current_chunk = next_chunk;
-        assert(request->current_chunk_p == 0);
-        goto notfinished;
     }
 
-bye:
-    DBG_REQ(request, "Done");
-
-    /* Everything done, bye client! */
     ev_io_stop(mainloop, &request->ev_watcher);
-    close(request->client_fd);
-    Request_free(request);
+    if(request->state.keep_alive) {
+        DBG_REQ(request, "done, keep-alive");
+        Request_reset(request, /* decref members? */ true);
+        ev_io_init(&request->ev_watcher, &ev_io_on_read,
+                   request->client_fd, EV_READ);
+        ev_io_start(mainloop, &request->ev_watcher);
+    } else {
+        DBG_REQ(request, "done, close");
+        close(request->client_fd);
+        Request_free(request);
+    }
 
-notfinished:
+out:
     GIL_UNLOCK(0);
 }
 
 static bool
 send_chunk(Request* request)
 {
+    ssize_t chunk_length;
     ssize_t sent_bytes;
 
     assert(request->current_chunk != NULL);
@@ -209,6 +243,7 @@ send_chunk(Request* request)
     );
 
     if(sent_bytes == -1) {
+        error:
         if(errno == EAGAIN || errno == EWOULDBLOCK) {
             /* Try again later */
             return 1;
@@ -222,7 +257,8 @@ send_chunk(Request* request)
         }
     }
 
-    DBG_REQ(request, "Sent %zd bytes from %p", sent_bytes, request->current_chunk);
+    DBG_REQ(request, "Sent %zd/%zd bytes from %p", sent_bytes,
+            PyString_GET_SIZE(request->current_chunk), request->current_chunk);
     request->current_chunk_p += sent_bytes;
     if(request->current_chunk_p == PyString_GET_SIZE(request->current_chunk)) {
         DBG_REQ(request, "Done with string %p", request->current_chunk);
@@ -253,6 +289,7 @@ set_error(Request* request, http_status status)
         default:
             assert(0);
     }
+    assert(!request->state.chunked_response);
     request->current_chunk = PyString_FromString(msg);
 
     if(request->iterable != NULL) {

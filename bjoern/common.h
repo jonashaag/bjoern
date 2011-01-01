@@ -28,7 +28,7 @@
 typedef PyObject* PyKeywordFunc(PyObject* self, PyObject* args, PyObject *kwargs);
 
 typedef enum {
-    HTTP_BAD_REQUEST, HTTP_LENGTH_REQUIRED, HTTP_SERVER_ERROR
+    HTTP_BAD_REQUEST = 1, HTTP_LENGTH_REQUIRED, HTTP_SERVER_ERROR
 } http_status;
 
 #ifdef DEBUG
@@ -52,5 +52,10 @@ typedef enum {
 
 #define DBG_REFCOUNT_REQ(request, obj) \
     DBG_REQ(request, #obj "->ob_refcnt: %d", obj->ob_refcnt)
+
+#ifdef WITHOUT_ASSERTS
+    #undef assert
+    #define assert(...) do{}while(0)
+#endif
 
 #endif

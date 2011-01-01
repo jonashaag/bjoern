@@ -41,7 +41,7 @@ Make sure *libev* is installed and then::
 Usage
 ~~~~~
 ::
-   
+
    bjoern.run(wsgi_application, host, port)
 
 Alternatively, the mainloop can be run separately::

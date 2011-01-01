@@ -38,6 +38,7 @@ else:
 
 def app(environ, start_response):
     app = chose_test()
+    print 'Testing %s...' % app.__name__
     return app(environ, start_response)
 
 import bjoern

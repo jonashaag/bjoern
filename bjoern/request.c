@@ -7,7 +7,8 @@ static Request* _Request_from_prealloc();
 static Request _preallocd[REQUEST_PREALLOC_N];
 static char _preallocd_used[REQUEST_PREALLOC_N];
 
-static PyObject* wsgi_http_header(const char*, const size_t);
+static void request_clean(Request*);
+static PyObject* wsgi_http_header(Request*, const char*, const size_t);
 static http_parser_settings parser_settings;
 static PyObject* wsgi_base_dict;
 
@@ -15,25 +16,26 @@ static PyObject* wsgi_base_dict;
 Request* Request_new(int client_fd, const char* client_addr)
 {
     Request* req = _Request_from_prealloc();
-    if(req == NULL)
-        req = malloc(sizeof(Request));
-    if(req == NULL)
-        return NULL;
-
-    memset(req, 0, sizeof(Request));
-
+    if(req == NULL) req = malloc(sizeof(Request));
+    if(req == NULL) return NULL;
 #ifdef DEBUG
     static unsigned long req_id = 0;
     req->id = req_id++;
 #endif
-
     req->client_fd = client_fd;
-    req->headers = PyDict_New();
-    PyDict_SetItem(req->headers, _REMOTE_ADDR, PyString_FromString(client_addr));
+    req->client_addr = PyString_FromString(client_addr);
     http_parser_init((http_parser*)&req->parser, HTTP_REQUEST);
     req->parser.parser.data = req;
-
+    Request_reset(req, false);
     return req;
+}
+
+void Request_reset(Request* req, bool decref_members)
+{
+    if(decref_members)
+        request_clean(req);
+    memset(&req->state, 0, sizeof(Request) - (size_t)&((Request*)NULL)->state);
+    req->state.response_length_unknown = true;
 }
 
 void Request_parse(Request* request,
@@ -47,21 +49,12 @@ void Request_parse(Request* request,
             return;
     }
 
-    request->state.error = true;
     request->state.error_code = HTTP_BAD_REQUEST;
 }
 
 void Request_free(Request* req)
 {
-    Py_XDECREF(req->iterable);
-    Py_XDECREF(req->body);
-    if(req->headers)
-        assert(req->headers->ob_refcnt >= 1);
-    if(req->status)
-        assert(req->status->ob_refcnt >= 1);
-    Py_XDECREF(req->headers);
-    Py_XDECREF(req->status);
-
+    request_clean(req);
     if(req >= _preallocd &&
        req <= _preallocd+REQUEST_PREALLOC_N*sizeof(Request)) {
         _preallocd_used[req-_preallocd] = false;
@@ -85,6 +78,18 @@ void Request_free(Request* req)
     DBG_REFCOUNT_REQ(req, _HTTP_1_0);
     DBG_REFCOUNT_REQ(req, _empty_string);
 #endif
+}
+
+static void request_clean(Request* req)
+{
+    Py_XDECREF(req->iterable);
+    Py_XDECREF(req->body);
+    if(req->headers)
+        assert(req->headers->ob_refcnt >= 1);
+    if(req->status)
+        assert(req->status->ob_refcnt >= 1);
+    Py_XDECREF(req->headers);
+    Py_XDECREF(req->status);
 }
 
 Request* _Request_from_prealloc()
@@ -143,6 +148,7 @@ Request* _Request_from_prealloc()
 static int
 on_message_begin(http_parser* parser)
 {
+    REQUEST->headers = PyDict_New();
     PARSER->field_start = NULL;
     PARSER->field_len = 0;
     PARSER->value_start = NULL;
@@ -196,7 +202,7 @@ static int on_header_field(http_parser* parser,
     if(PARSER->value_start) {
         /* Store previous header and start a new one */
         _set_header_free_both(
-            wsgi_http_header(PARSER->field_start, PARSER->field_len),
+            wsgi_http_header(REQUEST, PARSER->field_start, PARSER->field_len),
             PyString_FromStringAndSize(PARSER->value_start, PARSER->value_len)
         );
 
@@ -231,7 +237,7 @@ on_headers_complete(http_parser* parser)
 {
     if(PARSER->field_start) {
         _set_header_free_both(
-            wsgi_http_header(PARSER->field_start, PARSER->field_len),
+            wsgi_http_header(REQUEST, PARSER->field_start, PARSER->field_len),
             PyString_FromStringAndSize(PARSER->value_start, PARSER->value_len)
         );
     }
@@ -243,7 +249,6 @@ static int on_body(http_parser* parser,
                    const size_t body_len) {
     if(!REQUEST->body) {
         if(!parser->content_length) {
-            REQUEST->state.error = true;
             REQUEST->state.error_code = HTTP_LENGTH_REQUIRED;
             return 1;
         }
@@ -251,7 +256,6 @@ static int on_body(http_parser* parser,
     }
 
     if(PycStringIO->cwrite(REQUEST->body, body_start, body_len) < 0) {
-        REQUEST->state.error = true;
         REQUEST->state.error_code = HTTP_SERVER_ERROR;
         return 1;
     }
@@ -289,6 +293,11 @@ on_message_complete(http_parser* parser)
         parser->http_minor == 1 ? _HTTP_1_1 : _HTTP_1_0
     );
 
+    _set_header(
+        _REMOTE_ADDR,
+        REQUEST->client_addr
+    );
+
     PyDict_Update(REQUEST->headers, wsgi_base_dict);
 
     REQUEST->state.parse_finished = true;
@@ -309,7 +318,7 @@ string_iequal(const char* a, size_t len, const char* b)
 }
 
 static PyObject*
-wsgi_http_header(const char* data, size_t len)
+wsgi_http_header(Request* request, const char* data, size_t len)
 {
     if(string_iequal(data, len, "Content-Length")) {
         Py_INCREF(_CONTENT_LENGTH);

@@ -9,10 +9,12 @@ void _request_module_initialize(const char* host, const int port);
 
 typedef struct {
     unsigned error_code : 2;
-    unsigned error : 1;
     unsigned parse_finished : 1;
     unsigned start_response_called : 1;
-    unsigned headers_sent : 1;
+    unsigned wsgi_call_done : 1;
+    unsigned keep_alive : 1;
+    unsigned response_length_unknown : 1;
+    unsigned chunked_response : 1;
 } request_state;
 
 typedef struct {
@@ -27,14 +29,16 @@ typedef struct {
 #ifdef DEBUG
     unsigned long id;
 #endif
-    request_state state;
-    int client_fd;
+    bj_parser parser;
     ev_io ev_watcher;
 
-    bj_parser parser;
+    int client_fd;
+    PyObject* client_addr;
+
+    request_state state;
+
     PyObject* headers;
     PyObject* body;
-
     PyObject* current_chunk;
     Py_ssize_t current_chunk_p;
     PyObject* iterable;
@@ -42,9 +46,9 @@ typedef struct {
 } Request;
 
 Request* Request_new(int client_fd, const char* client_addr);
+void Request_reset(Request*, bool decref_members);
 void Request_parse(Request*, const char*, const size_t);
 void Request_free(Request*);
-
 
 static PyObject
     * _REMOTE_ADDR,
