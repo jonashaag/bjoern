@@ -7,29 +7,17 @@
 #include <stdbool.h>
 #include <string.h>
 
-#define GIL_LOCK(n) PyGILState_STATE _gilstate_##n = PyGILState_Ensure()
-#define GIL_UNLOCK(n) PyGILState_Release(_gilstate_##n)
-
-#define ADDR_FROM_MEMBER(ptr, strct, mem) (strct*)((size_t)ptr - (size_t)(&(((strct*)NULL)->mem)));
-
-#define TYPECHECK2(what, check_type, print_type, errmsg_name, failure_retval) \
-    if(!what || !check_type##_Check(what)) { \
-        assert(Py_TYPE(what ? what : Py_None)->tp_name); \
-        PyErr_Format(\
-            PyExc_TypeError, \
-            errmsg_name " must be of type %s, not %s", \
-            print_type##_Type.tp_name, \
-            Py_TYPE(what ? what : Py_None)->tp_name \
-        ); \
-        return failure_retval; \
-    }
-#define TYPECHECK(what, type, ...) TYPECHECK2(what, type, type, __VA_ARGS__);
-
-typedef PyObject* PyKeywordFunc(PyObject* self, PyObject* args, PyObject *kwargs);
+void _initialize_static_strings();
+bool string_iequal(const char* a, size_t len, const char* b);
 
 typedef enum {
     HTTP_BAD_REQUEST = 1, HTTP_LENGTH_REQUIRED, HTTP_SERVER_ERROR
 } http_status;
+
+PyObject *_REMOTE_ADDR, *_PATH_INFO, *_QUERY_STRING, *_REQUEST_URI,
+         *_HTTP_FRAGMENT, *_REQUEST_METHOD, *_SERVER_PROTOCOL, *_GET,
+         *_Content_Length, *_Content_Type, *_Connection, *_HTTP_1_1,
+         *_HTTP_1_0, *_wsgi_input, *_close, *_0, *_empty_string;
 
 #ifdef DEBUG
     #define DBG_REQ(request, ...) \

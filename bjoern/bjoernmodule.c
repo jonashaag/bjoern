@@ -26,7 +26,7 @@ listen(PyObject* self, PyObject* args)
     if(!PyArg_ParseTuple(args, "Osi:run/listen", &wsgi_app, &host, &port))
         return NULL;
 
-    _request_module_initialize(host, port);
+    _initialize_request_module(host, port);
 
     if(!server_init(host, port)) {
         PyErr_Format(
@@ -50,7 +50,7 @@ static PyObject*
 run(PyObject* self, PyObject* args)
 {
     if(PyTuple_GET_SIZE(args) == 0) {
-        // bjoern.run()
+        /* bjoern.run() */
         if(!wsgi_app) {
             PyErr_SetString(
                 PyExc_RuntimeError,
@@ -60,7 +60,7 @@ run(PyObject* self, PyObject* args)
             return NULL;
         }
     } else {
-        // bjoern.run(app, host, port)
+        /* bjoern.run(app, host, port) */
         if(!listen(self, args))
             return NULL;
     }
@@ -78,9 +78,8 @@ static PyMethodDef Bjoern_FunctionTable[] = {
 
 PyMODINIT_FUNC initbjoern()
 {
-    int ready = PyType_Ready(&StartResponse_Type);
-    assert(ready == 0);
-    assert(StartResponse_Type.tp_flags & Py_TPFLAGS_READY);
+    _initialize_wsgi_module();
+    _initialize_static_strings();
 
     PyObject* bjoern_module = Py_InitModule("bjoern", Bjoern_FunctionTable);
     PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(ii)", 1, 0));

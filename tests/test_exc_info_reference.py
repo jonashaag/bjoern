@@ -1,6 +1,7 @@
 alist = []
 
 def app(env, start_response):
+    '''
     print 'foo!'
     print type(start_response)
     print dir(start_response)
@@ -13,6 +14,7 @@ def app(env, start_response):
         class x(c): pass
     except:
         import traceback; traceback.print_exc()
+    '''
     start_response('200 alright', [])
     try:
         a

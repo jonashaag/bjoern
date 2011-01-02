@@ -2,128 +2,78 @@
 #include <cStringIO.h>
 #include "request.h"
 
-#define REQUEST_PREALLOC_N 100
-static Request* _Request_from_prealloc();
-static Request _preallocd[REQUEST_PREALLOC_N];
-static char _preallocd_used[REQUEST_PREALLOC_N];
-
-static void request_clean(Request*);
 static PyObject* wsgi_http_header(Request*, const char*, const size_t);
 static http_parser_settings parser_settings;
-static PyObject* wsgi_base_dict;
-
+static PyObject* wsgi_base_dict = NULL;
 
 Request* Request_new(int client_fd, const char* client_addr)
 {
-    Request* req = _Request_from_prealloc();
-    if(req == NULL) req = malloc(sizeof(Request));
-    if(req == NULL) return NULL;
+    Request* request = malloc(sizeof(Request));
 #ifdef DEBUG
-    static unsigned long req_id = 0;
-    req->id = req_id++;
+    static unsigned long request_id = 0;
+    request->id = request_id++;
 #endif
-    req->client_fd = client_fd;
-    req->client_addr = PyString_FromString(client_addr);
-    http_parser_init((http_parser*)&req->parser, HTTP_REQUEST);
-    req->parser.parser.data = req;
-    Request_reset(req, false);
-    return req;
+    request->client_fd = client_fd;
+    request->client_addr = PyString_FromString(client_addr);
+    http_parser_init((http_parser*)&request->parser, HTTP_REQUEST);
+    request->parser.parser.data = request;
+    Request_reset(request);
+    return request;
 }
 
-void Request_reset(Request* req, bool decref_members)
+void Request_reset(Request* request)
 {
-    if(decref_members)
-        request_clean(req);
-    memset(&req->state, 0, sizeof(Request) - (size_t)&((Request*)NULL)->state);
-    req->state.response_length_unknown = true;
+    memset(&request->state, 0, sizeof(Request) - (size_t)&((Request*)NULL)->state);
+    request->state.response_length_unknown = true;
 }
+
+void Request_free(Request* request)
+{
+    Request_clean(request);
+    free(request);
+}
+
+void Request_clean(Request* request)
+{
+    Py_XDECREF(request->iterable);
+    Py_XDECREF(request->body);
+    if(request->headers)
+        assert(request->headers->ob_refcnt >= 1);
+    if(request->status)
+        assert(request->status->ob_refcnt >= 1);
+    Py_XDECREF(request->headers);
+    Py_XDECREF(request->status);
+}
+
+/* Parse stuff */
 
 void Request_parse(Request* request,
                    const char* data,
                    const size_t data_len) {
-    if(data_len) {
-        size_t nparsed = http_parser_execute((http_parser*)&request->parser,
-                                             &parser_settings, data, data_len);
-        if(nparsed == data_len)
-            /* everything fine */
-            return;
-    }
-
-    request->state.error_code = HTTP_BAD_REQUEST;
+    assert(data_len);
+    size_t nparsed = http_parser_execute((http_parser*)&request->parser,
+                                         &parser_settings, data, data_len);
+    if(nparsed != data_len)
+        request->state.error_code = HTTP_BAD_REQUEST;
 }
 
-void Request_free(Request* req)
-{
-    request_clean(req);
-    if(req >= _preallocd &&
-       req <= _preallocd+REQUEST_PREALLOC_N*sizeof(Request)) {
-        _preallocd_used[req-_preallocd] = false;
-    } else {
-        free(req);
-    }
-
-#if 0
-    DBG_REFCOUNT_REQ(req, _PATH_INFO);
-    DBG_REFCOUNT_REQ(req, _QUERY_STRING);
-    DBG_REFCOUNT_REQ(req, _REQUEST_URI);
-    DBG_REFCOUNT_REQ(req, _HTTP_FRAGMENT);
-    DBG_REFCOUNT_REQ(req, _REQUEST_METHOD);
-    DBG_REFCOUNT_REQ(req, _wsgi_input);
-    DBG_REFCOUNT_REQ(req, _SERVER_PROTOCOL);
-    DBG_REFCOUNT_REQ(req, _GET);
-    DBG_REFCOUNT_REQ(req, _POST);
-    DBG_REFCOUNT_REQ(req, _CONTENT_LENGTH);
-    DBG_REFCOUNT_REQ(req, _CONTENT_TYPE);
-    DBG_REFCOUNT_REQ(req, _HTTP_1_1);
-    DBG_REFCOUNT_REQ(req, _HTTP_1_0);
-    DBG_REFCOUNT_REQ(req, _empty_string);
-#endif
-}
-
-static void request_clean(Request* req)
-{
-    Py_XDECREF(req->iterable);
-    Py_XDECREF(req->body);
-    if(req->headers)
-        assert(req->headers->ob_refcnt >= 1);
-    if(req->status)
-        assert(req->status->ob_refcnt >= 1);
-    Py_XDECREF(req->headers);
-    Py_XDECREF(req->status);
-}
-
-Request* _Request_from_prealloc()
-{
-    static int i = 0;
-    for(; i<REQUEST_PREALLOC_N; ++i) {
-        if(!_preallocd_used[i]) {
-            _preallocd_used[i] = true;
-            return &_preallocd[i];
-        }
-    }
-    i = 0;
-    return NULL;
-}
-
-
-/*
- * PARSER CALLBACKS
- */
+static int a;
+static void x() {}
 
 #define REQUEST ((Request*)parser->data)
 #define PARSER  ((bj_parser*)parser)
 #define _update_length(name) \
     /* Update the len of a header field/value.
-
-       Short explaination of the pointer arithmetics fun used here:
-
-         [old header data ] ...stuff... [ new header data ]
-         ^-------------- A -------------^--------B--------^
-
-       A = XXX_start - PARSER->XXX_start
-       B = XXX_len
-       A + B = old header start to new header end
-    */ \
+     *
+     * Short explaination of the pointer arithmetics fun used here:
+     *
+     *   [old header data ] ...stuff... [ new header data ]
+     *   ^-------------- A -------------^--------B--------^
+     *
+     * A = XXX_start - PARSER->XXX_start
+     * B = XXX_len
+     * A + B = old header start to new header end
+     */ \
     do {\
         PARSER->name##_len = (name##_start - PARSER->name##_start) \
                                 + name##_len; \
@@ -145,8 +95,7 @@ Request* _Request_from_prealloc()
         Py_DECREF(val); \
     } while(0)
 
-static int
-on_message_begin(http_parser* parser)
+static int on_message_begin(http_parser* parser)
 {
     REQUEST->headers = PyDict_New();
     PARSER->field_start = NULL;
@@ -222,9 +171,9 @@ static int on_header_field(http_parser* parser,
 static int on_header_value(http_parser* parser,
                            const char* value_start,
                            const size_t value_len) {
-    if(PARSER->value_start)
+    if(PARSER->value_start) {
         _update_length(value);
-    else {
+    } else {
         /* Start a new value */
         PARSER->value_start = value_start;
         PARSER->value_len = value_len;
@@ -232,8 +181,7 @@ static int on_header_value(http_parser* parser,
     return 0;
 }
 
-static int
-on_headers_complete(http_parser* parser)
+static int on_headers_complete(http_parser* parser)
 {
     if(PARSER->field_start) {
         _set_header_free_both(
@@ -263,40 +211,25 @@ static int on_body(http_parser* parser,
     return 0;
 }
 
-static int
-on_message_complete(http_parser* parser)
+static int on_message_complete(http_parser* parser)
 {
-    switch(parser->method) {
-        case HTTP_GET:
-            _set_header(_REQUEST_METHOD, _GET);
-            break;
-        case HTTP_POST:
-            _set_header(_REQUEST_METHOD, _POST);
-            break;
-        default:
-            _set_header_free_value(
-                _REQUEST_METHOD,
-                PyString_FromString(http_method_str(parser->method))
-            );
+    /* SERVER_PROTOCOL */
+    _set_header(_SERVER_PROTOCOL, parser->http_minor == 1 ? _HTTP_1_1 : _HTTP_1_0);
+    /* REQUEST_METHOD */
+    if(parser->method == HTTP_GET) {
+        /* I love useless micro-optimizations. */
+        _set_header(_REQUEST_METHOD, _GET);
+    } else {
+    _set_header_free_value(_REQUEST_METHOD,
+        PyString_FromString(http_method_str(parser->method)));
     }
-
-    _set_header_free_value(
-        _wsgi_input,
+    /* REMOTE_ADDR */
+    _set_header(_REMOTE_ADDR, REQUEST->client_addr);
+    /* wsgi.input */
+    _set_header_free_value(_wsgi_input,
         PycStringIO->NewInput(
             REQUEST->body ? PycStringIO->cgetvalue(REQUEST->body)
-                          : _empty_string
-        )
-    );
-
-    _set_header(
-        _SERVER_PROTOCOL,
-        parser->http_minor == 1 ? _HTTP_1_1 : _HTTP_1_0
-    );
-
-    _set_header(
-        _REMOTE_ADDR,
-        REQUEST->client_addr
-    );
+                          : _empty_string));
 
     PyDict_Update(REQUEST->headers, wsgi_base_dict);
 
@@ -305,28 +238,17 @@ on_message_complete(http_parser* parser)
 }
 
 
-/* Case insensitive string comparison */
-static inline bool
-string_iequal(const char* a, size_t len, const char* b)
-{
-    if(len != strlen(b))
-        return false;
-    for(size_t i=0; i<len; ++i)
-        if(a[i] != b[i] && a[i] - ('a'-'A') != b[i])
-            return false;
-    return true;
-}
-
 static PyObject*
 wsgi_http_header(Request* request, const char* data, size_t len)
 {
+    /* Do not rename Content-Length and Content-Type */
     if(string_iequal(data, len, "Content-Length")) {
-        Py_INCREF(_CONTENT_LENGTH);
-        return _CONTENT_LENGTH;
+        Py_INCREF(_Content_Length);
+        return _Content_Length;
     }
     if(string_iequal(data, len, "Content-Type")) {
-        Py_INCREF(_CONTENT_TYPE);
-        return _CONTENT_TYPE;
+        Py_INCREF(_Content_Type);
+        return _Content_Type;
     }
 
     PyObject* obj = PyString_FromStringAndSize(/* empty string */ NULL,
@@ -339,14 +261,14 @@ wsgi_http_header(Request* request, const char* data, size_t len)
     *dest++ = 'P';
     *dest++ = '_';
 
-    for(; len; --len, ++data, ++dest) {
-        char c = *data;
+    while(--len) {
+        char c = *data++;
         if(c == '-')
-            *dest = '_';
+            *dest++ = '_';
         else if(c >= 'a' && c <= 'z')
-            *dest = c - ('a'-'A');
+            *dest++ = c - ('a'-'A');
         else
-            *dest = c;
+            *dest++ = c;
     }
     return obj;
 }
@@ -366,80 +288,58 @@ parser_settings = {
     .on_message_complete = on_message_complete
 };
 
-void
-_request_module_initialize(const char* server_host, const int server_port)
+void _initialize_request_module(const char* server_host, const int server_port)
 {
-    memset(_preallocd_used, 0, sizeof(char)*REQUEST_PREALLOC_N);
+    if(wsgi_base_dict == NULL) {
+        PycString_IMPORT;
+        wsgi_base_dict = PyDict_New();
 
-    #define _(name) _##name = PyString_FromString(#name)
-    _(REMOTE_ADDR);
-    _(PATH_INFO);
-    _(QUERY_STRING);
-    _(REQUEST_URI);
-    _(HTTP_FRAGMENT);
-    _(REQUEST_METHOD);
-    _(SERVER_PROTOCOL);
-    _(GET);
-    _(POST);
-    _(CONTENT_LENGTH);
-    _(CONTENT_TYPE);
-    _HTTP_1_1 = PyString_FromString("HTTP/1.1");
-    _HTTP_1_0 = PyString_FromString("HTTP/1.0");
-    _wsgi_input = PyString_FromString("wsgi.input");
-    _empty_string = PyString_FromString("");
+        /* dct['wsgi.version'] = (1, 0) */
+        PyDict_SetItemString(
+            wsgi_base_dict,
+            "wsgi.version",
+            PyTuple_Pack(2, PyInt_FromLong(1), PyInt_FromLong(0))
+        );
 
-    PycString_IMPORT;
+        /* dct['wsgi.url_scheme'] = 'http'
+         * (This can be hard-coded as there is no TLS support in bjoern.) */
+        PyDict_SetItemString(
+            wsgi_base_dict,
+            "wsgi.url_scheme",
+            PyString_FromString("http")
+        );
 
-    wsgi_base_dict = PyDict_New();
+        /* dct['wsgi.errors'] = sys.stderr */
+        PyDict_SetItemString(
+            wsgi_base_dict,
+            "wsgi.errors",
+            PySys_GetObject("stderr")
+        );
 
-    /* dct['wsgi.version'] = (1, 0) */
-    PyDict_SetItemString(
-        wsgi_base_dict,
-        "wsgi.version",
-        PyTuple_Pack(2, PyInt_FromLong(1), PyInt_FromLong(0))
-    );
+        /* dct['wsgi.multithread'] = True
+         * If I correctly interpret the WSGI specs, this means
+         * "Can the server be ran in a thread?" */
+        PyDict_SetItemString(
+            wsgi_base_dict,
+            "wsgi.multithread",
+            Py_True
+        );
 
-    /* dct['wsgi.url_scheme'] = 'http'
-     * (This can be hard-coded as there is no TLS support in bjoern.)
-     */
-    PyDict_SetItemString(
-        wsgi_base_dict,
-        "wsgi.url_scheme",
-        PyString_FromString("http")
-    );
+        /* dct['wsgi.multiprocess'] = True
+         * ... and this one "Can the server process be forked?" */
+        PyDict_SetItemString(
+            wsgi_base_dict,
+            "wsgi.multiprocess",
+            Py_True
+        );
 
-    /* dct['wsgi.errors'] = sys.stderr */
-    PyDict_SetItemString(
-        wsgi_base_dict,
-        "wsgi.errors",
-        PySys_GetObject("stderr")
-    );
-
-    /* dct['wsgi.multithread'] = True
-     * If I correctly interpret the WSGI specs, this means
-     * "Can the server be ran in a thread?"
-     */
-    PyDict_SetItemString(
-        wsgi_base_dict,
-        "wsgi.multithread",
-        Py_True
-    );
-
-    /* dct['wsgi.multiprocess'] = True
-     * ... and this one "Can the server process be forked?"
-     */
-    PyDict_SetItemString(
-        wsgi_base_dict,
-        "wsgi.multiprocess",
-        Py_True
-    );
-
-    /* dct['wsgi.run_once'] = False (bjoern is no CGI gateway) */
-    PyDict_SetItemString(
-        wsgi_base_dict,
-        "wsgi.run_once",
-        Py_False
-    );
+        /* dct['wsgi.run_once'] = False (bjoern is no CGI gateway) */
+        PyDict_SetItemString(
+            wsgi_base_dict,
+            "wsgi.run_once",
+            Py_False
+        );
+    }
 
     PyDict_SetItemString(
         wsgi_base_dict,

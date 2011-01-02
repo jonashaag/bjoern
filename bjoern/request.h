@@ -5,7 +5,7 @@
 #include "http_parser.h"
 #include "common.h"
 
-void _request_module_initialize(const char* host, const int port);
+void _initialize_request_module(const char* host, const int port);
 
 typedef struct {
     unsigned error_code : 2;
@@ -45,27 +45,13 @@ typedef struct {
     PyObject* status;
 } Request;
 
-Request* Request_new(int client_fd, const char* client_addr);
-void Request_reset(Request*, bool decref_members);
-void Request_parse(Request*, const char*, const size_t);
-void Request_free(Request*);
+#define REQUEST_FROM_WATCHER(watcher) \
+    (Request*)((size_t)watcher - (size_t)(&(((Request*)NULL)->ev_watcher)));
 
-static PyObject
-    * _REMOTE_ADDR,
-    * _PATH_INFO,
-    * _QUERY_STRING,
-    * _REQUEST_URI,
-    * _HTTP_FRAGMENT,
-    * _REQUEST_METHOD,
-    * _wsgi_input,
-    * _SERVER_PROTOCOL,
-    * _GET,
-    * _POST,
-    * _CONTENT_LENGTH,
-    * _CONTENT_TYPE,
-    * _HTTP_1_1,
-    * _HTTP_1_0,
-    * _empty_string
-;
+Request* Request_new(int client_fd, const char* client_addr);
+void Request_parse(Request*, const char*, const size_t);
+void Request_reset(Request*);
+void Request_clean(Request*);
+void Request_free(Request*);
 
 #endif
