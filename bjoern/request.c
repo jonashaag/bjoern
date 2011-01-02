@@ -261,7 +261,7 @@ wsgi_http_header(Request* request, const char* data, size_t len)
     *dest++ = 'P';
     *dest++ = '_';
 
-    while(--len) {
+    while(len--) {
         char c = *data++;
         if(c == '-')
             *dest++ = '_';
