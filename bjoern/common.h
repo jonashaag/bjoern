@@ -8,7 +8,8 @@
 #include <string.h>
 
 void _initialize_static_strings();
-bool string_iequal(const char* a, size_t len, const char* b);
+size_t unquote_url(const char* url, const size_t len, char* buf);
+bool string_iequal(const char* a, const size_t len, const char* b);
 
 typedef enum {
     HTTP_BAD_REQUEST = 1, HTTP_LENGTH_REQUIRED, HTTP_SERVER_ERROR
