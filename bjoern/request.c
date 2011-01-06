@@ -108,11 +108,14 @@ static int on_message_begin(http_parser* parser)
 static int on_path(http_parser* parser,
                    const char* path_start,
                    const size_t path_len) {
-    _set_header_free_value(
-        _PATH_INFO,
-        PyString_FromStringAndSize(path_start, path_len)
-    );
-    return 0;
+    char buf[path_len];
+    size_t len = unquote_url(path_start, path_len, buf);
+    if(len) {
+        _set_header_free_value(_PATH_INFO, PyString_FromStringAndSize(buf, len));
+        return 0;
+    } else {
+        return 1;
+    }
 }
 
 static int on_query_string(http_parser* parser,
