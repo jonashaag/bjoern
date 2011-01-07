@@ -127,16 +127,6 @@ static int on_query_string(http_parser* parser,
     return 0;
 }
 
-static int on_url(http_parser* parser,
-                  const char* url_start,
-                  const size_t url_len) {
-    _set_header_free_value(
-        _REQUEST_URI,
-        PyString_FromStringAndSize(url_start, url_len)
-    );
-    return 0;
-}
-
 static int on_fragment(http_parser* parser,
                        const char* fragm_start,
                        const size_t fragm_len) {
@@ -215,7 +205,7 @@ static int on_body(http_parser* parser,
 
 static int on_message_complete(http_parser* parser)
 {
-    /* SERVER_PROTOCOL */
+    /* SERVER_PROTOCOL (REQUEST_PROTOCOL) */
     _set_header(_SERVER_PROTOCOL, parser->http_minor == 1 ? _HTTP_1_1 : _HTTP_1_0);
     /* REQUEST_METHOD */
     if(parser->method == HTTP_GET) {
@@ -281,7 +271,7 @@ parser_settings = {
     .on_message_begin    = on_message_begin,
     .on_path             = on_path,
     .on_query_string     = on_query_string,
-    .on_url              = on_url,
+    .on_url              = NULL,
     .on_fragment         = on_fragment,
     .on_header_field     = on_header_field,
     .on_header_value     = on_header_value,
