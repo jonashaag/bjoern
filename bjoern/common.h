@@ -8,7 +8,7 @@
 #include <string.h>
 
 void _initialize_static_strings();
-size_t unquote_url(const char* url, const size_t len, char* buf);
+size_t unquote_url_inplace(char* url, size_t len);
 bool string_iequal(const char* a, const size_t len, const char* b);
 
 typedef enum {
