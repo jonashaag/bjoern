@@ -5,7 +5,8 @@
                   (c >= 'A' && c <= 'F') ? (c - 'A' + 10) : NOHEX)
 #define NOHEX -1
 
-size_t unquote_url_inplace(char* url, size_t len) {
+size_t unquote_url_inplace(char* url, size_t len)
+{
     for(char *p=url, *end=url+len; url != end; ++url, ++p) {
         if(*url == '%') {
             if(url >= end-2) {
@@ -25,24 +26,12 @@ size_t unquote_url_inplace(char* url, size_t len) {
     return len;
 }
 
-/* Case insensitive string comparison */
-bool string_iequal(const char* a, const size_t len, const char* b)
+void _initialize_static_strings()
 {
-    if(len != strlen(b))
-        return false;
-    for(size_t i=0; i<len; ++i)
-        if(a[i] != b[i] && a[i] - ('a'-'A') != b[i])
-            return false;
-    return true;
-}
-
-void _initialize_static_strings() {
     #define _(name) _##name = PyString_FromString(#name)
     _(REMOTE_ADDR); _(PATH_INFO); _(QUERY_STRING);
-    _(HTTP_FRAGMENT); _(REQUEST_METHOD); _(SERVER_PROTOCOL); _(GET);
-    _(close); _(0); _(Connection);
-    _Content_Length = PyString_FromString("Content-Length");
-    _Content_Type = PyString_FromString("Content-Type");
+    _(REQUEST_METHOD); _(SERVER_PROTOCOL); _(GET);
+    _(HTTP_CONTENT_LENGTH); _(CONTENT_LENGTH); _(HTTP_CONTENT_TYPE); _(CONTENT_TYPE);
     _HTTP_1_1 = PyString_FromString("HTTP/1.1");
     _HTTP_1_0 = PyString_FromString("HTTP/1.0");
     _wsgi_input = PyString_FromString("wsgi.input");

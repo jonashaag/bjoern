@@ -2,6 +2,7 @@
 #include <cStringIO.h>
 #include "request.h"
 
+static inline void PyDict_ReplaceKey(PyObject* dict, PyObject* k1, PyObject* k2);
 static PyObject* wsgi_http_header(Request*, const char*, const size_t);
 static http_parser_settings parser_settings;
 static PyObject* wsgi_base_dict = NULL;
@@ -127,16 +128,6 @@ static int on_query_string(http_parser* parser,
     return 0;
 }
 
-static int on_fragment(http_parser* parser,
-                       const char* fragm_start,
-                       const size_t fragm_len) {
-    _set_header_free_value(
-        _HTTP_FRAGMENT,
-        PyString_FromStringAndSize(fragm_start, fragm_len)
-    );
-    return 0;
-}
-
 static int on_header_field(http_parser* parser,
                            const char* field_start,
                            const size_t field_len) {
@@ -205,8 +196,13 @@ static int on_body(http_parser* parser,
 
 static int on_message_complete(http_parser* parser)
 {
+    /* HTTP_CONTENT_{LENGTH,TYPE} -> CONTENT_{LENGTH,TYPE} */
+    PyDict_ReplaceKey(REQUEST->headers, _HTTP_CONTENT_LENGTH, _CONTENT_LENGTH);
+    PyDict_ReplaceKey(REQUEST->headers, _HTTP_CONTENT_TYPE, _CONTENT_TYPE);
+
     /* SERVER_PROTOCOL (REQUEST_PROTOCOL) */
     _set_header(_SERVER_PROTOCOL, parser->http_minor == 1 ? _HTTP_1_1 : _HTTP_1_0);
+
     /* REQUEST_METHOD */
     if(parser->method == HTTP_GET) {
         /* I love useless micro-optimizations. */
@@ -215,8 +211,10 @@ static int on_message_complete(http_parser* parser)
     _set_header_free_value(_REQUEST_METHOD,
         PyString_FromString(http_method_str(parser->method)));
     }
+
     /* REMOTE_ADDR */
     _set_header(_REMOTE_ADDR, REQUEST->client_addr);
+
     /* wsgi.input */
     _set_header_free_value(_wsgi_input,
         PycStringIO->NewInput(
@@ -233,16 +231,6 @@ static int on_message_complete(http_parser* parser)
 static PyObject*
 wsgi_http_header(Request* request, const char* data, size_t len)
 {
-    /* Do not rename Content-Length and Content-Type */
-    if(string_iequal(data, len, "Content-Length")) {
-        Py_INCREF(_Content_Length);
-        return _Content_Length;
-    }
-    if(string_iequal(data, len, "Content-Type")) {
-        Py_INCREF(_Content_Type);
-        return _Content_Type;
-    }
-
     PyObject* obj = PyString_FromStringAndSize(/* empty string */ NULL,
                                                len+strlen("HTTP_"));
     char* dest = PyString_AS_STRING(obj);
@@ -265,6 +253,18 @@ wsgi_http_header(Request* request, const char* data, size_t len)
     return obj;
 }
 
+static inline void
+PyDict_ReplaceKey(PyObject* dict, PyObject* old_key, PyObject* new_key)
+{
+    PyObject* value = PyDict_GetItem(dict, old_key);
+    if(value) {
+        Py_INCREF(value);
+        PyDict_DelItem(dict, old_key);
+        PyDict_SetItem(dict, new_key, value);
+        Py_DECREF(value);
+    }
+}
+
 
 static http_parser_settings
 parser_settings = {
@@ -272,7 +272,7 @@ parser_settings = {
     .on_path             = on_path,
     .on_query_string     = on_query_string,
     .on_url              = NULL,
-    .on_fragment         = on_fragment,
+    .on_fragment         = NULL,
     .on_header_field     = on_header_field,
     .on_header_value     = on_header_value,
     .on_headers_complete = on_headers_complete,

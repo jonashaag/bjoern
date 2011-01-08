@@ -7,18 +7,14 @@
 #include <stdbool.h>
 #include <string.h>
 
-void _initialize_static_strings();
+enum http_status { HTTP_BAD_REQUEST = 1, HTTP_LENGTH_REQUIRED, HTTP_SERVER_ERROR };
+
 size_t unquote_url_inplace(char* url, size_t len);
-bool string_iequal(const char* a, const size_t len, const char* b);
+void _initialize_static_strings();
 
-typedef enum {
-    HTTP_BAD_REQUEST = 1, HTTP_LENGTH_REQUIRED, HTTP_SERVER_ERROR
-} http_status;
-
-PyObject *_REMOTE_ADDR, *_PATH_INFO, *_QUERY_STRING,
-         *_HTTP_FRAGMENT, *_REQUEST_METHOD, *_SERVER_PROTOCOL,
-         *_GET, *_HTTP_1_1, *_HTTP_1_0, *_Content_Length, *_Content_Type,
-         *_Connection, *_wsgi_input, *_close, *_0, *_empty_string;
+PyObject *_REMOTE_ADDR, *_PATH_INFO, *_QUERY_STRING, *_REQUEST_METHOD, *_GET,
+         *_HTTP_CONTENT_LENGTH, *_CONTENT_LENGTH, *_HTTP_CONTENT_TYPE, *_CONTENT_TYPE,
+         *_SERVER_PROTOCOL, *_HTTP_1_1, *_HTTP_1_0, *_wsgi_input, *_empty_string;
 
 #ifdef DEBUG
     #define DBG_REQ(request, ...) \

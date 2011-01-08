@@ -2,18 +2,10 @@
 #include "bjoernmodule.h"
 #include "wsgi.h"
 
-#define ASSERT_ISINSTANCE(what, type, ...) ASSERT_ISINSTANCE_IMPL(what, type, type, __VA_ARGS__);
-#define ASSERT_ISINSTANCE_IMPL(what, check_type, print_type, errmsg_name, failure_retval) \
-    if(!what || !check_type##_Check(what)) { \
-        assert(Py_TYPE(what ? what : Py_None)->tp_name); \
-        PyErr_Format(\
-            PyExc_TypeError, \
-            errmsg_name " must be of type %s, not %s", \
-            print_type##_Type.tp_name, \
-            Py_TYPE(what ? what : Py_None)->tp_name \
-        ); \
-        return failure_retval; \
-    }
+#define TYPE_ERROR_INNER(what, expected, ...) \
+    PyErr_Format(PyExc_TypeError, what " must be " expected " " __VA_ARGS__)
+#define TYPE_ERROR(what, expected, got) \
+    TYPE_ERROR_INNER(what, expected, "(got '%.200s' object instead)", Py_TYPE(got)->tp_name)
 
 static PyObject* (start_response)(PyObject* self, PyObject* args, PyObject *kwargs);
 static Py_ssize_t wsgi_getheaders(Request*, PyObject* buf);
@@ -24,7 +16,6 @@ typedef struct {
     PyObject_HEAD
     Request* request;
 } StartResponse;
-
 
 bool
 wsgi_call_application(Request* request)
@@ -103,8 +94,8 @@ wsgi_call_application(Request* request)
         /* Generic iterable (list of length != 1, generator, ...) */
         PyObject* iter = PyObject_GetIter(retval);
         Py_DECREF(retval);
-        ASSERT_ISINSTANCE_IMPL(iter, PyIter, PySeqIter,
-                               "wsgi application return value", false);
+        if(iter == NULL)
+            return false;
         request->iterable = iter;
         first_chunk = wsgi_iterable_get_next_chunk(request);
         if(first_chunk == NULL && PyErr_Occurred())
@@ -117,15 +108,12 @@ wsgi_call_application(Request* request)
          * was an iterator, there's no chance start_response could be called
          * before. See above if you don't understand what I say. */
         PyErr_SetString(
-            PyExc_TypeError,
+            PyExc_RuntimeError,
             "wsgi application returned before start_response was called"
         );
         Py_DECREF(first_chunk);
         return false;
     }
-
-    if(!inspect_headers(request))
-        return NULL;
 
     if(should_keep_alive(request)) {
         request->state.chunked_response = request->state.response_length_unknown;
@@ -177,32 +165,30 @@ out:
 static inline bool
 inspect_headers(Request* request)
 {
-    for(Py_ssize_t i=0; i<PyList_GET_SIZE(request->headers); ++i) {
-        PyObject* tuple = PyList_GET_ITEM(request->headers, i);
-        assert(tuple);
-        ASSERT_ISINSTANCE(tuple, PyTuple, "headers", false);
+    Py_ssize_t i;
+    PyObject* tuple;
 
-        if(PyTuple_GET_SIZE(tuple) != 2) {
-            PyErr_Format(
-                PyExc_TypeError,
-                "headers must be tuples of length 2, not %zd",
-                PyTuple_GET_SIZE(tuple)
-            );
-            return false;
-        }
+    for(i=0; i<PyList_GET_SIZE(request->headers); ++i) {
+        tuple = PyList_GET_ITEM(request->headers, i);
+
+        if(!PyTuple_Check(tuple) || PyTuple_GET_SIZE(tuple) != 2)
+            goto err;
 
         PyObject* field = PyTuple_GET_ITEM(tuple, 0);
         PyObject* value = PyTuple_GET_ITEM(tuple, 1);
 
-        ASSERT_ISINSTANCE(field, PyString, "header tuple items", false);
-        ASSERT_ISINSTANCE(value, PyString, "header tuple items", false);
+        if(!PyString_Check(field) || !PyString_Check(value))
+            goto err;
 
-        if(string_iequal(PyString_AS_STRING(field), PyString_GET_SIZE(field),
-                        "Content-Length")) {
+        if(!strncasecmp(PyString_AS_STRING(field), "Content-Length", PyString_GET_SIZE(field)))
             request->state.response_length_unknown = false;
-        }
     }
     return true;
+
+err:
+    TYPE_ERROR_INNER("start_response argument 2", "a list of 2-tuples",
+        "(found invalid '%.200s' object at position %d)", Py_TYPE(tuple)->tp_name, i);
+    return false;
 }
 
 static Py_ssize_t
@@ -247,9 +233,14 @@ wsgi_iterable_get_next_chunk(Request* request)
         next = PyIter_Next(request->iterable);
         if(next == NULL)
             return NULL;
-        ASSERT_ISINSTANCE(next, PyString, "wsgi iterable items", NULL);
+        if(!PyString_Check(next)) {
+            TYPE_ERROR("wsgi iterable items", "strings", next);
+            Py_DECREF(next);
+            return NULL;
+        }
         if(PyString_GET_SIZE(next))
             return next;
+        Py_DECREF(next);
     }
 }
 
@@ -276,10 +267,9 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
     if(request->state.start_response_called) {
         /* not the first call of start_response --
          * throw away any previous status and headers. */
-        Py_DECREF(request->status);
-        Py_DECREF(request->headers);
-        request->status = NULL;
-        request->headers = NULL;
+        Py_CLEAR(request->status);
+        Py_CLEAR(request->headers);
+        request->state.response_length_unknown = false;
     }
 
     PyObject* status = NULL;
@@ -289,14 +279,8 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
         return NULL;
 
     if(exc_info) {
-        ASSERT_ISINSTANCE(exc_info, PyTuple, "start_response argument 3", NULL);
-        if(PyTuple_GET_SIZE(exc_info) != 3) {
-            PyErr_Format(
-                PyExc_TypeError,
-                "start_response argument 3 must be a tuple of length 3, "
-                "not of length %zd",
-                PyTuple_GET_SIZE(exc_info)
-            );
+        if(!PyTuple_Check(exc_info) || PyTuple_GET_SIZE(exc_info) != 3) {
+            TYPE_ERROR("start_response argument 3", "a 3-tuple", exc_info);
             return NULL;
         }
 
@@ -318,14 +302,27 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
         return NULL;
     }
 
-    ASSERT_ISINSTANCE(status, PyString, "start_response argument 1", NULL);
-    ASSERT_ISINSTANCE(headers, PyList, "start_response argument 2", NULL);
+    if(!PyString_Check(status)) {
+        TYPE_ERROR("start_response argument 1", "a 'status reason' string", status);
+        return NULL;
+    }
+    if(!PyList_Check(headers)) {
+        TYPE_ERROR("start response argument 2", "a list of 2-tuples", headers);
+        return NULL;
+    }
 
-    Py_INCREF(status);
-    Py_INCREF(headers);
+    request->headers = headers;
+
+    if(!inspect_headers(request)) {
+        request->headers = NULL;
+        return NULL;
+    }
 
     request->status = status;
-    request->headers = headers;
+
+    Py_INCREF(request->status);
+    Py_INCREF(request->headers);
+
     request->state.start_response_called = true;
 
     Py_RETURN_NONE;
