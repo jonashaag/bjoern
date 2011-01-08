@@ -1,0 +1,11 @@
+1.1
+    - Implemented HTTP/1.1 and 1.0 persistent connections as well as HTTP/1.1
+      chunked responses
+    - Added 'REMOTE_ADDR' (client's IP address) to the WSGI dictionary (#18)
+    - Fixed a possible inifite loop. Thanks to Alexander Shigin for adivce and tests
+    - Split 'bjoern.run' into '.listen' and '.run' while not breaking the old
+      API (contributed by Sergey Shepelev)
+    - Bug fixes (#24, #26, #27, ...)
+
+1.0 (Dec 2010)
+    First release on PyPI
