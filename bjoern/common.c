@@ -38,7 +38,7 @@ bool string_iequal(const char* a, const size_t len, const char* b)
 
 void _initialize_static_strings() {
     #define _(name) _##name = PyString_FromString(#name)
-    _(REMOTE_ADDR); _(PATH_INFO); _(QUERY_STRING); _(REQUEST_URI);
+    _(REMOTE_ADDR); _(PATH_INFO); _(QUERY_STRING);
     _(HTTP_FRAGMENT); _(REQUEST_METHOD); _(SERVER_PROTOCOL); _(GET);
     _(close); _(0); _(Connection);
     _Content_Length = PyString_FromString("Content-Length");
