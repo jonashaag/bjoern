@@ -1,0 +1,17 @@
+import random
+
+def invalid_header_type(environ, start_response):
+    start_response('200 ok', None)
+    return ['yo']
+
+def invalid_header_tuple(environ, start_response):
+    tuples = {1: (), 2: ('a', 'b', 'c'), 3: ('a',)}
+    start_response('200 ok', [tuples[random.randint(1, 3)]])
+    return ['yo']
+
+def invalid_header_tuple_item(environ, start_response):
+    start_response('200 ok', (object(), object()))
+    return ['yo']
+
+import bjoern
+bjoern.run(invalid_header_type, '0.0.0.0', 8080)
