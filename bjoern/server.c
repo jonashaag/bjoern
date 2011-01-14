@@ -128,7 +128,7 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
 
   Request* request = REQUEST_FROM_WATCHER(watcher);
 
-  ssize_t read_bytes = read(
+  Py_ssize_t read_bytes = read(
     request->client_fd,
     read_buf,
     READ_BUFFER_SIZE
@@ -249,8 +249,8 @@ out:
 static bool
 send_chunk(Request* request)
 {
-  ssize_t chunk_length;
-  ssize_t sent_bytes;
+  Py_ssize_t chunk_length;
+  Py_ssize_t sent_bytes;
 
   assert(request->current_chunk != NULL);
   assert(!(request->current_chunk_p == PyString_GET_SIZE(request->current_chunk)

@@ -2,7 +2,6 @@
         TODO/BUGS
     =================
 
-* ssize_t -> Py_ssize_t
 * wsgi_getheaders: get rid of buf_write (but memcpy is bad for that small strings)
 * wsgi_iterable_get_next_chunk: refactor
 * sendfile
