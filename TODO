@@ -3,7 +3,6 @@
     =================
 
 * ssize_t -> Py_ssize_t
-* There's a memory leak after ~ 20,000 requests (two `make ab` runs)
 * wsgi_getheaders: get rid of buf_write (but memcpy is bad for that small strings)
 * wsgi_iterable_get_next_chunk: refactor
 * sendfile

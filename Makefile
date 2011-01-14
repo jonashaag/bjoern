@@ -69,7 +69,7 @@ test:
 	cd tests && python ~/dev/wsgitest/runner.py
 
 valgrind:
-	valgrind --leak-check=full --show-reachable=yes python tests/hello.py
+	valgrind --leak-check=full --show-reachable=yes python tests/empty.py
 
 callgrind:
 	valgrind --tool=callgrind python tests/wsgitest-round-robin.py

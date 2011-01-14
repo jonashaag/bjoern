@@ -44,6 +44,7 @@ void Request_clean(Request* request)
     assert(request->status->ob_refcnt >= 1);
   Py_XDECREF(request->headers);
   Py_XDECREF(request->status);
+  Py_DECREF(request->client_addr);
 }
 
 /* Parse stuff */
