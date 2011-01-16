@@ -1,6 +1,7 @@
 #include "common.h"
 #include "bjoernmodule.h"
 #include "wsgi.h"
+#include "py3.h"
 
 #define TYPE_ERROR_INNER(what, expected, ...) \
   PyErr_Format(PyExc_TypeError, what " must be " expected " " __VA_ARGS__)
@@ -221,7 +222,9 @@ wsgi_getheaders(Request* request, PyObject* buf)
     buf_write2("\r\nTransfer-Encoding: chunked");
   buf_write2("\r\n\r\n");
 
-  return bufp - PyString_AS_STRING(buf);
+  char* bufz = PyString_AS_STRING(buf);
+
+  return bufp - bufz;
 }
 
 inline PyObject*

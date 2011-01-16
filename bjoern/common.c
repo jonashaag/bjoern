@@ -1,4 +1,5 @@
 #include "common.h"
+#include "py3.h"
 
 #define UNHEX(c) ((c >= '0' && c <= '9') ? (c - '0') : \
                   (c >= 'a' && c <= 'f') ? (c - 'a' + 10) : \
@@ -28,7 +29,11 @@ size_t unquote_url_inplace(char* url, size_t len)
 
 void _initialize_static_strings()
 {
-  #define _(name) _##name = PyString_FromString(#name)
+  #if PY_MAJOR_VERSION >= 3
+    #define _(name) _##name = PyBytes_FromString(#name)
+  #else
+    #define _(name) _##name = PyString_FromString(#name)
+  #endif
   _(REMOTE_ADDR); _(PATH_INFO); _(QUERY_STRING);
   _(REQUEST_METHOD); _(SERVER_PROTOCOL); _(GET);
   _(HTTP_CONTENT_LENGTH); _(CONTENT_LENGTH); _(HTTP_CONTENT_TYPE); _(CONTENT_TYPE);

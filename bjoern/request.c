@@ -1,6 +1,12 @@
 #include <Python.h>
-#include <cStringIO.h>
 #include "request.h"
+#include "py3.h"
+
+#if PY_MAJOR_VERSION >= 3
+  #define PyInt_FromLong PyLong_FromLong
+#else
+  #include <cStringIO.h>
+#endif
 
 static inline void PyDict_ReplaceKey(PyObject* dict, PyObject* k1, PyObject* k2);
 static PyObject* wsgi_http_header(Request*, const char*, const size_t);
@@ -166,9 +172,17 @@ on_body(http_parser* parser, const char* body, const size_t len)
       REQUEST->state.error_code = HTTP_LENGTH_REQUIRED;
       return 1;
     }
-    REQUEST->body = PycStringIO->NewOutput(parser->content_length);
+    #if PY_MAJOR_VERSION >= 3
+      REQUEST->body = PyBytes_FromStringAndSize(NULL, parser->content_length);
+    #else
+      REQUEST->body = PycStringIO->NewOutput(parser->content_length);
+    #endif
   }
-  if(PycStringIO->cwrite(REQUEST->body, body, len) < 0) {
+  #if PY_MAJOR_VERSION >= 3
+    if (memcpy(REQUEST->body, body, len) < 0) {
+  #else
+    if(PycStringIO->cwrite(REQUEST->body, body, len) < 0) {
+  #endif
     REQUEST->state.error_code = HTTP_SERVER_ERROR;
     return 1;
   }
@@ -198,10 +212,15 @@ on_message_complete(http_parser* parser)
   _set_header(_REMOTE_ADDR, REQUEST->client_addr);
 
   /* wsgi.input */
-  _set_header_free_value(
+  _set_header(
     _wsgi_input,
-    PycStringIO->NewInput(REQUEST->body ? PycStringIO->cgetvalue(REQUEST->body)
-                                        : _empty_string)
+    #if PY_MAJOR_VERSION >= 3
+      PyBytes_FromString(REQUEST->body)
+    #else
+      PycStringIO->NewInput(REQUEST->body ?
+                            PycStringIO->cgetvalue(REQUEST->body) :
+                            _empty_string)
+    #endif
   );
 
   PyDict_Update(REQUEST->headers, wsgi_base_dict);
@@ -258,7 +277,9 @@ parser_settings = {
 void _initialize_request_module(const char* server_host, const int server_port)
 {
   if(wsgi_base_dict == NULL) {
-    PycString_IMPORT;
+    #if PY_MAJOR_VERSION < 3
+      PycString_IMPORT;
+    #endif
     wsgi_base_dict = PyDict_New();
 
     /* dct['wsgi.version'] = (1, 0) */

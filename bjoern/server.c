@@ -9,6 +9,7 @@
 #include "common.h"
 #include "wsgi.h"
 #include "server.h"
+#include "py3.h"
 
 #define LISTEN_BACKLOG  1024
 #define READ_BUFFER_SIZE 64*1024
