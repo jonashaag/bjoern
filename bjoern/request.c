@@ -1,12 +1,6 @@
 #include <Python.h>
 #include "request.h"
-#include "py3.h"
-
-#if PY_MAJOR_VERSION >= 3
-  #define PyInt_FromLong PyLong_FromLong
-#else
-  #include <cStringIO.h>
-#endif
+#include "py2to3.h"
 
 static inline void PyDict_ReplaceKey(PyObject* dict, PyObject* k1, PyObject* k2);
 static PyObject* wsgi_http_header(Request*, const char*, const size_t);
@@ -21,7 +15,7 @@ Request* Request_new(int client_fd, const char* client_addr)
   request->id = request_id++;
 #endif
   request->client_fd = client_fd;
-  request->client_addr = PyString_FromString(client_addr);
+  request->client_addr = PyUnicode_FromString(client_addr);
   http_parser_init((http_parser*)&request->parser, HTTP_REQUEST);
   request->parser.parser.data = request;
   Request_reset(request);
@@ -110,13 +104,13 @@ static int on_path(http_parser* parser, char* path, size_t len)
 {
   if(!(len = unquote_url_inplace(path, len)))
     return 1;
-  _set_header_free_value(_PATH_INFO, PyString_FromStringAndSize(path, len));
+  _set_header_free_value(_PATH_INFO, PyUnicode_FromStringAndSize(path, len));
   return 0;
 }
 
 static int on_query_string(http_parser* parser, const char* query, size_t len)
 {
-  _set_header_free_value(_QUERY_STRING, PyString_FromStringAndSize(query, len));
+  _set_header_free_value(_QUERY_STRING, PyUnicode_FromStringAndSize(query, len));
   return 0;
 }
 
@@ -126,7 +120,7 @@ static int on_header_field(http_parser* parser, const char* field, size_t len)
     /* Store previous header and start a new one */
     _set_header_free_both(
       wsgi_http_header(REQUEST, PARSER->field_start, PARSER->field_len),
-      PyString_FromStringAndSize(PARSER->value_start, PARSER->value_len)
+      PyUnicode_FromStringAndSize(PARSER->value_start, PARSER->value_len)
     );
   } else if(PARSER->field_start) {
     UPDATE_LENGTH(field);
@@ -158,7 +152,7 @@ on_headers_complete(http_parser* parser)
   if(PARSER->field_start) {
     _set_header_free_both(
       wsgi_http_header(REQUEST, PARSER->field_start, PARSER->field_len),
-      PyString_FromStringAndSize(PARSER->value_start, PARSER->value_len)
+      PyUnicode_FromStringAndSize(PARSER->value_start, PARSER->value_len)
     );
   }
   return 0;
@@ -172,17 +166,9 @@ on_body(http_parser* parser, const char* body, const size_t len)
       REQUEST->state.error_code = HTTP_LENGTH_REQUIRED;
       return 1;
     }
-    #if PY_MAJOR_VERSION >= 3
-      REQUEST->body = PyBytes_FromStringAndSize(NULL, parser->content_length);
-    #else
-      REQUEST->body = PycStringIO->NewOutput(parser->content_length);
-    #endif
+    REQUEST->body = PyBytes_FromStringAndSize(NULL, parser->content_length);
   }
-  #if PY_MAJOR_VERSION >= 3
-    if (memcpy(REQUEST->body, body, len) < 0) {
-  #else
-    if(PycStringIO->cwrite(REQUEST->body, body, len) < 0) {
-  #endif
+  if(memcpy(REQUEST->body, body, len) < 0) {
     REQUEST->state.error_code = HTTP_SERVER_ERROR;
     return 1;
   }
@@ -205,7 +191,7 @@ on_message_complete(http_parser* parser)
     _set_header(_REQUEST_METHOD, _GET);
   } else {
     _set_header_free_value(_REQUEST_METHOD,
-      PyString_FromString(http_method_str(parser->method)));
+      PyUnicode_FromString(http_method_str(parser->method)));
   }
 
   /* REMOTE_ADDR */
@@ -214,13 +200,7 @@ on_message_complete(http_parser* parser)
   /* wsgi.input */
   _set_header(
     _wsgi_input,
-    #if PY_MAJOR_VERSION >= 3
-      PyBytes_FromString(REQUEST->body)
-    #else
-      PycStringIO->NewInput(REQUEST->body ?
-                            PycStringIO->cgetvalue(REQUEST->body) :
-                            _empty_string)
-    #endif
+    PyBytes_FromString(REQUEST->body ? REQUEST->body : _empty_string)
   );
 
   PyDict_Update(REQUEST->headers, wsgi_base_dict);
@@ -233,8 +213,8 @@ on_message_complete(http_parser* parser)
 static PyObject*
 wsgi_http_header(Request* request, const char* data, size_t len)
 {
-  PyObject* obj = PyString_FromStringAndSize(NULL, len+strlen("HTTP_"));
-  char* dest = PyString_AS_STRING(obj);
+  PyObject* obj = PyUnicode_FromStringAndSize(NULL, len+strlen("HTTP_"));
+  char* dest = PyUnicode_AS_UNICODE(obj);
 
   *dest++ = 'H';
   *dest++ = 'T';
@@ -277,9 +257,6 @@ parser_settings = {
 void _initialize_request_module(const char* server_host, const int server_port)
 {
   if(wsgi_base_dict == NULL) {
-    #if PY_MAJOR_VERSION < 3
-      PycString_IMPORT;
-    #endif
     wsgi_base_dict = PyDict_New();
 
     /* dct['wsgi.version'] = (1, 0) */
@@ -294,7 +271,7 @@ void _initialize_request_module(const char* server_host, const int server_port)
     PyDict_SetItemString(
       wsgi_base_dict,
       "wsgi.url_scheme",
-      PyString_FromString("http")
+      PyUnicode_FromString("http")
     );
 
     /* dct['wsgi.errors'] = sys.stderr */
@@ -332,12 +309,12 @@ void _initialize_request_module(const char* server_host, const int server_port)
   PyDict_SetItemString(
     wsgi_base_dict,
     "SERVER_NAME",
-    PyString_FromString(server_host)
+    PyUnicode_FromString(server_host)
   );
 
   PyDict_SetItemString(
     wsgi_base_dict,
     "SERVER_PORT",
-    PyString_FromFormat("%d", server_port)
+    PyUnicode_FromFormat("%d", server_port)
   );
 }

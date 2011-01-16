@@ -3,7 +3,6 @@
 #include "wsgi.h"
 #include "bjoernmodule.h"
 
-
 PyDoc_STRVAR(listen_doc,
 "listen(application, host, port) -> None\n\n \
 \
@@ -70,18 +69,6 @@ run(PyObject* self, PyObject* args)
   Py_RETURN_NONE;
 }
 
-
-struct module_state {
-  PyObject *error;
-};
-
-#if PY_MAJOR_VERSION >= 3
-  #define GETSTATE(m) ((struct module_state*)PyModule_GetState(m))
-#else
-  #define GETSTATE(m) (&_state)
-  static struct module_state _state;
-#endif
-
 static PyMethodDef Bjoern_FunctionTable[] = {
   {"run", run, METH_VARARGS, run_doc},
   {"listen", listen, METH_VARARGS, listen_doc},
@@ -89,30 +76,21 @@ static PyMethodDef Bjoern_FunctionTable[] = {
 };
 
 #if PY_MAJOR_VERSION >= 3
-  static int bjoern_traverse(PyObject *m, visitproc visit, void *arg) {
-    Py_VISIT(GETSTATE(m)->error);
-    return 0;
-  }
-  static int bjoern_clear(PyObject *m) {
-    Py_CLEAR(GETSTATE(m)->error);
-    return 0;
-  }
   static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
     "bjoern",
     NULL,
-    sizeof(struct module_state),
+    -1,
     Bjoern_FunctionTable,
     NULL,
-    bjoern_traverse,
-    bjoern_clear,
+    NULL,
+    NULL,
     NULL
   };
-  #define INITERROR return NULL
+
   PyObject *
   PyInit_bjoern(void)
 #else
-  #define INITERROR return
   void
   initbjoern(void)
 #endif
@@ -125,16 +103,6 @@ static PyMethodDef Bjoern_FunctionTable[] = {
   #else
     PyObject* bjoern_module = Py_InitModule("bjoern", Bjoern_FunctionTable);
   #endif
-
-  if (bjoern_module == NULL)
-    INITERROR;
-  struct module_state *st = GETSTATE(bjoern_module);
-  
-  st->error = PyErr_NewException("bjoern.Error", NULL, NULL);
-  if (st->error == NULL) {
-    Py_DECREF(bjoern_module);
-    INITERROR;
-  }
 
   PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(ii)", 1, 0));
 
