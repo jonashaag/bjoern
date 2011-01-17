@@ -261,6 +261,13 @@ void _initialize_request_module(const char* server_host, const int server_port)
     PycString_IMPORT;
     wsgi_base_dict = PyDict_New();
 
+    /* dct['SCRIPT_NAME'] = '' */
+    PyDict_SetItemString(
+      wsgi_base_dict,
+      "SCRIPT_NAME",
+      _empty_string
+    );
+
     /* dct['wsgi.version'] = (1, 0) */
     PyDict_SetItemString(
       wsgi_base_dict,
