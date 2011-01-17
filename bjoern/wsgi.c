@@ -92,11 +92,10 @@ wsgi_call_application(Request* request)
     }
   } else {
     /* Generic iterable (list of length != 1, generator, ...) */
-    PyObject* iter = PyObject_GetIter(retval);
-    Py_DECREF(retval);
-    if(iter == NULL)
+    request->iterable = retval;
+    request->iterator = PyObject_GetIter(retval);
+    if(request->iterator == NULL)
       return false;
-    request->iterable = iter;
     first_chunk = wsgi_iterable_get_next_chunk(request);
     if(first_chunk == NULL && PyErr_Occurred())
       return false;
@@ -122,7 +121,7 @@ wsgi_call_application(Request* request)
     request->state.keep_alive = false;
   }
 
-  /* Get the headers and concatenate the first body chunk to them.
+  /* Get the headers and concatenate the first body chunk.
    * In the first place this makes the code more simple because afterwards
    * we can throw away the first chunk PyObject; but it also is an optimization:
    * At least for small responses, the complete response could be sent with
@@ -230,7 +229,7 @@ wsgi_iterable_get_next_chunk(Request* request)
   /* Get the next item out of ``request->iterable``, skipping empty ones. */
   PyObject* next;
   while(true) {
-    next = PyIter_Next(request->iterable);
+    next = PyIter_Next(request->iterator);
     if(next == NULL)
       return NULL;
     if(!PyString_Check(next)) {

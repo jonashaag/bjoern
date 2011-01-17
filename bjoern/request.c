@@ -37,7 +37,20 @@ void Request_free(Request* request)
 
 void Request_clean(Request* request)
 {
-  Py_XDECREF(request->iterable);
+  if(request->iterable) {
+    /* Call 'iterable.close()' if available */
+    PyObject* close_method = PyObject_GetAttr(request->iterable, _close);
+    if(close_method == NULL) {
+      if(PyErr_ExceptionMatches(PyExc_AttributeError))
+        PyErr_Clear();
+    } else {
+      PyObject_CallObject(close_method, NULL);
+      Py_DECREF(close_method);
+    }
+    if(PyErr_Occurred()) PyErr_Print();
+    Py_DECREF(request->iterable);
+  }
+  Py_XDECREF(request->iterator);
   Py_XDECREF(request->body);
   if(request->headers)
     assert(request->headers->ob_refcnt >= 1);

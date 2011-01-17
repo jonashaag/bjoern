@@ -155,14 +155,14 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
     DBG_REQ(request, "Parse error");
     request->current_chunk = PyString_FromString(
       http_error_messages[request->state.error_code]);
-    assert(request->iterable == NULL);
+    assert(request->iterator == NULL);
   }
   else if(request->state.parse_finished) {
     if(!wsgi_call_application(request)) {
       assert(PyErr_Occurred());
       PyErr_Print();
       assert(!request->state.chunked_response);
-      Py_XCLEAR(request->iterable);
+      Py_XCLEAR(request->iterator);
       request->current_chunk = PyString_FromString(
         http_error_messages[HTTP_SERVER_ERROR]);
     }
@@ -192,7 +192,7 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
   if(send_chunk(request))
     goto out;
 
-  if(request->iterable) {
+  if(request->iterator) {
     PyObject* next_chunk;
     next_chunk = wsgi_iterable_get_next_chunk(request);
     if(next_chunk) {
@@ -215,8 +215,7 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
         Request_free(request);
         goto out;
       }
-      Py_DECREF(request->iterable);
-      request->iterable = NULL;
+      Py_CLEAR(request->iterator);
     }
   }
 
@@ -271,7 +270,7 @@ send_chunk(Request* request)
       /* Serious transmission failure. Hang up. */
       fprintf(stderr, "Client %d hit errno %d\n", request->client_fd, errno);
       Py_DECREF(request->current_chunk);
-      Py_XCLEAR(request->iterable);
+      Py_XCLEAR(request->iterator);
       request->state.keep_alive = false;
       return false;
     }
@@ -279,8 +278,7 @@ send_chunk(Request* request)
 
   request->current_chunk_p += sent_bytes;
   if(request->current_chunk_p == PyString_GET_SIZE(request->current_chunk)) {
-    Py_DECREF(request->current_chunk);
-    request->current_chunk = NULL;
+    Py_CLEAR(request->current_chunk);
     request->current_chunk_p = 0;
     return false;
   }
