@@ -82,5 +82,5 @@ PyMODINIT_FUNC initbjoern()
   _initialize_static_strings();
 
   PyObject* bjoern_module = Py_InitModule("bjoern", Bjoern_FunctionTable);
-  PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(ii)", 1, 0));
+  PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(ii)", 1, 1));
 }
