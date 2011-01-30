@@ -7,6 +7,14 @@ static PyObject* wsgi_http_header(Request*, const char*, const size_t);
 static http_parser_settings parser_settings;
 static PyObject* wsgi_base_dict = NULL;
 
+/* Non-public type from cStringIO I abuse in on_body */
+typedef struct {
+  PyObject_HEAD
+  char *buf;
+  Py_ssize_t pos, string_size;
+  PyObject *pbuf;
+} Iobject;
+
 Request* Request_new(int client_fd, const char* client_addr)
 {
   Request* request = malloc(sizeof(Request));
@@ -51,7 +59,6 @@ void Request_clean(Request* request)
     Py_DECREF(request->iterable);
   }
   Py_XDECREF(request->iterator);
-  Py_XDECREF(request->body);
   if(request->headers)
     assert(request->headers->ob_refcnt >= 1);
   if(request->status)
@@ -172,19 +179,26 @@ on_headers_complete(http_parser* parser)
 }
 
 static int
-on_body(http_parser* parser, const char* body, const size_t len)
+on_body(http_parser* parser, const char* data, const size_t len)
 {
-  if(!REQUEST->body) {
+  Iobject* body;
+
+  body = (Iobject*)PyDict_GetItem(REQUEST->headers, _wsgi_input);
+  if(body == NULL) {
     if(!parser->content_length) {
       REQUEST->state.error_code = HTTP_LENGTH_REQUIRED;
       return 1;
     }
-    REQUEST->body = PycStringIO->NewOutput(parser->content_length);
+    PyObject* buf = PyString_FromStringAndSize(NULL, parser->content_length);
+    body = (Iobject*)PycStringIO->NewInput(buf);
+    Py_XDECREF(buf);
+    if(body == NULL)
+      return 1;
+    _set_header(_wsgi_input, (PyObject*)body);
+    Py_DECREF(body);
   }
-  if(PycStringIO->cwrite(REQUEST->body, body, len) < 0) {
-    REQUEST->state.error_code = HTTP_SERVER_ERROR;
-    return 1;
-  }
+  memcpy(body->buf + body->pos, data, len);
+  body->pos += len;
   return 0;
 }
 
@@ -210,12 +224,15 @@ on_message_complete(http_parser* parser)
   /* REMOTE_ADDR */
   _set_header(_REMOTE_ADDR, REQUEST->client_addr);
 
-  /* wsgi.input */
-  _set_header_free_value(
-    _wsgi_input,
-    PycStringIO->NewInput(REQUEST->body ? PycStringIO->cgetvalue(REQUEST->body)
-                                        : _empty_string)
-  );
+  PyObject* body = PyDict_GetItem(REQUEST->headers, _wsgi_input);
+  if(body) {
+    /* We abused the `pos` member for tracking the amount of data copied from
+     * the buffer in on_body, so reset it to zero here. */
+    ((Iobject*)body)->pos = 0;
+  } else {
+    /* Request has no body */
+    _set_header_free_value(_wsgi_input, PycStringIO->NewInput(_empty_string));
+  }
 
   PyDict_Update(REQUEST->headers, wsgi_base_dict);
 

@@ -59,11 +59,24 @@ prepare-build:
 clean:
 	@rm -f $(BUILD_DIR)/*
 
-ab:
-	ab -c 100 -n 10000 'http://127.0.0.1:8080/a/b/c?k=v&k2=v2#fragment'
+AB		= ab -c 100 -n 10000
+TEST_URL	= "http://127.0.0.1:8080/a/b/c?k=v&k2=v2"
+
+ab: ab1 ab2 ab3 ab4
+
+ab1:
+	$(AB) $(TEST_URL)
+ab2:
+	@echo 'asdfghjkl=asdfghjkl&qwerty=qwertyuiop' > /tmp/bjoern-post.tmp
+	$(AB) -p /tmp/bjoern-post.tmp $(TEST_URL)
+ab3:
+	$(AB) -k $(TEST_URL)
+ab4:
+	@echo 'asdfghjkl=asdfghjkl&qwerty=qwertyuiop' > /tmp/bjoern-post.tmp
+	$(AB) -k -p /tmp/bjoern-post.tmp $(TEST_URL)
 
 wget:
-	wget -O - -q -S 'http://127.0.0.1:8080/a/b/c?k=v&k2=v2#fragment'
+	wget -O - -q -S $(TEST_URL)
 
 test:
 	cd tests && python ~/dev/wsgitest/runner.py

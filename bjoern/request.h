@@ -38,7 +38,6 @@ typedef struct {
   request_state state;
 
   PyObject* headers;
-  PyObject* body;
   PyObject* current_chunk;
   Py_ssize_t current_chunk_p;
   PyObject* iterable;

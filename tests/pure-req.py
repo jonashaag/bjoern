@@ -16,7 +16,9 @@ msgs = [
     # Content-{Length, Type}
     'GET / HTTP/1.0\r\nContent-Length: 11\r\n'
     'Content-Type: text/blah\r\nContent-Fype: bla\r\n'
-    'Content-Tength: bla\r\n\r\nhello world'
+    'Content-Tength: bla\r\n\r\nhello world',
+    # POST memory leak
+    'POST / HTTP/1.0\r\nContent-Length: 1000\r\n\r\n%s' % ('a'*1000)
 ]
 conn.send(msgs[int(sys.argv[1])])
 while 1:
