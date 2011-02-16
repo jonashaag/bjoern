@@ -8,7 +8,7 @@
   TYPE_ERROR_INNER(what, expected, "(got '%.200s' object instead)", Py_TYPE(got)->tp_name)
 
 static PyObject* (start_response)(PyObject* self, PyObject* args, PyObject *kwargs);
-static Py_ssize_t wsgi_getheaders(Request*, PyObject* buf);
+static size_t wsgi_getheaders(Request*, PyObject* buf);
 static inline bool inspect_headers(Request*);
 static inline bool should_keep_alive(Request*);
 
@@ -190,7 +190,7 @@ err:
   return false;
 }
 
-static Py_ssize_t
+static size_t
 wsgi_getheaders(Request* request, PyObject* buf)
 {
   char* bufp = PyString_AS_STRING(buf);
