@@ -29,15 +29,15 @@ if len(sys.argv) > 1:
         test = iterator.next()
 
     assert test is not None
-    def chose_test():
+    def choose_test():
         return test.app
 else:
     testlist = list(tests.chainvalues())
-    def chose_test():
+    def choose_test():
         return random.choice(testlist).app
 
 def app(environ, start_response):
-    app = chose_test()
+    app = choose_test()
     print 'Testing %s...' % app.__name__
     return app(environ, start_response)
 
