@@ -19,10 +19,9 @@ typedef struct {
 
 typedef struct {
   http_parser parser;
-  const char* field_start;
-  size_t field_len;
-  const char* value_start;
-  size_t value_len;
+  string field;
+  string value;
+  string body;
 } bj_parser;
 
 typedef struct {
