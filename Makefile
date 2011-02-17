@@ -89,12 +89,9 @@ callgrind:
 
 memwatch:
 	watch -n 0.5 \
-	  'cat /proc/$$(pidof -s python)/cmdline | tr "\0" " " | head -c -1; \
+	  'cat /proc/$$(pgrep -n python)/cmdline | tr "\0" " " | head -c -1; \
 	   echo; echo; \
 	   tail -n +25 /proc/$$(pidof -s python)/smaps'
-
-release:
-	python setup.py sdist
 
 upload:
 	python setup.py sdist upload
