@@ -1,7 +1,6 @@
 #include <Python.h>
 #include "server.h"
 #include "wsgi.h"
-#include "stream.h"
 #include "bjoernmodule.h"
 
 
@@ -74,15 +73,12 @@ run(PyObject* self, PyObject* args)
 static PyMethodDef Bjoern_FunctionTable[] = {
   {"run", run, METH_VARARGS, run_doc},
   {"listen", listen, METH_VARARGS, listen_doc},
-  {NULL, NULL, 0, NULL}
+  {NULL,  NULL, 0, NULL}
 };
 
 PyMODINIT_FUNC initbjoern()
 {
-  PyType_Ready(&StartResponse_Type);
-  PyType_Ready(&StreamType);
-  assert(StreamType.tp_flags & Py_TPFLAGS_READY);
-  assert(StartResponse_Type.tp_flags & Py_TPFLAGS_READY);
+  _initialize_wsgi_module();
   _initialize_static_strings();
 
   PyObject* bjoern_module = Py_InitModule("bjoern", Bjoern_FunctionTable);

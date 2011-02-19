@@ -20,6 +20,7 @@ typedef struct {
 bool
 wsgi_call_application(Request* request)
 {
+  assert(StartResponse_Type.tp_flags & Py_TPFLAGS_READY);
   StartResponse* start_response = PyObject_NEW(StartResponse, &StartResponse_Type);
   start_response->request = request;
 
@@ -377,4 +378,10 @@ wrap_http_chunk_cruft_around(PyObject* chunk)
   *new_chunk_p++ = '\r'; *new_chunk_p = '\n';
   assert(new_chunk_p == PyString_AS_STRING(new_chunk) + n + chunklen + 1);
   return new_chunk;
+}
+
+void _initialize_wsgi_module() {
+  int ready = PyType_Ready(&StartResponse_Type);
+  assert(ready == 0);
+  assert(StartResponse_Type.tp_flags & Py_TPFLAGS_READY);
 }

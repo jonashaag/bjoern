@@ -1,11 +1,19 @@
 #include <Python.h>
+#include <cStringIO.h>
 #include "request.h"
-#include "stream.h"
 
 static inline void PyDict_ReplaceKey(PyObject* dict, PyObject* k1, PyObject* k2);
-static PyObject* wsgi_http_header(string header);
+static PyObject* wsgi_http_header(Request*, const char*, const size_t);
 static http_parser_settings parser_settings;
 static PyObject* wsgi_base_dict = NULL;
+
+/* Non-public type from cStringIO I abuse in on_body */
+typedef struct {
+  PyObject_HEAD
+  char *buf;
+  Py_ssize_t pos, string_size;
+  PyObject *pbuf;
+} Iobject;
 
 Request* Request_new(int client_fd, const char* client_addr)
 {
@@ -26,7 +34,6 @@ void Request_reset(Request* request)
 {
   memset(&request->state, 0, sizeof(Request) - (size_t)&((Request*)NULL)->state);
   request->state.response_length_unknown = true;
-  request->parser.body = (string){NULL, 0};
 }
 
 void Request_free(Request* request)
@@ -81,11 +88,11 @@ void Request_parse(Request* request, const char* data, const size_t data_len)
    *   [old header data ] ...stuff... [ new header data ]
    *   ^-------------- A -------------^--------B--------^
    *
-   * A = XXX- PARSER->XXX.data
+   * A = XXX- PARSER->XXX_start
    * B = len
    * A + B = old header start to new header end
    */ \
-  do { PARSER->name.len = (name - PARSER->name.data) + len; } while(0)
+  do { PARSER->name##_len = (name - PARSER->name##_start) + len; } while(0)
 
 #define _set_header(k, v) PyDict_SetItem(REQUEST->headers, k, v);
 #define _set_header_free_value(k, v) \
@@ -106,8 +113,10 @@ void Request_parse(Request* request, const char* data, const size_t data_len)
 static int on_message_begin(http_parser* parser)
 {
   REQUEST->headers = PyDict_New();
-  PARSER->field = (string){NULL, 0};
-  PARSER->value = (string){NULL, 0};
+  PARSER->field_start = NULL;
+  PARSER->field_len = 0;
+  PARSER->value_start = NULL;
+  PARSER->value_len = 0;
   return 0;
 }
 
@@ -127,29 +136,32 @@ static int on_query_string(http_parser* parser, const char* query, size_t len)
 
 static int on_header_field(http_parser* parser, const char* field, size_t len)
 {
-  if(PARSER->value.data) {
+  if(PARSER->value_start) {
     /* Store previous header and start a new one */
     _set_header_free_both(
-      wsgi_http_header(PARSER->field),
-      PyString_FromStringAndSize(PARSER->value.data, PARSER->value.len)
+      wsgi_http_header(REQUEST, PARSER->field_start, PARSER->field_len),
+      PyString_FromStringAndSize(PARSER->value_start, PARSER->value_len)
     );
-  } else if(PARSER->field.data) {
+  } else if(PARSER->field_start) {
     UPDATE_LENGTH(field);
     return 0;
   }
-  PARSER->field = (string){(char*)field, len};
-  PARSER->value = (string){NULL, 0};
+  PARSER->field_start = field;
+  PARSER->field_len = len;
+  PARSER->value_start = NULL;
+  PARSER->value_len = 0;
   return 0;
 }
 
 static int
 on_header_value(http_parser* parser, const char* value, size_t len)
 {
-  if(PARSER->value.data) {
+  if(PARSER->value_start) {
     UPDATE_LENGTH(value);
   } else {
     /* Start a new value */
-    PARSER->value = (string){(char*)value, len};
+    PARSER->value_start = value;
+    PARSER->value_len = len;
   }
   return 0;
 }
@@ -157,10 +169,10 @@ on_header_value(http_parser* parser, const char* value, size_t len)
 static int
 on_headers_complete(http_parser* parser)
 {
-  if(PARSER->field.data) {
+  if(PARSER->field_start) {
     _set_header_free_both(
-      wsgi_http_header(PARSER->field),
-      PyString_FromStringAndSize(PARSER->value.data, PARSER->value.len)
+      wsgi_http_header(REQUEST, PARSER->field_start, PARSER->field_len),
+      PyString_FromStringAndSize(PARSER->value_start, PARSER->value_len)
     );
   }
   return 0;
@@ -169,20 +181,24 @@ on_headers_complete(http_parser* parser)
 static int
 on_body(http_parser* parser, const char* data, const size_t len)
 {
-  /* XXX does the body copying really make the code more readable? */
-  string body = PARSER->body;
-  if(body.data == NULL) {
+  Iobject* body;
+
+  body = (Iobject*)PyDict_GetItem(REQUEST->headers, _wsgi_input);
+  if(body == NULL) {
     if(!parser->content_length) {
       REQUEST->state.error_code = HTTP_LENGTH_REQUIRED;
       return 1;
     }
-    body.data = malloc(parser->content_length);
-    if(body.data == NULL)
+    PyObject* buf = PyString_FromStringAndSize(NULL, parser->content_length);
+    body = (Iobject*)PycStringIO->NewInput(buf);
+    Py_XDECREF(buf);
+    if(body == NULL)
       return 1;
+    _set_header(_wsgi_input, (PyObject*)body);
+    Py_DECREF(body);
   }
-  memcpy(body.data + body.len, data, len);
-  body.len += len;
-  PARSER->body = body;
+  memcpy(body->buf + body->pos, data, len);
+  body->pos += len;
   return 0;
 }
 
@@ -208,10 +224,15 @@ on_message_complete(http_parser* parser)
   /* REMOTE_ADDR */
   _set_header(_REMOTE_ADDR, REQUEST->client_addr);
 
-  Stream* body = PyObject_NEW(Stream, &StreamType);
-  body->data = PARSER->body;
-  body->pos = 0;
-  _set_header_free_value(_wsgi_input, (PyObject*)body);
+  PyObject* body = PyDict_GetItem(REQUEST->headers, _wsgi_input);
+  if(body) {
+    /* We abused the `pos` member for tracking the amount of data copied from
+     * the buffer in on_body, so reset it to zero here. */
+    ((Iobject*)body)->pos = 0;
+  } else {
+    /* Request has no body */
+    _set_header_free_value(_wsgi_input, PycStringIO->NewInput(_empty_string));
+  }
 
   PyDict_Update(REQUEST->headers, wsgi_base_dict);
 
@@ -221,9 +242,9 @@ on_message_complete(http_parser* parser)
 
 
 static PyObject*
-wsgi_http_header(string header)
+wsgi_http_header(Request* request, const char* data, size_t len)
 {
-  PyObject* obj = PyString_FromStringAndSize(NULL, header.len+strlen("HTTP_"));
+  PyObject* obj = PyString_FromStringAndSize(NULL, len+strlen("HTTP_"));
   char* dest = PyString_AS_STRING(obj);
 
   *dest++ = 'H';
@@ -232,8 +253,8 @@ wsgi_http_header(string header)
   *dest++ = 'P';
   *dest++ = '_';
 
-  while(header.len--) {
-    char c = *header.data++;
+  while(len--) {
+    char c = *data++;
     if(c == '-')
       *dest++ = '_';
     else if(c >= 'a' && c <= 'z')
@@ -267,6 +288,7 @@ parser_settings = {
 void _initialize_request_module(const char* server_host, const int server_port)
 {
   if(wsgi_base_dict == NULL) {
+    PycString_IMPORT;
     wsgi_base_dict = PyDict_New();
 
     /* dct['SCRIPT_NAME'] = '' */
