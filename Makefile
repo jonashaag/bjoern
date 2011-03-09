@@ -38,8 +38,8 @@ small: clean
 	CFLAGS='-Os' make
 
 bjoernmodule:
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(objects) $(HTTP_PARSER_OBJ) -o $(BUILD_DIR)/bjoern.so
-	PYTHONPATH=$$PYTHONPATH:$(BUILD_DIR) python -c "import bjoern"
+	@$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(objects) $(HTTP_PARSER_OBJ) -o $(BUILD_DIR)/bjoern.so
+	@PYTHONPATH=$$PYTHONPATH:$(BUILD_DIR) python -c "import bjoern"
 
 again: clean all
 
@@ -47,7 +47,8 @@ debug:
 	CFLAGS='-D DEBUG' make again
 
 $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+	@echo ' -> ' $(CC) -c $< -o $@
+	@$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 # foo.o: shortcut to $(BUILD_DIR)/foo.o
 %.o: $(BUILD_DIR)/%.o
