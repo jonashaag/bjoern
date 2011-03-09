@@ -1,6 +1,7 @@
 #include <Python.h>
 #include <cStringIO.h>
 #include "request.h"
+#include "filewrapper.h"
 
 static inline void PyDict_ReplaceKey(PyObject* dict, PyObject* k1, PyObject* k2);
 static PyObject* wsgi_http_header(string header);
@@ -286,6 +287,13 @@ void _initialize_request_module(const char* server_host, const int server_port)
   if(wsgi_base_dict == NULL) {
     PycString_IMPORT;
     wsgi_base_dict = PyDict_New();
+
+    /* dct['wsgi.file_wrapper'] = FileWrapper */
+    PyDict_SetItemString(
+      wsgi_base_dict,
+      "wsgi.file_wrapper",
+      (PyObject*)&FileWrapper_Type
+    );
 
     /* dct['SCRIPT_NAME'] = '' */
     PyDict_SetItemString(

@@ -7,12 +7,17 @@
 #include <stdbool.h>
 #include <string.h>
 
+#define TYPE_ERROR_INNER(what, expected, ...) \
+  PyErr_Format(PyExc_TypeError, what " must be " expected " " __VA_ARGS__)
+#define TYPE_ERROR(what, expected, got) \
+  TYPE_ERROR_INNER(what, expected, "(got '%.200s' object instead)", Py_TYPE(got)->tp_name)
+
 typedef struct { char* data; size_t len; } string;
 
 enum http_status { HTTP_BAD_REQUEST = 1, HTTP_LENGTH_REQUIRED, HTTP_SERVER_ERROR };
 
 size_t unquote_url_inplace(char* url, size_t len);
-void _initialize_static_strings();
+void (_init_common)();
 
 PyObject *_REMOTE_ADDR, *_PATH_INFO, *_QUERY_STRING, *_REQUEST_METHOD, *_GET,
          *_HTTP_CONTENT_LENGTH, *_CONTENT_LENGTH, *_HTTP_CONTENT_TYPE, *_CONTENT_TYPE,

@@ -2,6 +2,7 @@
 #include "server.h"
 #include "wsgi.h"
 #include "bjoernmodule.h"
+#include "filewrapper.h"
 
 
 PyDoc_STRVAR(listen_doc,
@@ -78,9 +79,13 @@ static PyMethodDef Bjoern_FunctionTable[] = {
 
 PyMODINIT_FUNC initbjoern()
 {
+  _init_common();
+  _init_filewrapper();
+
+  PyType_Ready(&FileWrapper_Type);
+  assert(FileWrapper_Type.tp_flags & Py_TPFLAGS_READY);
   PyType_Ready(&StartResponse_Type);
   assert(StartResponse_Type.tp_flags & Py_TPFLAGS_READY);
-  _initialize_static_strings();
 
   PyObject* bjoern_module = Py_InitModule("bjoern", Bjoern_FunctionTable);
   PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(iii)", 1, 1, 1));

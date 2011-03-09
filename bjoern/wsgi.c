@@ -2,11 +2,6 @@
 #include "bjoernmodule.h"
 #include "wsgi.h"
 
-#define TYPE_ERROR_INNER(what, expected, ...) \
-  PyErr_Format(PyExc_TypeError, what " must be " expected " " __VA_ARGS__)
-#define TYPE_ERROR(what, expected, got) \
-  TYPE_ERROR_INNER(what, expected, "(got '%.200s' object instead)", Py_TYPE(got)->tp_name)
-
 static PyObject* (start_response)(PyObject* self, PyObject* args, PyObject *kwargs);
 static size_t wsgi_getheaders(Request*, PyObject* buf);
 static inline bool inspect_headers(Request*);
@@ -327,8 +322,7 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
 }
 
 PyTypeObject StartResponse_Type = {
-  PyObject_HEAD_INIT(NULL)
-  0,                          /* ob_size (deprecated)                       */
+  PyVarObject_HEAD_INIT(NULL, 0)
   "start_response",           /* tp_name (__name__)                         */
   sizeof(StartResponse),      /* tp_basicsize                               */
   0,                          /* tp_itemsize                                */

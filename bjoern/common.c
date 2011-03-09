@@ -26,7 +26,7 @@ size_t unquote_url_inplace(char* url, size_t len)
   return len;
 }
 
-void _initialize_static_strings()
+void _init_common()
 {
   #define _(name) _##name = PyString_FromString(#name)
   _(REMOTE_ADDR); _(PATH_INFO); _(QUERY_STRING); _(close);
