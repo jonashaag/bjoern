@@ -10,7 +10,7 @@ Why It's Cool
 bjoern is the *fastest*, *smallest* and *most lightweight* WSGI server out there,
 featuring
 
-* < 1000 lines of code
+* ~ 1000 lines of C code
 * Memory footprint ~ 600KB
 * Single-threaded and without coroutines or other crap
 * Full persistent connection ("*keep-alive*") support in both HTTP/1.0 and 1.1,
