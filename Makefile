@@ -92,7 +92,7 @@ memwatch:
 	watch -n 0.5 \
 	  'cat /proc/$$(pgrep -n python)/cmdline | tr "\0" " " | head -c -1; \
 	   echo; echo; \
-	   tail -n +25 /proc/$$(pidof -s python)/smaps'
+	   tail -n +25 /proc/$$(pgrep -n python)/smaps'
 
 upload:
 	python setup.py sdist upload

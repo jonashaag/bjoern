@@ -61,10 +61,6 @@ void Request_clean(Request* request)
     Py_DECREF(request->iterable);
   }
   Py_XDECREF(request->iterator);
-  if(request->headers)
-    assert(request->headers->ob_refcnt >= 1);
-  if(request->status)
-    assert(request->status->ob_refcnt >= 1);
   Py_XDECREF(request->headers);
   Py_XDECREF(request->status);
 }

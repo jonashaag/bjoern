@@ -5,6 +5,7 @@
 #ifdef WANT_SIGINT_HANDLING
 # include <sys/signal.h>
 #endif
+#include <sys/sendfile.h>
 #include <ev.h>
 #include "common.h"
 #include "wsgi.h"
@@ -33,6 +34,8 @@ static ev_io_callback ev_io_on_request;
 static ev_io_callback ev_io_on_read;
 static ev_io_callback ev_io_on_write;
 static bool send_chunk(Request*);
+static bool do_sendfile(Request*);
+static bool handle_nonzero_errno(Request*);
 
 void server_run(const char* hostaddr, const int port)
 {
@@ -187,44 +190,54 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
   Request* request = REQUEST_FROM_WATCHER(watcher);
 
   GIL_LOCK(0);
-  assert(request->current_chunk);
 
-  if(send_chunk(request))
-    goto out;
-
-  if(request->iterator) {
-    PyObject* next_chunk;
-    next_chunk = wsgi_iterable_get_next_chunk(request);
-    if(next_chunk) {
-      if(request->state.chunked_response) {
-        request->current_chunk = wrap_http_chunk_cruft_around(next_chunk);
-        Py_DECREF(next_chunk);
-      } else {
-        request->current_chunk = next_chunk;
-      }
-      assert(request->current_chunk_p == 0);
+  if(request->state.use_sendfile) {
+    /* sendfile */
+    if(request->current_chunk && send_chunk(request))
       goto out;
-    } else {
-      if(PyErr_Occurred()) {
-        PyErr_Print();
-        /* We can't do anything graceful here because at least one
-         * chunk is already sent... just close the connection */
-        DBG_REQ(request, "Exception in iterator, can not recover");
-        ev_io_stop(mainloop, &request->ev_watcher);
-        close(request->client_fd);
-        Request_free(request);
-        goto out;
-      }
-      Py_CLEAR(request->iterator);
-    }
-  }
+    /* abuse current_chunk_p to store the file fd */
+    request->current_chunk_p = PyObject_AsFileDescriptor(request->iterable);
+    if(do_sendfile(request))
+      goto out;
+  } else {
+    /* iterable */
+    if(send_chunk(request))
+      goto out;
 
-  if(request->state.chunked_response) {
-    /* We have to send a terminating empty chunk + \r\n */
-    request->current_chunk = PyString_FromString("0\r\n\r\n");
-    assert(request->current_chunk_p == 0);
-    request->state.chunked_response = false;
-    goto out;
+    if(request->iterator) {
+      PyObject* next_chunk;
+      next_chunk = wsgi_iterable_get_next_chunk(request);
+      if(next_chunk) {
+        if(request->state.chunked_response) {
+          request->current_chunk = wrap_http_chunk_cruft_around(next_chunk);
+          Py_DECREF(next_chunk);
+        } else {
+          request->current_chunk = next_chunk;
+        }
+        assert(request->current_chunk_p == 0);
+        goto out;
+      } else {
+        if(PyErr_Occurred()) {
+          PyErr_Print();
+          /* We can't do anything graceful here because at least one
+           * chunk is already sent... just close the connection */
+          DBG_REQ(request, "Exception in iterator, can not recover");
+          ev_io_stop(mainloop, &request->ev_watcher);
+          close(request->client_fd);
+          Request_free(request);
+          goto out;
+        }
+        Py_CLEAR(request->iterator);
+      }
+    }
+
+    if(request->state.chunked_response) {
+      /* We have to send a terminating empty chunk + \r\n */
+      request->current_chunk = PyString_FromString("0\r\n\r\n");
+      assert(request->current_chunk_p == 0);
+      request->state.chunked_response = false;
+      goto out;
+    }
   }
 
   ev_io_stop(mainloop, &request->ev_watcher);
@@ -249,38 +262,57 @@ static bool
 send_chunk(Request* request)
 {
   Py_ssize_t chunk_length;
-  Py_ssize_t sent_bytes;
+  Py_ssize_t bytes_sent;
 
   assert(request->current_chunk != NULL);
   assert(!(request->current_chunk_p == PyString_GET_SIZE(request->current_chunk)
          && PyString_GET_SIZE(request->current_chunk) != 0));
 
-  sent_bytes = write(
+  bytes_sent = write(
     request->client_fd,
     PyString_AS_STRING(request->current_chunk) + request->current_chunk_p,
     PyString_GET_SIZE(request->current_chunk) - request->current_chunk_p
   );
 
-  if(sent_bytes == -1) {
-    error:
-    if(errno == EAGAIN || errno == EWOULDBLOCK) {
-      /* Try again later */
-      return true;
-    } else {
-      /* Serious transmission failure. Hang up. */
-      fprintf(stderr, "Client %d hit errno %d\n", request->client_fd, errno);
-      Py_DECREF(request->current_chunk);
-      Py_XCLEAR(request->iterator);
-      request->state.keep_alive = false;
-      return false;
-    }
-  }
+  if(bytes_sent == -1)
+    return handle_nonzero_errno(request);
 
-  request->current_chunk_p += sent_bytes;
+  request->current_chunk_p += bytes_sent;
   if(request->current_chunk_p == PyString_GET_SIZE(request->current_chunk)) {
     Py_CLEAR(request->current_chunk);
     request->current_chunk_p = 0;
     return false;
   }
   return true;
+}
+
+#define SENDFILE_CHUNK_SIZE 16*1024
+
+static bool
+do_sendfile(Request* request)
+{
+  Py_ssize_t bytes_sent = sendfile(
+    request->client_fd,
+    request->current_chunk_p, /* current_chunk_p stores the file fd */
+    NULL, SENDFILE_CHUNK_SIZE
+  );
+  if(bytes_sent == -1)
+    return handle_nonzero_errno(request);
+  return bytes_sent != 0;
+}
+
+static bool
+handle_nonzero_errno(Request* request)
+{
+  if(errno == EAGAIN || errno == EWOULDBLOCK) {
+    /* Try again later */
+    return true;
+  } else {
+    /* Serious transmission failure. Hang up. */
+    fprintf(stderr, "Client %d hit errno %d\n", request->client_fd, errno);
+    Py_XDECREF(request->current_chunk);
+    Py_XCLEAR(request->iterator);
+    request->state.keep_alive = false;
+    return false;
+  }
 }

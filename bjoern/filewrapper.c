@@ -12,6 +12,7 @@ FileWrapper_New(PyObject* self, PyObject* args, PyObject* kwargs)
   }
   Py_INCREF(file);
   FileWrapper* wrapper = PyObject_NEW(FileWrapper, &FileWrapper_Type);
+  PyFile_IncUseCount((PyFileObject*)file);
   wrapper->file = file;
   return (PyObject*)wrapper;
 }
@@ -31,6 +32,7 @@ FileWrapper_Iter(PyObject* self)
 static void
 FileWrapper_dealloc(PyObject* self)
 {
+  PyFile_DecUseCount((PyFileObject*)((FileWrapper*)self)->file);
   Py_DECREF(((FileWrapper*)self)->file);
   PyObject_FREE(self);
 }

@@ -1,5 +1,6 @@
 #include "common.h"
 #include "bjoernmodule.h"
+#include "filewrapper.h"
 #include "wsgi.h"
 
 static PyObject* (start_response)(PyObject* self, PyObject* args, PyObject *kwargs);
@@ -84,6 +85,13 @@ wsgi_call_application(Request* request)
       Py_DECREF(retval);
       first_chunk = NULL;
     }
+  } else if(FileWrapper_CheckExact(retval)) {
+    request->state.use_sendfile = true;
+    request->iterable = ((FileWrapper*)retval)->file;
+    Py_INCREF(request->iterable);
+    Py_DECREF(retval);
+    request->iterator = NULL;
+    first_chunk = NULL;
   } else {
     /* Generic iterable (list of length != 1, generator, ...) */
     request->iterable = retval;

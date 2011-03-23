@@ -15,6 +15,7 @@ typedef struct {
   unsigned keep_alive : 1;
   unsigned response_length_unknown : 1;
   unsigned chunked_response : 1;
+  unsigned use_sendfile : 1;
 } request_state;
 
 typedef struct {
@@ -36,12 +37,12 @@ typedef struct {
 
   request_state state;
 
+  PyObject* status;
   PyObject* headers;
   PyObject* current_chunk;
   Py_ssize_t current_chunk_p;
   PyObject* iterable;
   PyObject* iterator;
-  PyObject* status;
 } Request;
 
 #define REQUEST_FROM_WATCHER(watcher) \
