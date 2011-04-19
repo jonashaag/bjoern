@@ -7,6 +7,11 @@
 #include <stdbool.h>
 #include <string.h>
 
+#ifndef Py_TYPE
+/* Python 2.5 compatibility */
+# define Py_TYPE(ob) (((PyObject*)(ob))->ob_type)
+#endif
+
 #define TYPE_ERROR_INNER(what, expected, ...) \
   PyErr_Format(PyExc_TypeError, what " must be " expected " " __VA_ARGS__)
 #define TYPE_ERROR(what, expected, got) \
