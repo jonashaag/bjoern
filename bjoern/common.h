@@ -7,9 +7,8 @@
 #include <stdbool.h>
 #include <string.h>
 
-#ifndef Py_TYPE
-/* Python 2.5 compatibility */
-# define Py_TYPE(ob) (((PyObject*)(ob))->ob_type)
+#if PY_MINOR_VERSION < 6
+# include "25compat.h"
 #endif
 
 #define TYPE_ERROR_INNER(what, expected, ...) \
