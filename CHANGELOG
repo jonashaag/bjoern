@@ -1,9 +1,11 @@
-1.2 (to be released)
+1.2 (Apr 2011)
     - sendfile() support
     - Python 2.5 compatibility
-1.1.1 (Feb 2010)
+
+1.1.1 (Feb 2011)
     - Fixed a severe memory leak: didn't release the bodies of HTTP requests
-1.1 (Jan 2010)
+
+1.1 (Jan 2011)
     - Implemented HTTP/1.1 and 1.0 persistent connections as well as HTTP/1.1
       chunked responses
     - Added 'REMOTE_ADDR' (client's IP address) to the WSGI dictionary (#18)
