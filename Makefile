@@ -1,7 +1,5 @@
 SOURCE_DIR	= bjoern
 BUILD_DIR	= build
-objects		= $(patsubst $(SOURCE_DIR)/%.c, $(BUILD_DIR)/%.o, \
-		             $(wildcard $(SOURCE_DIR)/*.c))
 
 PYTHON_INCLUDE	= $(shell python-config --include)
 PYTHON_LDFLAGS	= $(shell python-config --ldflags)
@@ -9,6 +7,10 @@ PYTHON_LDFLAGS	= $(shell python-config --ldflags)
 HTTP_PARSER_DIR	= http-parser
 HTTP_PARSER_OBJ = $(HTTP_PARSER_DIR)/http_parser.o
 HTTP_PARSER_SRC = $(HTTP_PARSER_DIR)/http_parser.c
+
+objects		= $(HTTP_PARSER_OBJ) \
+		  $(patsubst $(SOURCE_DIR)/%.c, $(BUILD_DIR)/%.o, \
+		             $(wildcard $(SOURCE_DIR)/*.c))
 
 CPPFLAGS	+= $(PYTHON_INCLUDE) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR)
 CFLAGS		+= $(FEATURES) -std=c99 -fno-strict-aliasing -Wall -Wextra \
@@ -38,7 +40,7 @@ small: clean
 	CFLAGS='-Os' make
 
 bjoernmodule:
-	@$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(objects) $(HTTP_PARSER_OBJ) -o $(BUILD_DIR)/bjoern.so
+	@$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(objects) -o $(BUILD_DIR)/bjoern.so
 	@PYTHONPATH=$$PYTHONPATH:$(BUILD_DIR) python -c "import bjoern"
 
 again: clean all
@@ -96,3 +98,6 @@ memwatch:
 
 upload:
 	python setup.py sdist upload
+
+$(HTTP_PARSER_OBJ):
+	$(MAKE) -C $(HTTP_PARSER_DIR) http_parser.o OPT_DEBUG_EXTRA=-fPIC OPT_FAST_EXTRA=-fPIC
