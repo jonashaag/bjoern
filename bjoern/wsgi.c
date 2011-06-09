@@ -279,7 +279,7 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
   if(!PyArg_UnpackTuple(args, "start_response", 2, 3, &status, &headers, &exc_info))
     return NULL;
 
-  if(exc_info) {
+  if(exc_info && exc_info != Py_None) {
     if(!PyTuple_Check(exc_info) || PyTuple_GET_SIZE(exc_info) != 3) {
       TYPE_ERROR("start_response argument 3", "a 3-tuple", exc_info);
       return NULL;
