@@ -1,11 +1,14 @@
 #ifndef __request_h__
 #define __request_h__
 
+#ifdef TLS_SUPPORT
+# include <openssl/ssl.h>
+#endif
 #include <ev.h>
 #include "http_parser.h"
 #include "common.h"
 
-void _initialize_request_module(const char* host, const int port);
+void _initialize_request_module(const char* server_host, const int server_port, bool tls);
 
 typedef struct {
   unsigned error_code : 2;
@@ -43,6 +46,9 @@ typedef struct {
   Py_ssize_t current_chunk_p;
   PyObject* iterable;
   PyObject* iterator;
+#if TLS_SUPPORT
+  SSL* ssl;
+#endif
 } Request;
 
 #define REQUEST_FROM_WATCHER(watcher) \

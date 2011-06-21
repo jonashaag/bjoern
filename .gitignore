@@ -2,3 +2,11 @@
 build/
 dist/
 MANIFEST
+/nbproject/private/
+/.kdev4/
+*.kdev4
+core
+*.crt
+*.csr
+*.key
+*.~

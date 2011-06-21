@@ -3,7 +3,14 @@
 #include "wsgi.h"
 #include "bjoernmodule.h"
 #include "filewrapper.h"
+#include "server_tls.h"
 
+#ifdef TLS_SUPPORT
+# include "server_tls.h"
+#endif
+
+// indicates tls is activated
+bool tls = false;
 
 PyDoc_STRVAR(listen_doc,
 "listen(application, host, port) -> None\n\n \
@@ -26,10 +33,32 @@ listen(PyObject* self, PyObject* args)
 
   if(!PyArg_ParseTuple(args, "Osi:run/listen", &wsgi_app, &host, &port))
     return NULL;
-
-  _initialize_request_module(host, port);
-
-  if(!server_init(host, port)) {
+  
+  PyObject* key_obj = PyObject_GetAttrString(bjoern_module, "key_path");
+  PyObject* cert_obj = PyObject_GetAttrString(bjoern_module, "cert_path");
+  
+#if TLS_SUPPORT
+  char *key, *cert;
+  if(PyString_Check(key_obj) && PyString_Check(cert_obj)) {
+    tls = true;
+    key = PyString_AsString(key_obj);
+    cert = PyString_AsString(cert_obj);
+  }
+#endif
+  
+   _initialize_request_module(host, port, tls);
+  
+  if(tls){
+#if TLS_SUPPORT
+    if(!server_tls_init(host, port, key, cert)) {
+    PyErr_Format(
+      PyExc_RuntimeError,
+      "Could not start tls server on %s:%d", host, port
+    );
+    return NULL; 
+    }
+#endif
+  } else if(!server_init(host, port)) {
     PyErr_Format(
       PyExc_RuntimeError,
       "Could not start server on %s:%d", host, port
@@ -66,7 +95,12 @@ run(PyObject* self, PyObject* args)
       return NULL;
   }
 
-  server_run();
+  if(tls){
+#if TLS_SUPPORT
+    server_tls_run();
+#endif
+  }else
+    server_run();
   wsgi_app = NULL;
   Py_RETURN_NONE;
 }
@@ -87,6 +121,14 @@ PyMODINIT_FUNC initbjoern()
   PyType_Ready(&StartResponse_Type);
   assert(StartResponse_Type.tp_flags & Py_TPFLAGS_READY);
 
-  PyObject* bjoern_module = Py_InitModule("bjoern", Bjoern_FunctionTable);
-  PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(ii)", 1, 2));
+  bjoern_module = Py_InitModule("bjoern", Bjoern_FunctionTable);
+  PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(ii)", 1, 3));
+  PyModule_AddObject(bjoern_module, "key_path", Py_BuildValue("s", NULL));
+  PyModule_AddObject(bjoern_module, "cert_path", Py_BuildValue("s", NULL));
+#if TLS_SUPPORT
+  PyModule_AddObject(bjoern_module, "tls", Py_True);
+#else
+  PyModule_AddObject(bjoern_module, "tls", Py_False);
+#endif
+  
 }

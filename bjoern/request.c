@@ -33,7 +33,16 @@ Request* Request_new(int client_fd, const char* client_addr)
 
 void Request_reset(Request* request)
 {
+  //keep ssl context
+#ifdef TLS_SUPPORT
+  SSL* ssl = request->ssl;
+#endif
+  
   memset(&request->state, 0, sizeof(Request) - (size_t)&((Request*)NULL)->state);
+  
+#if TLS_SUPPORT
+  request->ssl = ssl;
+#endif
   request->state.response_length_unknown = true;
   request->parser.body = (string){NULL, 0};
 }
@@ -278,7 +287,7 @@ parser_settings = {
   on_header_value, on_headers_complete, on_body, on_message_complete
 };
 
-void _initialize_request_module(const char* server_host, const int server_port)
+void _initialize_request_module(const char* server_host, const int server_port, bool tls)
 {
   if(wsgi_base_dict == NULL) {
     PycString_IMPORT;
@@ -305,12 +314,11 @@ void _initialize_request_module(const char* server_host, const int server_port)
       PyTuple_Pack(2, PyInt_FromLong(1), PyInt_FromLong(0))
     );
 
-    /* dct['wsgi.url_scheme'] = 'http'
-     * (This can be hard-coded as there is no TLS support in bjoern.) */
+    /* dct['wsgi.url_scheme'] = 'https?'  */
     PyDict_SetItemString(
       wsgi_base_dict,
       "wsgi.url_scheme",
-      PyString_FromString("http")
+      tls ? PyString_FromString("https") : PyString_FromString("http")
     );
 
     /* dct['wsgi.errors'] = sys.stderr */

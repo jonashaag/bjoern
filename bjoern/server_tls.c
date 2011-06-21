@@ -7,6 +7,11 @@
 #endif
 #include <sys/sendfile.h>
 #include <ev.h>
+
+#include <openssl/x509.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
 #include "common.h"
 #include "wsgi.h"
 #include "server.h"
@@ -33,11 +38,14 @@ static ev_signal_callback ev_signal_on_sigint;
 static ev_io_callback ev_io_on_request;
 static ev_io_callback ev_io_on_read;
 static ev_io_callback ev_io_on_write;
-static bool send_chunk(Request*);
+static ev_io_callback ev_io_on_handshake;
+static bool send_chunk(Request* request);
 static bool do_sendfile(Request*);
 static bool handle_nonzero_errno(Request*);
 
-void server_run(const char* hostaddr, const int port)
+SSL_CTX *ctx;
+
+void server_tls_run()
 {
   struct ev_loop* mainloop = ev_default_loop(0);
 
@@ -68,8 +76,38 @@ ev_signal_on_sigint(struct ev_loop* mainloop, ev_signal* watcher, const int even
 }
 #endif
 
-bool server_init(const char* hostaddr, const int port)
+static bool 
+create_tls_context(char* key, char* cert){
+  DBG("Creating TLS Context.");
+  
+  SSL_library_init();
+  SSL_load_error_strings();
+  ctx = SSL_CTX_new(TLSv1_server_method());
+    
+  if (SSL_CTX_use_certificate_file(ctx, cert, SSL_FILETYPE_PEM) <= 0){
+    ERR_print_errors_fp(stderr);
+    return false;    
+  }
+
+  if (SSL_CTX_use_RSAPrivateKey_file(ctx, key, SSL_FILETYPE_PEM) <= 0){
+    ERR_print_errors_fp(stderr);
+    return false;
+  }
+  
+  if (!SSL_CTX_check_private_key(ctx)){
+    DBG("Private key dont matches certificate.");
+    return false;
+  }
+  
+  return true;
+}
+
+bool server_tls_init(const char* hostaddr, const int port, char* key, char* cert)
 {
+  
+  if(!create_tls_context(key, cert))
+    return false;
+  
   if((sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
     return false;
 
@@ -83,6 +121,7 @@ bool server_init(const char* hostaddr, const int port)
   int optval = true;
   setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
 
+  
   if(bind(sockfd, (struct sockaddr*)&sockaddr, sizeof(sockaddr)) < 0)
     return false;
 
@@ -99,20 +138,25 @@ ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
   int client_fd;
   struct sockaddr_in sockaddr;
   socklen_t addrlen;
-
+  
   addrlen = sizeof(struct sockaddr_in);
   client_fd = accept(watcher->fd, (struct sockaddr*)&sockaddr, &addrlen);
   if(client_fd < 0) {
     DBG("Could not accept() client: errno %d", errno);
     return;
   }
-
+ 
   int flags = fcntl(client_fd, F_GETFL, 0);
   if(fcntl(client_fd, F_SETFL, (flags < 0 ? 0 : flags) | O_NONBLOCK) == -1) {
     DBG("Could not set_nonblocking() client %d: errno %d", client_fd, errno);
     return;
   }
-
+  
+  SSL* ssl = SSL_new(ctx);
+  SSL_set_mode(ssl, SSL_MODE_ENABLE_PARTIAL_WRITE);
+  SSL_set_accept_state(ssl);
+  SSL_set_fd(ssl, client_fd);  
+  
   GIL_LOCK(0);
   Request* request = Request_new(client_fd, inet_ntoa(sockaddr.sin_addr));
   GIL_UNLOCK(0);
@@ -120,20 +164,51 @@ ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
   DBG_REQ(request, "Accepted client %s:%d on fd %d",
           inet_ntoa(sockaddr.sin_addr), ntohs(sockaddr.sin_port), client_fd);
 
-  ev_io_init(&request->ev_watcher, &ev_io_on_read,
+  
+  request->ssl = ssl;
+  
+  ev_io_init(&request->ev_watcher, &ev_io_on_handshake,
              client_fd, EV_READ);
   ev_io_start(mainloop, &request->ev_watcher);
+}
+
+static void 
+ev_io_on_handshake(struct ev_loop* mainloop, ev_io* watcher, const int events)
+{
+  Request* request = REQUEST_FROM_WATCHER(watcher);
+  int t = SSL_do_handshake(request->ssl);
+  
+  if(t == 1){
+      ev_io_stop(mainloop, &request->ev_watcher);
+      ev_io_init(&request->ev_watcher, &ev_io_on_read,
+             watcher->fd, EV_READ);
+      ev_io_start(mainloop, &request->ev_watcher);
+  }else {
+    int err = SSL_get_error(request->ssl, t);
+    DBG("SSL error: %d", err);
+    if (err == SSL_ERROR_WANT_READ) {
+      // do noting
+    }
+    else {
+      DBG_REQ(request, "Unexpected SSL error, closed request: %d", err);
+      close(request->client_fd);
+      SSL_free(request->ssl);
+      Request_free(request);
+      ev_io_stop(mainloop, &request->ev_watcher);
+    }
+      
+  }
 }
 
 static void
 ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
 {
   static char read_buf[READ_BUFFER_SIZE];
-
+  
   Request* request = REQUEST_FROM_WATCHER(watcher);
 
-  Py_ssize_t read_bytes = read(
-    request->client_fd,
+  Py_ssize_t read_bytes = SSL_read(
+    request->ssl,
     read_buf,
     READ_BUFFER_SIZE
   );
@@ -224,8 +299,10 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
            * chunk is already sent... just close the connection */
           DBG_REQ(request, "Exception in iterator, can not recover");
           ev_io_stop(mainloop, &request->ev_watcher);
-          close(request->client_fd);
-          Request_free(request);
+	  SSL_shutdown(request->ssl);
+	  close(request->client_fd);
+	  SSL_free(request->ssl);
+	  Request_free(request);
           goto out;
         }
         Py_CLEAR(request->iterator);
@@ -251,7 +328,9 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
     ev_io_start(mainloop, &request->ev_watcher);
   } else {
     DBG_REQ(request, "done, close");
+    SSL_shutdown(request->ssl);
     close(request->client_fd);
+    SSL_free(request->ssl);
     Request_free(request);
   }
 
@@ -269,8 +348,8 @@ send_chunk(Request* request)
   assert(!(request->current_chunk_p == PyString_GET_SIZE(request->current_chunk)
          && PyString_GET_SIZE(request->current_chunk) != 0));
 
-  bytes_sent = write(
-    request->client_fd,
+  bytes_sent = SSL_write(
+    request->ssl,
     PyString_AS_STRING(request->current_chunk) + request->current_chunk_p,
     PyString_GET_SIZE(request->current_chunk) - request->current_chunk_p
   );

@@ -3,8 +3,8 @@ BUILD_DIR	= build
 objects		= $(patsubst $(SOURCE_DIR)/%.c, $(BUILD_DIR)/%.o, \
 		             $(wildcard $(SOURCE_DIR)/*.c))
 
-PYTHON_INCLUDE	= $(shell python-config --include)
-PYTHON_LDFLAGS	= $(shell python-config --ldflags)
+PYTHON_INCLUDE	= $(shell python2-config --include)
+PYTHON_LDFLAGS	= $(shell python2-config --ldflags)
 
 HTTP_PARSER_DIR	= http-parser
 HTTP_PARSER_OBJ = $(HTTP_PARSER_DIR)/http_parser.o
@@ -23,6 +23,12 @@ ifneq ($(WANT_SIGINT_HANDLING), no)
 FEATURES	+= -D WANT_SIGINT_HANDLING
 endif
 
+ifneq ($(TLS_SUPPORT), no)
+FEATURES	+= -D TLS_SUPPORT
+LDFLAGS		+= -lssl -lcrypto
+endif
+
+
 all: prepare-build $(objects) bjoernmodule
 
 print-env:
@@ -39,7 +45,7 @@ small: clean
 
 bjoernmodule:
 	@$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(objects) $(HTTP_PARSER_OBJ) -o $(BUILD_DIR)/bjoern.so
-	@PYTHONPATH=$$PYTHONPATH:$(BUILD_DIR) python -c "import bjoern"
+	@PYTHONPATH=$$PYTHONPATH:$(BUILD_DIR) python2 -c "import bjoern"
 
 again: clean all
 
@@ -58,7 +64,7 @@ prepare-build:
 	@mkdir -p $(BUILD_DIR)
 
 clean:
-	@rm -f $(BUILD_DIR)/*
+	@rm -rf $(BUILD_DIR)/*
 
 AB		= ab -c 100 -n 10000
 TEST_URL	= "http://127.0.0.1:8080/a/b/c?k=v&k2=v2"
