@@ -220,6 +220,10 @@ wsgi_getheaders(Request* request, PyObject* buf)
   }
   if(request->state.chunked_response)
     buf_write2("\r\nTransfer-Encoding: chunked");
+  if(request->state.keep_alive)
+    /* TODO
+      Keep-Alive: timeout=x, max=y */
+    buf_write2("\r\nConnection: Keep-Alive");
   buf_write2("\r\n\r\n");
 
   return bufp - PyString_AS_STRING(buf);
