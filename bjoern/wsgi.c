@@ -85,7 +85,14 @@ wsgi_call_application(Request* request)
       Py_DECREF(retval);
       first_chunk = NULL;
     }
-  } else if(FileWrapper_CheckExact(retval)) {
+  } else if(PyFile_CheckExact(retval)) {
+    request->state.use_sendfile = true;
+    request->iterable = ((PyObject*)retval);
+    Py_INCREF(request->iterable);
+    Py_DECREF(retval);
+    request->iterator = NULL;
+    first_chunk = NULL;    
+  } else if (FileWrapper_CheckExact(retval)) {
     request->state.use_sendfile = true;
     request->iterable = ((FileWrapper*)retval)->file;
     Py_INCREF(request->iterable);

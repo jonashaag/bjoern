@@ -28,7 +28,8 @@ typedef struct {
   string body;
 } bj_parser;
 
-typedef struct {
+
+typedef struct Request {
 #ifdef DEBUG
   unsigned long id;
 #endif
@@ -38,6 +39,16 @@ typedef struct {
   int client_fd;
   PyObject* client_addr;
 
+#if TLS_SUPPORT
+  SSL* ssl;
+#endif
+  
+  //callback functions, have to be set when accepting request
+  int (*read)(struct Request*, char*);
+  int (*write)(struct Request*, char*, int);
+  int (*sendfile)(struct Request*, int);
+  void (*close)(struct Request*);
+  
   request_state state;
 
   PyObject* status;
@@ -46,9 +57,7 @@ typedef struct {
   Py_ssize_t current_chunk_p;
   PyObject* iterable;
   PyObject* iterator;
-#if TLS_SUPPORT
-  SSL* ssl;
-#endif
+  
 } Request;
 
 #define REQUEST_FROM_WATCHER(watcher) \

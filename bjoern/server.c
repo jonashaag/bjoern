@@ -5,6 +5,11 @@
 #ifdef WANT_SIGINT_HANDLING
 # include <sys/signal.h>
 #endif
+#ifdef TLS_SUPPORT
+# include <openssl/x509.h>
+# include <openssl/ssl.h>
+# include <openssl/err.h>
+#endif
 #include <sys/sendfile.h>
 #include <ev.h>
 #include "common.h"
@@ -13,6 +18,7 @@
 
 #define LISTEN_BACKLOG  1024
 #define READ_BUFFER_SIZE 64*1024
+#define SENDFILE_CHUNK_SIZE 16*1024
 #define Py_XCLEAR(obj) do { if(obj) { Py_DECREF(obj); obj = NULL; } } while(0)
 #define GIL_LOCK(n) PyGILState_STATE _gilstate_##n = PyGILState_Ensure()
 #define GIL_UNLOCK(n) PyGILState_Release(_gilstate_##n)
@@ -25,6 +31,9 @@ static const char* http_error_messages[4] = {
   "HTTP/1.1 500 Internal Server Error\r\n\r\n"
 };
 
+// ssl context SSL_CTX *
+static void* ctx = NULL;
+
 typedef void ev_io_callback(struct ev_loop*, ev_io*, const int);
 #if WANT_SIGINT_HANDLING
 typedef void ev_signal_callback(struct ev_loop*, ev_signal*, const int);
@@ -33,16 +42,71 @@ static ev_signal_callback ev_signal_on_sigint;
 static ev_io_callback ev_io_on_request;
 static ev_io_callback ev_io_on_read;
 static ev_io_callback ev_io_on_write;
+
+static int read_socket(Request*, char*);
+static int write_socket(Request*, char*, int);
+static int sendfile_socket(Request*, int);
+static void close_socket(Request*);
+
+
+//used by tls
+static ev_io_callback ev_io_on_tls_request;
+static ev_io_callback ev_io_on_handshake;
+
+static int read_tls(Request*, char*);
+static int write_tls(Request*, char*, int);
+static int sendfile_tls(Request*, int);
+static void close_tls(Request*);
+
+
+static Request* accept_request(ev_io* watcher);
 static bool send_chunk(Request*);
 static bool do_sendfile(Request*);
 static bool handle_nonzero_errno(Request*);
+
+#if TLS_SUPPORT
+
+bool create_tls_context(char* key, char* cert, char* cipher){
+  DBG("Creating TLS Context.");
+  
+  SSL_library_init();
+  SSL_load_error_strings();
+  SSL_CTX * context = SSL_CTX_new(TLSv1_server_method());
+    
+  if (SSL_CTX_use_certificate_file(context, cert, SSL_FILETYPE_PEM) <= 0){
+    ERR_print_errors_fp(stderr);
+    return false;    
+  }
+
+  if (SSL_CTX_use_RSAPrivateKey_file(context, key, SSL_FILETYPE_PEM) <= 0){
+    ERR_print_errors_fp(stderr);
+    return false;
+  }
+  
+  if (!SSL_CTX_check_private_key(context)){
+    DBG("Private key dont matches certificate.");
+    return false;
+  }
+  
+  if(cipher)
+    SSL_CTX_set_cipher_list(context, cipher);
+     
+  ctx = (void*) context;
+  
+  return true;
+}
+#endif
 
 void server_run(const char* hostaddr, const int port)
 {
   struct ev_loop* mainloop = ev_default_loop(0);
 
   ev_io accept_watcher;
-  ev_io_init(&accept_watcher, ev_io_on_request, sockfd, EV_READ);
+  if(!ctx)
+    ev_io_init(&accept_watcher, ev_io_on_request, sockfd, EV_READ);
+  else
+    ev_io_init(&accept_watcher, ev_io_on_tls_request, sockfd, EV_READ);
+  
   ev_io_start(mainloop, &accept_watcher);
 
 #if WANT_SIGINT_HANDLING
@@ -93,9 +157,7 @@ bool server_init(const char* hostaddr, const int port)
   return true;
 }
 
-static void
-ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
-{
+static Request* accept_request(ev_io* watcher){
   int client_fd;
   struct sockaddr_in sockaddr;
   socklen_t addrlen;
@@ -104,13 +166,13 @@ ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
   client_fd = accept(watcher->fd, (struct sockaddr*)&sockaddr, &addrlen);
   if(client_fd < 0) {
     DBG("Could not accept() client: errno %d", errno);
-    return;
+    return NULL;
   }
 
   int flags = fcntl(client_fd, F_GETFL, 0);
   if(fcntl(client_fd, F_SETFL, (flags < 0 ? 0 : flags) | O_NONBLOCK) == -1) {
     DBG("Could not set_nonblocking() client %d: errno %d", client_fd, errno);
-    return;
+    return NULL;
   }
 
   GIL_LOCK(0);
@@ -119,11 +181,134 @@ ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
 
   DBG_REQ(request, "Accepted client %s:%d on fd %d",
           inet_ntoa(sockaddr.sin_addr), ntohs(sockaddr.sin_port), client_fd);
+  
+  return request;
+}
+
+static void
+ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
+{
+
+  Request* request = accept_request(watcher);
+  if(!request) return;
+  
+  request->read = &read_socket;
+  request->write = &write_socket;
+  request->sendfile = &sendfile_socket;
+  request->close = &close_socket;
 
   ev_io_init(&request->ev_watcher, &ev_io_on_read,
-             client_fd, EV_READ);
+             request->client_fd, EV_READ);
   ev_io_start(mainloop, &request->ev_watcher);
 }
+
+#ifdef TLS_SUPPORT
+static void
+ev_io_on_tls_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
+{
+
+  Request* request = accept_request(watcher);
+  if(!request) return;
+  
+  request->read = &read_tls;
+  request->write = &write_tls;
+  request->sendfile = &sendfile_tls;
+  request->close = &close_tls;
+  
+  SSL* ssl = SSL_new((SSL_CTX*) ctx);
+  SSL_set_mode(ssl, SSL_MODE_ENABLE_PARTIAL_WRITE);
+  SSL_set_mode(ssl, SSL_MODE_RELEASE_BUFFERS);
+  SSL_set_accept_state(ssl);
+  SSL_set_fd(ssl, request->client_fd);
+  
+  request->ssl = ssl;
+  
+  DBG("SSL cipher: %s", SSL_get_cipher_list(ssl, 0));
+
+  ev_io_init(&request->ev_watcher, &ev_io_on_handshake,
+             request->client_fd, EV_READ);
+  ev_io_start(mainloop, &request->ev_watcher);
+}
+
+static void 
+ev_io_on_handshake(struct ev_loop* mainloop, ev_io* watcher, const int events)
+{
+  Request* request = REQUEST_FROM_WATCHER(watcher);
+  int t = SSL_do_handshake(request->ssl);
+  
+  if(t == 1){
+      ev_io_stop(mainloop, &request->ev_watcher);
+      ev_io_init(&request->ev_watcher, &ev_io_on_read,
+             watcher->fd, EV_READ);
+      ev_io_start(mainloop, &request->ev_watcher);
+  }else {
+    int err = SSL_get_error(request->ssl, t);
+    if (err == SSL_ERROR_WANT_READ) {
+      // wait for more data
+    }
+    else {
+      if(err == SSL_ERROR_SSL || err == SSL_ERROR_SYSCALL){
+	unsigned long ec = ERR_get_error();
+	DBG_REQ(request, "SSL Error %s" ,ERR_error_string(ec, NULL));
+      }
+      DBG_REQ(request, "Unexpected SSL error, closed request: %d", err);
+      close(request->client_fd);
+      SSL_free(request->ssl);
+      Request_free(request);
+      ev_io_stop(mainloop, &request->ev_watcher);
+    }
+      
+  }
+}
+
+static int
+read_tls(Request* request, char* buf){
+  return SSL_read(
+     request->ssl, buf, READ_BUFFER_SIZE
+  );
+}
+
+static int
+write_tls(Request* request, char* buf, int size){
+  return SSL_write(
+     request->ssl, buf, size
+   );
+}
+
+static int
+sendfile_tls(Request* request, int fp){
+  char buf[SENDFILE_CHUNK_SIZE];
+  int read_bytes;
+    
+  read_bytes = read(fp, buf, SENDFILE_CHUNK_SIZE);
+
+  if (read_bytes == 0)
+        return 0;
+   else if (read_bytes < 0)
+        return -1;
+
+   SSL_write(request->ssl, buf, read_bytes);
+   
+   return read_bytes;
+
+}
+
+static void
+close_tls(Request* request){
+    SSL_shutdown(request->ssl);
+    close(request->client_fd);
+    SSL_free(request->ssl);
+}
+#else
+
+static void
+ev_io_on_tls_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
+{
+    // compiler requires this definition
+    printf("Should not have been used. Report Error.\n");
+}
+
+#endif
 
 static void
 ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
@@ -132,12 +317,8 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
 
   Request* request = REQUEST_FROM_WATCHER(watcher);
 
-  Py_ssize_t read_bytes = read(
-    request->client_fd,
-    read_buf,
-    READ_BUFFER_SIZE
-  );
-
+  Py_ssize_t read_bytes = (*request->read)(request, read_buf);
+  
   GIL_LOCK(0);
 
   if(read_bytes <= 0) {
@@ -146,7 +327,7 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
         DBG_REQ(request, "Client disconnected");
       else
         DBG_REQ(request, "Hit errno %d while read()ing", errno);
-      close(request->client_fd);
+      (*request->close)(request);
       Request_free(request);
       ev_io_stop(mainloop, &request->ev_watcher);
     }
@@ -224,7 +405,7 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
            * chunk is already sent... just close the connection */
           DBG_REQ(request, "Exception in iterator, can not recover");
           ev_io_stop(mainloop, &request->ev_watcher);
-          close(request->client_fd);
+          (*request->close)(request);
           Request_free(request);
           goto out;
         }
@@ -251,13 +432,41 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
     ev_io_start(mainloop, &request->ev_watcher);
   } else {
     DBG_REQ(request, "done, close");
-    close(request->client_fd);
+    (*request->close)(request);
     Request_free(request);
   }
 
 out:
   GIL_UNLOCK(0);
 }
+
+static int
+read_socket(Request* request, char* buf){
+  return read(
+     request->client_fd, buf, READ_BUFFER_SIZE
+  );
+}
+
+static int
+write_socket(Request* request, char* buf, int size){
+  return write(
+     request->client_fd, buf, size
+   );
+}
+
+static int
+sendfile_socket(Request* request, int fd){
+  return sendfile(
+    request->client_fd, fd,
+    NULL, SENDFILE_CHUNK_SIZE
+  );
+}
+
+static void
+close_socket(Request* request){
+    close(request->client_fd);
+}
+
 
 static bool
 send_chunk(Request* request)
@@ -269,11 +478,12 @@ send_chunk(Request* request)
   assert(!(request->current_chunk_p == PyString_GET_SIZE(request->current_chunk)
          && PyString_GET_SIZE(request->current_chunk) != 0));
 
-  bytes_sent = write(
-    request->client_fd,
+  bytes_sent = (*request->write)(
+    request, 
     PyString_AS_STRING(request->current_chunk) + request->current_chunk_p,
     PyString_GET_SIZE(request->current_chunk) - request->current_chunk_p
   );
+  
 
   if(bytes_sent == -1)
     return handle_nonzero_errno(request);
@@ -287,16 +497,11 @@ send_chunk(Request* request)
   return true;
 }
 
-#define SENDFILE_CHUNK_SIZE 16*1024
-
 static bool
 do_sendfile(Request* request)
 {
-  Py_ssize_t bytes_sent = sendfile(
-    request->client_fd,
-    request->current_chunk_p, /* current_chunk_p stores the file fd */
-    NULL, SENDFILE_CHUNK_SIZE
-  );
+  DBG_REQ(request, "Send file %d", request->current_chunk_p);
+  Py_ssize_t bytes_sent = (*request->sendfile)(request, request->current_chunk_p);
   if(bytes_sent == -1)
     return handle_nonzero_errno(request);
   return bytes_sent != 0;

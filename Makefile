@@ -68,6 +68,7 @@ clean:
 
 AB		= ab -c 100 -n 10000
 TEST_URL	= "http://127.0.0.1:8080/a/b/c?k=v&k2=v2"
+TEST_URL_SSL    = $(subst http://,https://,$(TEST_URL))
 
 ab: ab1 ab2 ab3 ab4
 
@@ -82,6 +83,12 @@ ab4:
 	@echo 'asdfghjkl=asdfghjkl&qwerty=qwertyuiop' > /tmp/bjoern-post.tmp
 	$(AB) -k -p /tmp/bjoern-post.tmp $(TEST_URL)
 
+ab-tls:
+	$(AB) $(TEST_URL_SSL)
+
+ab-tls-k:
+	$(AB) -k $(TEST_URL_SSL)
+
 wget:
 	wget -O - -q -S $(TEST_URL)
 
@@ -93,6 +100,9 @@ valgrind:
 
 callgrind:
 	valgrind --tool=callgrind python tests/wsgitest-round-robin.py
+
+callgrind2:
+	valgrind --tool=callgrind python2 tests/tls_server.py
 
 memwatch:
 	watch -n 0.5 \

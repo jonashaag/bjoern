@@ -32,17 +32,9 @@ Request* Request_new(int client_fd, const char* client_addr)
 }
 
 void Request_reset(Request* request)
-{
-  //keep ssl context
-#ifdef TLS_SUPPORT
-  SSL* ssl = request->ssl;
-#endif
-  
+{  
   memset(&request->state, 0, sizeof(Request) - (size_t)&((Request*)NULL)->state);
   
-#if TLS_SUPPORT
-  request->ssl = ssl;
-#endif
   request->state.response_length_unknown = true;
   request->parser.body = (string){NULL, 0};
 }

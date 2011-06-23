@@ -17,5 +17,6 @@ def app(env, start_response):
         return open(FILES['big'])
     return open(FILES['small'])
 
-import bjoern
-bjoern.run(app, '0.0.0.0', 8080)
+if __name__ == "__main__":
+    import bjoern
+    bjoern.run(app, '0.0.0.0', 8080)

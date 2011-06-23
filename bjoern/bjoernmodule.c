@@ -3,11 +3,6 @@
 #include "wsgi.h"
 #include "bjoernmodule.h"
 #include "filewrapper.h"
-#include "server_tls.h"
-
-#ifdef TLS_SUPPORT
-# include "server_tls.h"
-#endif
 
 // indicates tls is activated
 bool tls = false;
@@ -37,7 +32,7 @@ listen(PyObject* self, PyObject* args)
   PyObject* key_obj = PyObject_GetAttrString(bjoern_module, "key_path");
   PyObject* cert_obj = PyObject_GetAttrString(bjoern_module, "cert_path");
   
-#if TLS_SUPPORT
+#ifdef TLS_SUPPORT
   char *key, *cert;
   if(PyString_Check(key_obj) && PyString_Check(cert_obj)) {
     tls = true;
@@ -50,15 +45,24 @@ listen(PyObject* self, PyObject* args)
   
   if(tls){
 #if TLS_SUPPORT
-    if(!server_tls_init(host, port, key, cert)) {
+
+   char* ciphers = NULL;
+   PyObject* ciphers_obj = PyObject_GetAttrString(bjoern_module, "ciphers");
+   
+   if(PyString_Check(ciphers_obj)) {
+     ciphers =  PyString_AsString(ciphers_obj);
+  }
+
+    if(!create_tls_context(key, cert, ciphers)) {
     PyErr_Format(
       PyExc_RuntimeError,
-      "Could not start tls server on %s:%d", host, port
+      "Could not create tls context"
     );
     return NULL; 
     }
 #endif
-  } else if(!server_init(host, port)) {
+  } 
+  if(!server_init(host, port)) {
     PyErr_Format(
       PyExc_RuntimeError,
       "Could not start server on %s:%d", host, port
@@ -95,12 +99,7 @@ run(PyObject* self, PyObject* args)
       return NULL;
   }
 
-  if(tls){
-#if TLS_SUPPORT
-    server_tls_run();
-#endif
-  }else
-    server_run();
+  server_run();
   wsgi_app = NULL;
   Py_RETURN_NONE;
 }
@@ -125,6 +124,7 @@ PyMODINIT_FUNC initbjoern()
   PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(ii)", 1, 3));
   PyModule_AddObject(bjoern_module, "key_path", Py_BuildValue("s", NULL));
   PyModule_AddObject(bjoern_module, "cert_path", Py_BuildValue("s", NULL));
+  PyModule_AddObject(bjoern_module, "ciphers", Py_BuildValue("s", NULL));
 #if TLS_SUPPORT
   PyModule_AddObject(bjoern_module, "tls", Py_True);
 #else
