@@ -188,7 +188,7 @@ inspect_headers(Request* request)
 
 err:
   TYPE_ERROR_INNER("start_response argument 2", "a list of 2-tuples",
-    "(found invalid '%.200s' object at position %d)", Py_TYPE(tuple)->tp_name, i);
+    "(found invalid '%.200s' object at position %zd)", Py_TYPE(tuple)->tp_name, i);
   return false;
 }
 
@@ -368,8 +368,8 @@ wrap_http_chunk_cruft_around(PyObject* chunk)
    * but hexadecimal representation for chunk lengths btw!?! Fuck W3C */
   size_t chunklen = PyString_GET_SIZE(chunk);
   assert(chunklen);
-  char buf[strlen("ffffffffffffffff") + 2];
-  size_t n = sprintf(buf, "%x\r\n", chunklen);
+  char buf[strlen("ffffffff") + 2];
+  size_t n = sprintf(buf, "%x\r\n", (unsigned int)chunklen);
   PyObject* new_chunk = PyString_FromStringAndSize(NULL, n + chunklen + 2);
   char* new_chunk_p = PyString_AS_STRING(new_chunk);
   memcpy(new_chunk_p, buf, n);

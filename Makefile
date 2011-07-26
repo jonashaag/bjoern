@@ -100,4 +100,4 @@ upload:
 	python2 setup.py sdist upload
 
 $(HTTP_PARSER_OBJ):
-	$(MAKE) -C $(HTTP_PARSER_DIR) http_parser.o OPT_DEBUG_EXTRA=-fPIC OPT_FAST_EXTRA=-fPIC
+	$(MAKE) -C $(HTTP_PARSER_DIR) http_parser.o CFLAGS_DEBUG_EXTRA=-fPIC CFLAGS_FAST_EXTRA=-fPIC
