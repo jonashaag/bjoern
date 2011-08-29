@@ -48,5 +48,5 @@ Alternatively, the mainloop can be run separately::
 
 .. _WSGI:         http://www.python.org/dev/peps/pep-0333/
 .. _libev:        http://software.schmorp.de/pkg/libev.html
-.. _http_parser:  http://github.com/ry/http-parser
+.. _http-parser:  http://github.com/ry/http-parser
 .. _homebrew: http://mxcl.github.com/homebrew/
