@@ -2,7 +2,5 @@
         TODO/BUGS
     =================
 
-* wsgi_getheaders: get rid of buf_write (but memcpy is bad for that small strings)
-* wsgi_iterable_get_next_chunk: refactor
-* sendfile
 * body -> tempfile for large requests
+* wsgi_getheaders: get rid of buf_write (but memcpy is bad for that small strings)
