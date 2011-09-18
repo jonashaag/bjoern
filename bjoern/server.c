@@ -193,10 +193,14 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
 
   if(request->state.use_sendfile) {
     /* sendfile */
-    if(request->current_chunk && send_chunk(request))
-      goto out;
-    /* abuse current_chunk_p to store the file fd */
-    request->current_chunk_p = PyObject_AsFileDescriptor(request->iterable);
+    if(request->current_chunk) {
+      /* current_chunk contains the HTTP headers */
+      if(send_chunk(request))
+        goto out;
+      assert(!request->current_chunk_p);
+      /* abuse current_chunk_p to store the file fd */
+      request->current_chunk_p = PyObject_AsFileDescriptor(request->iterable);
+    }
     if(do_sendfile(request))
       goto out;
   } else {
