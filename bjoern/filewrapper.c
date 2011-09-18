@@ -47,7 +47,7 @@ PyTypeObject FileWrapper_Type = {
 
 void _init_filewrapper()
 {
-  FileWrapper_Type.tp_new = FileWrapper_New;
+  FileWrapper_Type.tp_new = (newfunc)FileWrapper_New;
   FileWrapper_Type.tp_iter = FileWrapper_Iter;
   FileWrapper_Type.tp_getattro = FileWrapper_GetAttrO;
   FileWrapper_Type.tp_flags |= Py_TPFLAGS_DEFAULT;

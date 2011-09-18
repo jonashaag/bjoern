@@ -37,7 +37,7 @@ static bool send_chunk(Request*);
 static bool do_sendfile(Request*);
 static bool handle_nonzero_errno(Request*);
 
-void server_run(const char* hostaddr, const int port)
+void server_run(void)
 {
   struct ev_loop* mainloop = ev_default_loop(0);
 
@@ -131,7 +131,7 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
 
   Request* request = REQUEST_FROM_WATCHER(watcher);
 
-  Py_ssize_t read_bytes = read(
+  ssize_t read_bytes = read(
     request->client_fd,
     read_buf,
     READ_BUFFER_SIZE
@@ -152,7 +152,7 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
     goto out;
   }
 
-  Request_parse(request, read_buf, read_bytes);
+  Request_parse(request, read_buf, (size_t)read_bytes);
 
   if(request->state.error_code) {
     DBG_REQ(request, "Parse error");
