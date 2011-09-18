@@ -24,6 +24,8 @@ Arch Linux
    ``pacman -S libev``
 Ubuntu
    ``apt-get install libev-dev``
+Fedora
+   ``yum install libev-devel``
 Mac OS X (using homebrew_)
    ``brew install libev``
 Your Contribution Here
@@ -31,9 +33,22 @@ Your Contribution Here
 
 bjoern
 ------
-Make sure *libev* is installed and then::
+
+For most users, the easiest way to install bjoern is using ``pip``. Make sure
+*libev* is installed and then::
 
    pip install bjoern
+
+You can also build bjoern by directly using the provided ``setup.py`` file (this
+is probably most useful if you actually want to hack on bjoern)::
+
+   python setup.py install
+
+On some Linux systems (notably Fedora), the libev headers may be installed
+outside of the default include path. In order to build bjoern you will need to
+export ``CFLAGS`` when running ``setup.py``, for instance::
+
+   CFLAGS=-I/usr/include/libev python setup.py install
 
 Usage
 ~~~~~
