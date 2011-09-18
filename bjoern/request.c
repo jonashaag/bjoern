@@ -302,7 +302,7 @@ void _initialize_request_module(const char* server_host, const int server_port)
     PyDict_SetItemString(
       wsgi_base_dict,
       "wsgi.version",
-      PyTuple_Pack(2, PyInt_FromLong(1), PyInt_FromLong(0))
+      _wsgi_version
     );
 
     /* dct['wsgi.url_scheme'] = 'http'
