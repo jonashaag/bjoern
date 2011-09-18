@@ -36,5 +36,6 @@ void _init_common()
   _HTTP_1_0 = PyString_FromString("HTTP/1.0");
   _wsgi_input = PyString_FromString("wsgi.input");
   _empty_string = PyString_FromString("");
+  _wsgi_version = PyTuple_Pack(2, PyInt_FromLong(1), PyInt_FromLong(0));
   #undef _
 }
