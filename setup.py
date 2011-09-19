@@ -13,7 +13,8 @@ bjoern_extension = Extension(
     define_macros = [('WANT_SENDFILE', '1'),
                      ('WANT_SIGINT_HANDLING', '1')],
     extra_compile_args = ['-std=c99', '-fno-strict-aliasing', '-Wall',
-                          '-Wextra', '-Wno-unused', '-g', '-fPIC']
+                          '-Wextra', '-Wno-unused', '-g', '-fPIC',
+                          '-Wno-missing-field-initializers']
 )
 
 setup(
