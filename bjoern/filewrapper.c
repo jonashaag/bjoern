@@ -1,7 +1,7 @@
 #include "filewrapper.h"
 
 static PyObject*
-FileWrapper_New(PyTypeObject* self, PyObject* args, PyObject* kwargs)
+FileWrapper_New(PyTypeObject* cls, PyObject* args, PyObject* kwargs)
 {
   PyObject* file;
   if(!PyArg_ParseTuple(args, "O:FileWrapper", &file))
