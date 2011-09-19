@@ -78,20 +78,28 @@ bool server_init(const char* hostaddr, const int port)
   if (*hostaddr == '\0')
     hostaddr = "0.0.0.0";
 
-  /* Truncate port to six digits. getaddrinfo will fail if the port number is
-   * too big. TODO: is this ipv6-compatible? does it need to be? */
-  char port_s[7];
-  snprintf(port_s, sizeof(port_s), "%d", port);
-
   struct addrinfo *addr;
-  if ((getaddrinfo(hostaddr, port_s, NULL, &addr)) != 0)
+  if ((getaddrinfo(hostaddr, NULL, NULL, &addr)) != 0)
     return false;
+
+  struct sockaddr *sockaddr = addr->ai_addr;
+  switch(sockaddr->sa_family)
+  {
+  case AF_INET:
+    ((struct sockaddr_in*)(sockaddr))->sin_port = htons(port);
+    break;
+  case AF_INET6:
+    ((struct sockaddr_in6*)(sockaddr))->sin6_port = htons(port);
+    break;
+  default:
+    return false;
+  }
 
   /* Set SO_REUSEADDR t make the IP address available for reuse */
   int optval = true;
   setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
 
-  if(bind(sockfd, addr->ai_addr, sizeof(*(addr->ai_addr))) < 0)
+  if(bind(sockfd, sockaddr, sizeof(*sockaddr)) < 0)
     return false;
 
   if(listen(sockfd, LISTEN_BACKLOG) < 0)
