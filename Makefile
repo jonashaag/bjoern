@@ -14,7 +14,7 @@ objects		= $(HTTP_PARSER_OBJ) \
 
 CPPFLAGS	+= $(PYTHON_INCLUDE) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR)
 CFLAGS		+= $(FEATURES) -std=c99 -fno-strict-aliasing -Wall -Wextra \
-		   -Wno-unused -g -O0 -fPIC
+		   -Wno-unused -g -O0 -fPIC -D_POSIX_C_SOURCE=200112L
 LDFLAGS		+= $(PYTHON_LDFLAGS) -l ev -shared
 
 ifneq ($(WANT_SENDFILE), no)
