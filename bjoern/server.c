@@ -184,6 +184,7 @@ out:
   return;
 }
 
+/* XXX too much gotos */
 static void
 ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
 {
@@ -200,6 +201,7 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
       assert(!request->current_chunk_p);
       /* abuse current_chunk_p to store the file fd */
       request->current_chunk_p = PyObject_AsFileDescriptor(request->iterable);
+      goto out;
     }
     if(do_sendfile(request))
       goto out;
