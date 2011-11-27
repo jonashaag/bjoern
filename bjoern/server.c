@@ -1,5 +1,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netdb.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
 #ifdef WANT_SIGINT_HANDLING
@@ -73,16 +74,32 @@ bool server_init(const char* hostaddr, const int port)
   if((sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
     return false;
 
-  struct sockaddr_in sockaddr;
-  sockaddr.sin_family = PF_INET;
-  inet_pton(AF_INET, hostaddr, &sockaddr.sin_addr);
-  sockaddr.sin_port = htons(port);
+  /* If hostaddr is the empty string, bind to 0.0.0.0 */
+  if (*hostaddr == '\0')
+    hostaddr = "0.0.0.0";
+
+  struct addrinfo *addr;
+  if ((getaddrinfo(hostaddr, NULL, NULL, &addr)) != 0)
+    return false;
+
+  struct sockaddr *sockaddr = addr->ai_addr;
+  switch(sockaddr->sa_family)
+  {
+  case AF_INET:
+    ((struct sockaddr_in*)(sockaddr))->sin_port = htons(port);
+    break;
+  case AF_INET6:
+    ((struct sockaddr_in6*)(sockaddr))->sin6_port = htons(port);
+    break;
+  default:
+    return false;
+  }
 
   /* Set SO_REUSEADDR t make the IP address available for reuse */
   int optval = true;
   setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
 
-  if(bind(sockfd, (struct sockaddr*)&sockaddr, sizeof(sockaddr)) < 0)
+  if(bind(sockfd, sockaddr, sizeof(*sockaddr)) < 0)
     return false;
 
   if(listen(sockfd, LISTEN_BACKLOG) < 0)
