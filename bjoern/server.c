@@ -1,4 +1,5 @@
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -70,26 +71,46 @@ ev_signal_on_sigint(struct ev_loop* mainloop, ev_signal* watcher, const int even
 
 bool server_init(const char* hostaddr, const int port)
 {
-  if((sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
-    return false;
+  if(strncmp("unix:", hostaddr, 5) == 0) {
+    if((sockfd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0)
+      return false;
 
-  struct sockaddr_in sockaddr;
-  sockaddr.sin_family = PF_INET;
-  inet_pton(AF_INET, hostaddr, &sockaddr.sin_addr);
-  sockaddr.sin_port = htons(port);
+    struct sockaddr_un sockaddr;
+    sockaddr.sun_family = PF_UNIX;
+    strcpy(sockaddr.sun_path, hostaddr+5);
+    if(hostaddr[5] == '@') sockaddr.sun_path[0] = '\0'; /* Use @ for abstract */
 
-  /* Set SO_REUSEADDR t make the IP address available for reuse */
-  int optval = true;
-  setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+    if(bind(sockfd, (struct sockaddr*)&sockaddr, strlen(hostaddr+5)+2) < 0)
+      return false;
 
-  if(bind(sockfd, (struct sockaddr*)&sockaddr, sizeof(sockaddr)) < 0)
-    return false;
+    if(listen(sockfd, LISTEN_BACKLOG) < 0)
+      return false;
 
-  if(listen(sockfd, LISTEN_BACKLOG) < 0)
-    return false;
+    DBG("Listening on %s...", hostaddr);
+    return true;
+  }
+  else {
+    if((sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
+      return false;
 
-  DBG("Listening on %s:%d...", hostaddr, port);
-  return true;
+    struct sockaddr_in sockaddr;
+    sockaddr.sin_family = PF_INET;
+    inet_pton(AF_INET, hostaddr, &sockaddr.sin_addr);
+    sockaddr.sin_port = htons(port);
+
+    /* Set SO_REUSEADDR t make the IP address available for reuse */
+    int optval = true;
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+
+    if(bind(sockfd, (struct sockaddr*)&sockaddr, sizeof(sockaddr)) < 0)
+      return false;
+
+    if(listen(sockfd, LISTEN_BACKLOG) < 0)
+      return false;
+
+    DBG("Listening on %s:%d...", hostaddr, port);
+    return true;
+  }
 }
 
 static void
