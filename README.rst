@@ -13,6 +13,7 @@ featuring
 * ~ 1000 lines of C code
 * Memory footprint ~ 600KB
 * Single-threaded and without coroutines or other crap
+* Can bind to TCP `host:port` addresses and Unix sockets (thanks @k3d3's!)
 * Full persistent connection ("*keep-alive*") support in both HTTP/1.0 and 1.1,
   including support for HTTP/1.1 chunked responses
 
@@ -54,7 +55,11 @@ Usage
 ~~~~~
 ::
 
+   # Bind to TCP host/port pair:
    bjoern.run(wsgi_application, host, port)
+
+   # Bind to Unix socket:
+   bjoern.run(wsgi_application, 'unix:/path/to/socket')
 
 Alternatively, the mainloop can be run separately::
 
