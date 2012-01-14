@@ -25,4 +25,5 @@ apps = (app1, app2, app3, app4)
 def wsgi_app(env, start_response):
     return choice(apps)(env, start_response)
 
-bjoern.run(wsgi_app, '0.0.0.0', 8080)
+if __name__ == '__main__':
+    bjoern.run(wsgi_app, '0.0.0.0', 8080)

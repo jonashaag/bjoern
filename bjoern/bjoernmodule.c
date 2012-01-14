@@ -14,7 +14,7 @@ static PyObject*
 listen(PyObject* self, PyObject* args)
 {
   const char* host;
-  int port;
+  int port = 0;
 
   if(wsgi_app) {
     PyErr_SetString(
@@ -24,20 +24,33 @@ listen(PyObject* self, PyObject* args)
     return NULL;
   }
 
-  if(!PyArg_ParseTuple(args, "Osi:run/listen", &wsgi_app, &host, &port))
+  if(!PyArg_ParseTuple(args, "Os|i:run/listen", &wsgi_app, &host, &port))
     return NULL;
 
   _initialize_request_module(host, port);
 
+  if(!port) {
+    /* Unix socket: "unix:/tmp/foo.sock" or "unix:@abstract-socket" (Linux) */
+    if(strncmp("unix:", host, 5)) {
+      PyErr_Format(PyExc_ValueError, "'port' missing but 'host' is not a Unix socket");
+      goto err;
+    }
+    host += 5;
+  }
+
   if(!server_init(host, port)) {
-    PyErr_Format(
-      PyExc_RuntimeError,
-      "Could not start server on %s:%d", host, port
-    );
-    return NULL;
+    if(port)
+      PyErr_Format(PyExc_RuntimeError, "Could not start server on %s:%d", host, port);
+    else
+      PyErr_Format(PyExc_RuntimeError, "Could not start server on %s", host);
+    goto err;
   }
 
   Py_RETURN_NONE;
+
+err:
+  wsgi_app = NULL;
+  return NULL;
 }
 
 PyDoc_STRVAR(run_doc,

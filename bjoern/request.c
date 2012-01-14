@@ -354,6 +354,6 @@ void _initialize_request_module(const char* server_host, const int server_port)
   PyDict_SetItemString(
     wsgi_base_dict,
     "SERVER_PORT",
-    PyString_FromFormat("%d", server_port)
+    server_port ? PyString_FromFormat("%d", server_port) : _empty_string
   );
 }

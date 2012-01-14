@@ -18,7 +18,6 @@
 #define GIL_LOCK(n) PyGILState_STATE _gilstate_##n = PyGILState_Ensure()
 #define GIL_UNLOCK(n) PyGILState_Release(_gilstate_##n)
 
-static int sockfd;
 static const char* http_error_messages[4] = {
   NULL, /* Error codes start at 1 because 0 means "no error" */
   "HTTP/1.1 400 Bad Request\r\n\r\n",
@@ -38,12 +37,14 @@ static bool send_chunk(Request*);
 static bool do_sendfile(Request*);
 static bool handle_nonzero_errno(Request*);
 
+static struct { int fd; const char* filename; } sockinfo;
+
 void server_run(void)
 {
   struct ev_loop* mainloop = ev_default_loop(0);
 
   ev_io accept_watcher;
-  ev_io_init(&accept_watcher, ev_io_on_request, sockfd, EV_READ);
+  ev_io_init(&accept_watcher, ev_io_on_request, sockinfo.fd, EV_READ);
   ev_io_start(mainloop, &accept_watcher);
 
 #if WANT_SIGINT_HANDLING
@@ -55,7 +56,14 @@ void server_run(void)
   /* This is the program main loop */
   Py_BEGIN_ALLOW_THREADS
   ev_loop(mainloop, 0);
+  ev_default_destroy();
   Py_END_ALLOW_THREADS
+}
+
+static void cleanup() {
+  close(sockinfo.fd);
+  if(sockinfo.filename)
+    unlink(sockinfo.filename);
 }
 
 #if WANT_SIGINT_HANDLING
@@ -64,6 +72,7 @@ ev_signal_on_sigint(struct ev_loop* mainloop, ev_signal* watcher, const int even
 {
   /* Clean up and shut down this thread.
    * (Shuts down the Python interpreter if this is the main thread) */
+  cleanup();
   ev_unloop(mainloop, EVUNLOOP_ALL);
   PyErr_SetInterrupt();
 }
@@ -71,26 +80,27 @@ ev_signal_on_sigint(struct ev_loop* mainloop, ev_signal* watcher, const int even
 
 bool server_init(const char* hostaddr, const int port)
 {
-  if(strncmp("unix:", hostaddr, 5) == 0) {
-    if((sockfd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0)
+  if(!port) {
+    /* Unix socket */
+    if((sockinfo.fd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0)
       return false;
 
     struct sockaddr_un sockaddr;
     sockaddr.sun_family = PF_UNIX;
-    strcpy(sockaddr.sun_path, hostaddr+5);
-    if(hostaddr[5] == '@') sockaddr.sun_path[0] = '\0'; /* Use @ for abstract */
+    strcpy(sockaddr.sun_path, hostaddr);
 
-    if(bind(sockfd, (struct sockaddr*)&sockaddr, strlen(hostaddr+5)+2) < 0)
-      return false;
+    /* Use @ for abstract */
+    if(hostaddr[0] == '@')
+      sockaddr.sun_path[0] = '\0';
+    else
+      sockinfo.filename = hostaddr;
 
-    if(listen(sockfd, LISTEN_BACKLOG) < 0)
-      return false;
-
-    DBG("Listening on %s...", hostaddr);
-    return true;
+    if(bind(sockinfo.fd, (struct sockaddr*)&sockaddr, sizeof(sockaddr)) < 0)
+      goto err;
   }
   else {
-    if((sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
+    /* IP bind */
+    if((sockinfo.fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
       return false;
 
     struct sockaddr_in sockaddr;
@@ -100,17 +110,21 @@ bool server_init(const char* hostaddr, const int port)
 
     /* Set SO_REUSEADDR t make the IP address available for reuse */
     int optval = true;
-    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+    setsockopt(sockinfo.fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
 
-    if(bind(sockfd, (struct sockaddr*)&sockaddr, sizeof(sockaddr)) < 0)
-      return false;
-
-    if(listen(sockfd, LISTEN_BACKLOG) < 0)
-      return false;
-
-    DBG("Listening on %s:%d...", hostaddr, port);
-    return true;
+    if(bind(sockinfo.fd, (struct sockaddr*)&sockaddr, sizeof(sockaddr)) < 0)
+      goto err;
   }
+
+  if(listen(sockinfo.fd, LISTEN_BACKLOG) < 0)
+    goto err;
+
+  DBG("Listening on %s:%d...", hostaddr, port);
+  return true;
+
+err:
+  cleanup();
+  return false;
 }
 
 static void
@@ -205,7 +219,7 @@ out:
   return;
 }
 
-/* XXX too much gotos */
+/* XXX too many gotos */
 static void
 ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
 {
