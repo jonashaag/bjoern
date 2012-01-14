@@ -13,7 +13,7 @@ featuring
 * ~ 1000 lines of C code
 * Memory footprint ~ 600KB
 * Single-threaded and without coroutines or other crap
-* Can bind to TCP `host:port` addresses and Unix sockets (thanks @k3d3's!)
+* Can bind to TCP `host:port` addresses and Unix sockets (thanks @k3d3!)
 * Full persistent connection ("*keep-alive*") support in both HTTP/1.0 and 1.1,
   including support for HTTP/1.1 chunked responses
 
