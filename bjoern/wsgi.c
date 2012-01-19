@@ -6,7 +6,6 @@
 static PyObject* (start_response)(PyObject* self, PyObject* args, PyObject *kwargs);
 static size_t wsgi_getheaders(Request*, PyObject* buf);
 static inline bool inspect_headers(Request*);
-static inline bool should_keep_alive(Request*);
 
 typedef struct {
   PyObject_HEAD
@@ -115,8 +114,9 @@ wsgi_call_application(Request* request)
     Py_DECREF(first_chunk);
     return false;
   }
-
-  if(should_keep_alive(request)) {
+  
+/* Let http-parser decide if connection should be keep-alive: */
+  if(http_should_keep_alive(&request->parser.parser)) { 
     request->state.chunked_response = request->state.response_length_unknown;
     request->state.keep_alive = true;
   } else {
@@ -192,10 +192,12 @@ err:
   return false;
 }
 
+
 static size_t
 wsgi_getheaders(Request* request, PyObject* buf)
 {
   char* bufp = PyString_AS_STRING(buf);
+  int have_http11 = (request->parser.parser.http_major > 0 && request->parser.parser.http_minor > 0);
 
   #define buf_write(src, len) \
     do { \
@@ -218,7 +220,15 @@ wsgi_getheaders(Request* request, PyObject* buf)
     buf_write2(": ");
     buf_write(PyString_AS_STRING(value), PyString_GET_SIZE(value));
   }
-  if(request->state.chunked_response)
+  if(!have_http11) {
+    if(request->state.chunked_response)
+      /* Can't do chunked with HTTP 1.0 */
+      buf_write2("\r\nConnection: close");
+    else if (request->state.keep_alive)
+      /* Need to be explicit with HTTP 1.0 */
+      buf_write2("\r\nConnection: Keep-Alive"); 
+  }
+  else if(request->state.chunked_response)
     buf_write2("\r\nTransfer-Encoding: chunked");
   buf_write2("\r\n\r\n");
 
@@ -339,27 +349,8 @@ PyTypeObject StartResponse_Type = {
   start_response              /* tp_call (__call__)                         */
 };
 
-#define F_KEEP_ALIVE 1<<1
-#define have_http11(parser) (parser.http_major > 0 && parser.http_minor > 0)
 
-static inline bool
-should_keep_alive(Request* request)
-{
-  if(!(request->parser.parser.flags & F_KEEP_ALIVE)) {
-    /* Only keep-alive if the client requested it explicitly */
-    return false;
-  }
-  if(request->state.response_length_unknown) {
-    /* If the client wants to keep-alive the connection but we don't know
-     * the response length, we can use Transfer-Encoding: chunked on HTTP/1.1.
-     * On HTTP/1.0 no such thing exists so there's no other option than closing
-     * the connection to indicate the response end. */
-    return have_http11(request->parser.parser);
-  } else {
-    /* If the response length is known we can keep-alive for both 1.0 and 1.1 */
-    return true;
-  }
-}
+
 
 PyObject*
 wrap_http_chunk_cruft_around(PyObject* chunk)
