@@ -25,10 +25,10 @@ Arch Linux
    ``pacman -S libev``
 Ubuntu
    ``apt-get install libev-dev``
-Fedora
+Fedora, CentOS
    ``yum install libev-devel``
 Mac OS X (using homebrew_)
-   ``brew install libev``
+   ``brew install libev``z
 Your Contribution Here
    Fork me and send a pull request
 
@@ -45,7 +45,7 @@ is probably most useful if you actually want to hack on bjoern)::
 
    python setup.py install
 
-On some Linux systems (notably Fedora), the libev headers may be installed
+On some Linux systems (notably Fedora and CentOS), the libev headers may be installed
 outside of the default include path. In order to build bjoern you will need to
 export ``CFLAGS`` when running ``setup.py``, for instance::
 
