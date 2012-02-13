@@ -28,7 +28,7 @@ Ubuntu
 Fedora, CentOS
    ``yum install libev-devel``
 Mac OS X (using homebrew_)
-   ``brew install libev``z
+   ``brew install libev``
 Your Contribution Here
    Fork me and send a pull request
 
