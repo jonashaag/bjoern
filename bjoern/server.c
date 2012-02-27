@@ -104,12 +104,10 @@ bool server_init(const char* hostaddr, const int port)
       return false;
 
     struct sockaddr_in sockaddr;
+    memset(&sockaddr, 0, sizeof(sockaddr));
     sockaddr.sin_family = PF_INET;
     inet_pton(AF_INET, hostaddr, &sockaddr.sin_addr);
     sockaddr.sin_port = htons(port);
-#ifdef __APPLE__
-    sockaddr.sin_len = sizeof(sockaddr);
-#endif
 
     /* Set SO_REUSEADDR t make the IP address available for reuse */
     int optval = true;
