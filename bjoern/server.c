@@ -6,7 +6,12 @@
 #ifdef WANT_SIGINT_HANDLING
 # include <sys/signal.h>
 #endif
-#include <sys/sendfile.h>
+#ifdef __APPLE__
+# include <string.h>
+# include <sys/types.h>
+#else
+# include <sys/sendfile.h>
+#endif
 #include <ev.h>
 #include "common.h"
 #include "wsgi.h"
@@ -104,6 +109,7 @@ bool server_init(const char* hostaddr, const int port)
       return false;
 
     struct sockaddr_in sockaddr;
+    memset(&sockaddr, 0, sizeof(sockaddr));
     sockaddr.sin_family = PF_INET;
     inet_pton(AF_INET, hostaddr, &sockaddr.sin_addr);
     sockaddr.sin_port = htons(port);
@@ -329,6 +335,26 @@ send_chunk(Request* request)
 
 #define SENDFILE_CHUNK_SIZE 16*1024
 
+#ifdef __APPLE__
+
+static bool
+do_sendfile(Request* request){
+    off_t len = SENDFILE_CHUNK_SIZE;
+
+    int r = sendfile(
+        request->current_chunk_p,
+        request->client_fd,
+        0,
+        &len,
+        NULL,
+        0);
+    if(r == -1)
+        return handle_nonzero_errno(request);
+    return  len !=0;
+}
+
+#else
+
 static bool
 do_sendfile(Request* request)
 {
@@ -341,6 +367,8 @@ do_sendfile(Request* request)
     return handle_nonzero_errno(request);
   return bytes_sent != 0;
 }
+
+#endif
 
 static bool
 handle_nonzero_errno(Request* request)

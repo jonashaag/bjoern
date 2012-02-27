@@ -1,5 +1,7 @@
 #include "filewrapper.h"
 
+PyTypeObject FileWrapper_Type;
+
 static PyObject*
 FileWrapper_New(PyTypeObject* cls, PyObject* args, PyObject* kwargs)
 {
