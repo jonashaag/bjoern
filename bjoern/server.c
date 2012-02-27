@@ -7,6 +7,7 @@
 # include <sys/signal.h>
 #endif
 #ifdef __APPLE__
+# include <string.h>
 # include <sys/types.h>
 # include <sys/socket.h>
 # include <sys/uio.h>
@@ -113,6 +114,11 @@ bool server_init(const char* hostaddr, const int port)
     sockaddr.sin_family = PF_INET;
     inet_pton(AF_INET, hostaddr, &sockaddr.sin_addr);
     sockaddr.sin_port = htons(port);
+
+#ifdef __APPLE__
+    memset(&sockaddr, '\0', sizeof(sockaddr));
+    sockaddr.sin_len = sizeof(sockaddr);
+#endif
 
     /* Set SO_REUSEADDR t make the IP address available for reuse */
     int optval = true;
