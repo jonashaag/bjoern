@@ -3,6 +3,8 @@
 #include "filewrapper.h"
 #include "wsgi.h"
 
+PyTypeObject StartResponse_Type;
+
 static PyObject* (start_response)(PyObject* self, PyObject* args, PyObject *kwargs);
 static size_t wsgi_getheaders(Request*, PyObject* buf);
 static inline bool inspect_headers(Request*);

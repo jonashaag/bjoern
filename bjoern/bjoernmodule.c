@@ -4,6 +4,7 @@
 #include "bjoernmodule.h"
 #include "filewrapper.h"
 
+PyObject* wsgi_app;
 
 PyDoc_STRVAR(listen_doc,
 "listen(application, host, port) -> None\n\n \
