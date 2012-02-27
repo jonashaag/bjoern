@@ -9,8 +9,6 @@
 #ifdef __APPLE__
 # include <string.h>
 # include <sys/types.h>
-# include <sys/socket.h>
-# include <sys/uio.h>
 #else
 # include <sys/sendfile.h>
 #endif
