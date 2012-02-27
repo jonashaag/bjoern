@@ -6,8 +6,8 @@
 #ifdef WANT_SIGINT_HANDLING
 # include <sys/signal.h>
 #endif
-#include <sys/sendfile.h>
 #include <ev.h>
+#include "portable_sendfile.h"
 #include "common.h"
 #include "wsgi.h"
 #include "server.h"
@@ -104,6 +104,7 @@ bool server_init(const char* hostaddr, const int port)
       return false;
 
     struct sockaddr_in sockaddr;
+    memset(&sockaddr, 0, sizeof(sockaddr));
     sockaddr.sin_family = PF_INET;
     inet_pton(AF_INET, hostaddr, &sockaddr.sin_addr);
     sockaddr.sin_port = htons(port);
@@ -302,7 +303,6 @@ out:
 static bool
 send_chunk(Request* request)
 {
-  Py_ssize_t chunk_length;
   Py_ssize_t bytes_sent;
 
   assert(request->current_chunk != NULL);
@@ -327,15 +327,12 @@ send_chunk(Request* request)
   return true;
 }
 
-#define SENDFILE_CHUNK_SIZE 16*1024
-
 static bool
 do_sendfile(Request* request)
 {
-  Py_ssize_t bytes_sent = sendfile(
-    request->client_fd,
-    request->current_chunk_p, /* current_chunk_p stores the file fd */
-    NULL, SENDFILE_CHUNK_SIZE
+  Py_ssize_t bytes_sent = portable_sendfile(
+      request->client_fd,
+      request->current_chunk_p /* current_chunk_p stores the file fd */
   );
   if(bytes_sent == -1)
     return handle_nonzero_errno(request);

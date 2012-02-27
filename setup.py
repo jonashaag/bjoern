@@ -14,7 +14,7 @@ bjoern_extension = Extension(
                      ('WANT_SIGINT_HANDLING', '1')],
     extra_compile_args = ['-std=c99', '-fno-strict-aliasing', '-Wall',
                           '-Wextra', '-Wno-unused', '-g', '-fPIC',
-                          '-Wno-missing-field-initializers']
+                          '-Wno-missing-field-initializers', '-fcommon']
 )
 
 setup(
