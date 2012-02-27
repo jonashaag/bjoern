@@ -91,12 +91,6 @@ bool server_init(const char* hostaddr, const int port)
       return false;
 
     struct sockaddr_un sockaddr;
-
-#ifdef __APPLE__
-    memset(&sockaddr, 0, sizeof(sockaddr));
-    sockaddr.sun_len = sizeof(sockaddr);
-#endif
-
     sockaddr.sun_family = PF_UNIX;
     strcpy(sockaddr.sun_path, hostaddr);
 
@@ -115,12 +109,7 @@ bool server_init(const char* hostaddr, const int port)
       return false;
 
     struct sockaddr_in sockaddr;
-
-#ifdef __APPLE__
     memset(&sockaddr, 0, sizeof(sockaddr));
-    sockaddr.sin_len = sizeof(sockaddr);
-#endif
-
     sockaddr.sin_family = PF_INET;
     inet_pton(AF_INET, hostaddr, &sockaddr.sin_addr);
     sockaddr.sin_port = htons(port);
