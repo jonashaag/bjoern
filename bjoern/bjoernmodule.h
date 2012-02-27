@@ -1,1 +1,1 @@
-PyObject* wsgi_app;
+extern PyObject* wsgi_app;

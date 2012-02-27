@@ -23,7 +23,7 @@ enum http_status { HTTP_BAD_REQUEST = 1, HTTP_LENGTH_REQUIRED, HTTP_SERVER_ERROR
 size_t unquote_url_inplace(char* url, size_t len);
 void (_init_common)();
 
-PyObject *_REMOTE_ADDR, *_PATH_INFO, *_QUERY_STRING, *_REQUEST_METHOD, *_GET,
+extern PyObject *_REMOTE_ADDR, *_PATH_INFO, *_QUERY_STRING, *_REQUEST_METHOD, *_GET,
          *_HTTP_CONTENT_LENGTH, *_CONTENT_LENGTH, *_HTTP_CONTENT_TYPE, *_CONTENT_TYPE,
          *_SERVER_PROTOCOL, *_HTTP_1_1, *_HTTP_1_0, *_wsgi_input, *_close, *_empty_string;
 
