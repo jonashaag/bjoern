@@ -6,6 +6,7 @@
 
   /* OS X */
 
+  #include <sys/socket.h>
   #include <sys/types.h>
 
   ssize_t portable_sendfile(int out_fd, int in_fd) {
