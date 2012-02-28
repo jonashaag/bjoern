@@ -13,8 +13,8 @@ objects		= $(HTTP_PARSER_OBJ) \
 		             $(wildcard $(SOURCE_DIR)/*.c))
 
 CPPFLAGS	+= $(PYTHON_INCLUDE) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR)
-CFLAGS		+= $(FEATURES) -std=c99 -fno-strict-aliasing -Wall -Wextra \
-		   -Wno-unused -g -O0 -fPIC
+CFLAGS		+= $(FEATURES) -std=c99 -fno-strict-aliasing -fcommon -fPIC -Wall \
+		   -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -g -O0
 LDFLAGS		+= $(PYTHON_LDFLAGS) -l ev -shared -fcommon
 
 ifneq ($(WANT_SENDFILE), no)
