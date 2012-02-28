@@ -9,4 +9,4 @@ typedef struct {
   PyObject* file;
 } FileWrapper;
 
-void (_init_filewrapper)();
+void _init_filewrapper(void);

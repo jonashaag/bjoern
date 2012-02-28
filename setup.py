@@ -12,9 +12,9 @@ bjoern_extension = Extension(
     include_dirs  = ['http-parser'],
     define_macros = [('WANT_SENDFILE', '1'),
                      ('WANT_SIGINT_HANDLING', '1')],
-    extra_compile_args = ['-std=c99', '-fno-strict-aliasing', '-Wall',
-                          '-Wextra', '-Wno-unused', '-g', '-fPIC',
-                          '-Wno-missing-field-initializers', '-fcommon']
+    extra_compile_args = ['-std=c99', '-fno-strict-aliasing', '-fcommon',
+                          '-fPIC', '-Wall', '-Wextra', '-Wno-unused-parameter',
+                          '-Wno-missing-field-initializers', '-g']
 )
 
 setup(

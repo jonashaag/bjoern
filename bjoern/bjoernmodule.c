@@ -90,7 +90,7 @@ static PyMethodDef Bjoern_FunctionTable[] = {
   {NULL, NULL, 0, NULL}
 };
 
-PyMODINIT_FUNC initbjoern()
+PyMODINIT_FUNC initbjoern(void)
 {
   _init_common();
   _init_filewrapper();
