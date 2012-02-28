@@ -118,9 +118,9 @@ on_message_begin(http_parser* parser)
 }
 
 static int
-on_path(http_parser* parser, char* path, size_t len)
+on_path(http_parser* parser, const char* path, size_t len)
 {
-  if(!(len = unquote_url_inplace(path, len)))
+  if(!(len = unquote_url_inplace((char*)path, len)))
     return 1;
   _set_header_free_value(_PATH_INFO, PyString_FromStringAndSize(path, len));
   return 0;
