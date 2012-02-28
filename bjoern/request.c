@@ -108,7 +108,8 @@ void Request_parse(Request* request, const char* data, const size_t data_len)
     Py_DECREF(val); \
   } while(0)
 
-static int on_message_begin(http_parser* parser)
+static int
+on_message_begin(http_parser* parser)
 {
   REQUEST->headers = PyDict_New();
   PARSER->field = (string){NULL, 0};
@@ -116,7 +117,8 @@ static int on_message_begin(http_parser* parser)
   return 0;
 }
 
-static int on_path(http_parser* parser, char* path, size_t len)
+static int
+on_path(http_parser* parser, char* path, size_t len)
 {
   if(!(len = unquote_url_inplace(path, len)))
     return 1;
@@ -124,13 +126,15 @@ static int on_path(http_parser* parser, char* path, size_t len)
   return 0;
 }
 
-static int on_query_string(http_parser* parser, const char* query, size_t len)
+static int
+on_query_string(http_parser* parser, const char* query, size_t len)
 {
   _set_header_free_value(_QUERY_STRING, PyString_FromStringAndSize(query, len));
   return 0;
 }
 
-static int on_header_field(http_parser* parser, const char* field, size_t len)
+static int
+on_header_field(http_parser* parser, const char* field, size_t len)
 {
   if(PARSER->value.data) {
     /* Store previous header and start a new one */
