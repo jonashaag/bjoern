@@ -1,5 +1,6 @@
 #include <Python.h>
 #include <cStringIO.h>
+#include <string.h>
 #include "request.h"
 #include "filewrapper.h"
 
