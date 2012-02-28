@@ -61,6 +61,9 @@ Usage
    # Bind to Unix socket:
    bjoern.run(wsgi_application, 'unix:/path/to/socket')
 
+   # Bind to abstract Unix socket: (Linux only)
+   bjoern.run(wsgi_application, 'unix:@socket_name')
+
 Alternatively, the mainloop can be run separately::
 
    bjoern.listen(wsgi_application, host, port)

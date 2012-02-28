@@ -89,7 +89,7 @@ bool server_init(const char* hostaddr, const int port)
     sockaddr.sun_family = PF_UNIX;
     strcpy(sockaddr.sun_path, hostaddr);
 
-    /* Use @ for abstract */
+    /* Use @ for abstract (Linux) */
     if(hostaddr[0] == '@')
       sockaddr.sun_path[0] = '\0';
     else
