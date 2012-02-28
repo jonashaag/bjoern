@@ -45,7 +45,7 @@ PyTypeObject FileWrapper_Type = {
   (destructor)FileWrapper_dealloc,  /* tp_dealloc                             */
 };
 
-void _init_filewrapper()
+void _init_filewrapper(void)
 {
   FileWrapper_Type.tp_new = FileWrapper_New;
   FileWrapper_Type.tp_iter = FileWrapper_Iter;

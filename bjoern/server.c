@@ -60,7 +60,7 @@ void server_run(void)
   Py_END_ALLOW_THREADS
 }
 
-static void cleanup() {
+static void cleanup(void) {
   close(sockinfo.fd);
   if(sockinfo.filename)
     unlink(sockinfo.filename);
