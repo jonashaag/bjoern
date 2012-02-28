@@ -15,7 +15,7 @@ bjoern_extension = Extension(
     extra_compile_args = ['-std=c99', '-fno-strict-aliasing', '-Wall',
                           '-Wextra', '-Wno-unused', '-Wno-unused-parameter',
                           '-g', '-fPIC', '-Wno-missing-field-initializers',
-                          '-Wno-array-bounds', '-fcommon']
+                          '-fcommon']
 )
 
 setup(
