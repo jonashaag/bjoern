@@ -1,5 +1,6 @@
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -99,22 +100,36 @@ bool server_init(const char* hostaddr, const int port)
       goto err;
   }
   else {
-    /* IP bind */
-    if((sockinfo.fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
-      return false;
+    struct addrinfo hints;
+    struct addrinfo *p, *servinfo;
+    char strport[6];
 
-    struct sockaddr_in sockaddr;
-    memset(&sockaddr, 0, sizeof(sockaddr));
-    sockaddr.sin_family = PF_INET;
-    inet_pton(AF_INET, hostaddr, &sockaddr.sin_addr);
-    sockaddr.sin_port = htons(port);
+    // Stringify the port
+    snprintf(strport, 6, "%d", port);
 
-    /* Set SO_REUSEADDR t make the IP address available for reuse */
-    int optval = true;
-    setsockopt(sockinfo.fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+    // Set up the hints struct
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_UNSPEC; // Allow IPv4 and IPv6
+    hints.ai_socktype = SOCK_STREAM;
 
-    if(bind(sockinfo.fd, (struct sockaddr*)&sockaddr, sizeof(sockaddr)) < 0)
+    if (getaddrinfo(hostaddr, strport, &hints, &servinfo) != 0)
       goto err;
+
+    // Iterate through the results, trying to bind
+    for (p = servinfo; p != NULL; p = p->ai_next) {
+      if ((sockinfo.fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0)
+        continue;
+
+      if (bind(sockinfo.fd, p->ai_addr, p->ai_addrlen) < 0)
+        continue;
+
+      break; // success
+    }
+
+    if (p == NULL) // Bind failed
+      goto err;
+
+    freeaddrinfo(servinfo);
   }
 
   if(listen(sockinfo.fd, LISTEN_BACKLOG) < 0)
