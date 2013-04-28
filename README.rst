@@ -35,7 +35,13 @@ Your Contribution Here
 bjoern
 ------
 
-Make sure *libev* is installed and then::
+For most users, the easiest way to install bjoern is using ``pip``. Make sure
+*libev* is installed and then::
+
+   pip install bjoern
+
+You can also build bjoern by directly using the provided ``setup.py`` file (this
+is probably most useful if you actually want to hack on bjoern)::
 
    python setup.py install
 
