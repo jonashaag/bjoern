@@ -49,7 +49,7 @@ debug:
 	CFLAGS='-D DEBUG' make again
 
 $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.c
-	@echo ' -> ' $(CC) -c $< -o $@
+	@echo ' -> ' $(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 	@$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 # foo.o: shortcut to $(BUILD_DIR)/foo.o

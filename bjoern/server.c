@@ -234,13 +234,15 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
       /* current_chunk contains the HTTP headers */
       if(send_chunk(request))
         goto out;
-      assert(!request->current_chunk_p);
+      assert(request->current_chunk_p == 0);
       /* abuse current_chunk_p to store the file fd */
       request->current_chunk_p = PyObject_AsFileDescriptor(request->iterable);
       goto out;
     }
+
     if(do_sendfile(request))
       goto out;
+
   } else {
     /* iterable */
     if(send_chunk(request))
@@ -307,7 +309,7 @@ send_chunk(Request* request)
 
   assert(request->current_chunk != NULL);
   assert(!(request->current_chunk_p == PyString_GET_SIZE(request->current_chunk)
-         && PyString_GET_SIZE(request->current_chunk) != 0));
+           && PyString_GET_SIZE(request->current_chunk) != 0));
 
   bytes_sent = write(
     request->client_fd,

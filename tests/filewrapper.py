@@ -3,9 +3,10 @@ import os
 import bjoern
 
 W = {
-    'callable-iterator' : lambda f, e: iter(lambda: f.read(64*1024), ''),
-    'xreadlines' : lambda f, e: f,
-    'filewrapper' : lambda f, env: env['wsgi.file_wrapper'](f)
+    'callable-iterator': lambda f, e: iter(lambda: f.read(64*1024), ''),
+    'xreadlines': lambda f, e: f,
+    'filewrapper': lambda f, env: env['wsgi.file_wrapper'](f),
+    'filewrapper2': lambda f, env: env['wsgi.file_wrapper'](f, 1)
 }
 
 F = len(sys.argv) > 1 and sys.argv[1] or 'README.rst'

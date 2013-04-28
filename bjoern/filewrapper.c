@@ -4,16 +4,22 @@ static PyObject*
 FileWrapper_New(PyTypeObject* cls, PyObject* args, PyObject* kwargs)
 {
   PyObject* file;
-  if(!PyArg_ParseTuple(args, "O:FileWrapper", &file))
+  unsigned int ignored_blocksize;
+
+  if(!PyArg_ParseTuple(args, "O|I:FileWrapper", &file, &ignored_blocksize))
     return NULL;
+
   if(!PyFile_Check(file)) {
     TYPE_ERROR("FileWrapper argument", "file", file);
     return NULL;
   }
+
   Py_INCREF(file);
-  FileWrapper* wrapper = PyObject_NEW(FileWrapper, &FileWrapper_Type);
   PyFile_IncUseCount((PyFileObject*)file);
+
+  FileWrapper* wrapper = PyObject_NEW(FileWrapper, cls);
   wrapper->file = file;
+
   return (PyObject*)wrapper;
 }
 
