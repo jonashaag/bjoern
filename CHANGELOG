@@ -2,7 +2,7 @@
     - Unix socket support (contributed by https://github.com/k3d3)
     - Restored OS X compatibility (contributed by Patrick Lucas)
     - Fixed 64bit compile errors
-    - Tickets closed: #35, #36, #38, #40, #43, #44, #45, #49, #19, #59, #60
+    - Tickets closed: #35, #36, #38, #40, #43, #44, #45, #49, #19, #59, #60, #57
 
 1.2 (Apr 2011)
     - sendfile() support
