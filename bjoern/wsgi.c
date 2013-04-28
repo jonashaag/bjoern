@@ -115,11 +115,23 @@ wsgi_call_application(Request* request)
     return false;
   }
   
-/* Let http-parser decide if connection should be keep-alive: */
+  /* keep-alive cruft */
   if(http_should_keep_alive(&request->parser.parser)) { 
-    request->state.chunked_response = request->state.response_length_unknown;
-    request->state.keep_alive = true;
+    if(request->state.response_length_unknown) {
+      if(request->parser.parser.http_major > 0 && request->parser.parser.http_minor > 0) {
+        /* On HTTP 1.1, we can use Transfer-Encoding: chunked. */
+        request->state.chunked_response = true;
+        request->state.keep_alive = true;
+      } else {
+        /* On HTTP 1.0, we can only resort to closing the connection.  */
+        request->state.keep_alive = false;
+      }
+    } else {
+      /* We know the content-length. Can always keep-alive. */
+      request->state.keep_alive = true;
+    }
   } else {
+    /* Explicit "Connection: close" (HTTP 1.1) or missing "Connection: keep-alive" (HTTP 1.0) */
     request->state.keep_alive = false;
   }
 
@@ -197,7 +209,6 @@ static size_t
 wsgi_getheaders(Request* request, PyObject* buf)
 {
   char* bufp = PyString_AS_STRING(buf);
-  int have_http11 = (request->parser.parser.http_major > 0 && request->parser.parser.http_minor > 0);
 
   #define buf_write(src, len) \
     do { \
@@ -207,10 +218,15 @@ wsgi_getheaders(Request* request, PyObject* buf)
     } while(0)
   #define buf_write2(src) buf_write(src, strlen(src))
 
+  /* First line, e.g. "HTTP/1.1 200 Ok" */
   buf_write2("HTTP/1.1 ");
   buf_write(PyString_AS_STRING(request->status),
         PyString_GET_SIZE(request->status));
 
+  /* Headers, from the `request->headers` mapping.
+   * [("Header1", "value1"), ("Header2", "value2")]
+   * --> "Header1: value1\r\nHeader2: value2"
+   */
   for(Py_ssize_t i=0; i<PyList_GET_SIZE(request->headers); ++i) {
     PyObject *tuple = PyList_GET_ITEM(request->headers, i);
     PyObject *field = PyTuple_GET_ITEM(tuple, 0),
@@ -220,16 +236,17 @@ wsgi_getheaders(Request* request, PyObject* buf)
     buf_write2(": ");
     buf_write(PyString_AS_STRING(value), PyString_GET_SIZE(value));
   }
-  if(!have_http11) {
-    if(request->state.chunked_response)
-      /* Can't do chunked with HTTP 1.0 */
-      buf_write2("\r\nConnection: close");
-    else if (request->state.keep_alive)
-      /* Need to be explicit with HTTP 1.0 */
-      buf_write2("\r\nConnection: Keep-Alive"); 
+
+  /* See `wsgi_call_application` */
+  if(request->state.keep_alive) {
+    buf_write2("\r\nConnection: Keep-Alive");
+    if(request->state.chunked_response) {
+      buf_write2("\r\nTransfer-Encoding: chunked");
+    }
+  } else {
+    buf_write2("\r\nConnection: close");
   }
-  else if(request->state.chunked_response)
-    buf_write2("\r\nTransfer-Encoding: chunked");
+
   buf_write2("\r\n\r\n");
 
   return bufp - PyString_AS_STRING(buf);

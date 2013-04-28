@@ -1,5 +1,4 @@
 import os
-import re
 import random
 import httplib
 import socket
@@ -61,7 +60,7 @@ class Testcase(object):
 
         if still_alive(self.conn.sock):
             if not self.expect_keep_alive:
-                raise Fail("Expected connection not be kept-alive")
+                raise Fail("Expected connection not to be kept-alive")
             self.request_count -= 1
             if self.request_count:
                 if self.request_count == 1:
@@ -87,9 +86,14 @@ class Testcase(object):
         return True
 
     def _tinker_request(self):
-        req = 'GET / HTTP/1.%d\r\n' % self.http_minor
-        if self.want_keep_alive:
-            req += 'Connection: Keep-Alive\r\n'
+        if self.http_minor == 0:
+            req = 'GET / HTTP/1.0\r\n'
+            if self.want_keep_alive:
+                req += 'Connection: Keep-Alive\r\n'
+        else:
+            req = 'GET / HTTP/1.1\r\n'
+            if not self.want_keep_alive:
+                req += 'Connection: close\r\n'
         req += '\r\n'
         return req
 
@@ -120,23 +124,41 @@ thread.start_new_thread(bjoern.run, (dispatcher,)+HOST)
 import time; time.sleep(0.1)
 
 for index, tpl in enumerate([
-        (0, False,  False, False, False, False),
-        (0, False,  False, True,  False, False),
-        (0, False,  False, True,  False, False),
-        (0, False,  True,  True,  False, True),
-        (0, True,   False, False, False, False),
-        (0, True,   False, True,  False, False),
-        (0, True,   True,  False, False, False),
-        (0, True,   True,  True,  False, False),
+    # HTTP 1.0:
+    # - Column "keep-alive" means "keep-alive header sent".
+    # - Never do keep-alive unless requested.
+    # - Never do chunked (not supported).
+    # - Can only keep-alive if content length is given.
+    # => Only "keep-alive" case is:
+    #    "no-error AND content-length is given AND keep-alive requested"
 
-        (1, False,  False, False, False, False),
-        (1, False,  False, True,  True,  True),
-        (1, False,  True,  False, False, False),
-        (1, False,  True,  True,  False, True),
-        (1, True,   False, False, False, False),
-        (1, True,   False, True,  False, False),
-        (1, True,   True,  False, False, False),
-        (1, True,   True,  True,  False, False)
+    # |----------------------- inputs -----------------| |------- outputs -------|
+    # | HTTP minor error  content-length   keep-alive  | | chunked    keep alive |
+    (       0,      0,          0,              0,          0,          0),
+    (       0,      0,          0,              1,          0,          0),
+    (       0,      0,          1,              0,          0,          0),
+    (       0,      0,          1,              1,          0,          1),
+    (       0,      1,          0,              0,          0,          0),
+    (       0,      1,          0,              1,          0,          0),
+    (       0,      1,          1,              0,          0,          0),
+    (       0,      1,          1,              1,          0,          0),
+
+    # HTTP 1.1:
+    # - Columns "keep-alive" means "no close header sent"
+    # - Do keep-alive by default
+    # - Do chunked if content length is missing and keep-alive
+    # => Only "close" in case of error.
+
+    # |----------------------- inputs -----------------| |------- outputs -------|
+    # | HTTP minor error  content-length   keep-alive  | | chunked    keep alive |
+    (       1,      0,          0,              0,          0,          0),
+    (       1,      0,          0,              1,          1,          1),
+    (       1,      0,          1,              0,          0,          0),
+    (       1,      0,          1,              1,          0,          1),
+    (       1,      1,          0,              0,          0,          0),
+    (       1,      1,          0,              1,          0,          0),
+    (       1,      1,          1,              0,          0,          0),
+    (       1,      1,          1,              1,          0,          0)
 ]):
     print 'Running test %d: %r' % (index, tpl)
     class _test(Testcase):
