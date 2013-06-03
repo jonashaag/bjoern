@@ -2,7 +2,7 @@
 
 #define SENDFILE_CHUNK_SIZE 16*1024
 
-#ifdef __APPLE__
+#if defined __APPLE__
 
   /* OS X */
 
@@ -13,6 +13,21 @@
     off_t len = SENDFILE_CHUNK_SIZE;
     if(sendfile(in_fd, out_fd, 0, &len, NULL, 0) == -1)
       return -1;
+    return len;
+  }
+
+#elif defined __FreeBSD__
+
+  /* FreeBSD */
+
+  #include <sys/socket.h>
+  #include <sys/types.h>
+
+  ssize_t portable_sendfile(int out_fd, int in_fd) {
+    off_t len;
+    if (sendfile(in_fd, out_fd, 0, SENDFILE_CHUNK_SIZE, NULL, &len, 0) == -1) {
+      return -1;
+    }
     return len;
   }
 
