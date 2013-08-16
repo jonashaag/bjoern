@@ -58,6 +58,9 @@ Usage
    # Bind to TCP host/port pair:
    bjoern.run(wsgi_application, host, port)
 
+   # TCP host/port pair, enabling SO_REUSEPORT if available.
+   bjoern.run(wsgi_application, host, port, reuseport=True)
+
    # Bind to Unix socket:
    bjoern.run(wsgi_application, 'unix:/path/to/socket')
 

@@ -78,7 +78,7 @@ ev_signal_on_sigint(struct ev_loop* mainloop, ev_signal* watcher, const int even
 }
 #endif
 
-bool server_init(const char* hostaddr, const int port)
+bool server_init(const char* hostaddr, const int port, const int reuseport)
 {
   if(!port) {
     /* Unix socket */
@@ -112,6 +112,21 @@ bool server_init(const char* hostaddr, const int port)
     /* Set SO_REUSEADDR t make the IP address available for reuse */
     int optval = true;
     setsockopt(sockinfo.fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+
+    /* Enable "receive steering" on FreeBSD and Linux >=3.9. This allows
+     * multiple independent bjoerns to bind to the same port (and ideally also
+     * set their CPU affinity), resulting in more efficient load distribution.
+     * https://lwn.net/Articles/542629/ */
+    if(reuseport) {
+#ifdef SO_REUSEPORT
+      setsockopt(sockinfo.fd, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
+#else
+      PyErr_SetString(
+        PyExc_RuntimeError,
+        "SO_REUSEPORT is not available.");
+      goto err;
+#endif
+    }
 
     if(bind(sockinfo.fd, (struct sockaddr*)&sockaddr, sizeof(sockaddr)) < 0)
       goto err;

@@ -11,10 +11,14 @@ PyDoc_STRVAR(listen_doc,
 Makes bjoern listen to host:port and use application as WSGI callback. \
 (This does not run the server mainloop.)");
 static PyObject*
-listen(PyObject* self, PyObject* args)
+listen(PyObject* self, PyObject* args, PyObject* kwds)
 {
+  static /*const*/ char* keywords[] = {"wsgi_app", "host", "port", "reuseport"};
+
   const char* host;
   int port = 0;
+  /* Enable SO_REUSEPORT if supported? */
+  int reuseport = 0;
 
   if(wsgi_app) {
     PyErr_SetString(
@@ -24,7 +28,8 @@ listen(PyObject* self, PyObject* args)
     return NULL;
   }
 
-  if(!PyArg_ParseTuple(args, "Os|i:run/listen", &wsgi_app, &host, &port))
+  if(!PyArg_ParseTupleAndKeywords(args, kwds, "Os|ii:run/listen", keywords,
+                                  &wsgi_app, &host, &port, &reuseport))
     return NULL;
 
   _initialize_request_module(host, port);
@@ -38,7 +43,7 @@ listen(PyObject* self, PyObject* args)
     host += 5;
   }
 
-  if(!server_init(host, port)) {
+  if(!server_init(host, port, reuseport)) {
     if(port)
       PyErr_Format(PyExc_RuntimeError, "Could not start server on %s:%d", host, port);
     else
@@ -61,7 +66,7 @@ run() -> None\n \
 Starts the server mainloop. listen(...) has to be called before calling \
 run() without arguments.");
 static PyObject*
-run(PyObject* self, PyObject* args)
+run(PyObject* self, PyObject* args, PyObject* kwds)
 {
   if(PyTuple_GET_SIZE(args) == 0) {
     /* bjoern.run() */
@@ -75,7 +80,7 @@ run(PyObject* self, PyObject* args)
     }
   } else {
     /* bjoern.run(app, host, port) */
-    if(!listen(self, args))
+    if(!listen(self, args, kwds))
       return NULL;
   }
 
@@ -85,8 +90,8 @@ run(PyObject* self, PyObject* args)
 }
 
 static PyMethodDef Bjoern_FunctionTable[] = {
-  {"run", run, METH_VARARGS, run_doc},
-  {"listen", listen, METH_VARARGS, listen_doc},
+  {"run", run, METH_VARARGS|METH_KEYWORDS, run_doc},
+  {"listen", listen, METH_VARARGS|METH_KEYWORDS, listen_doc},
   {NULL, NULL, 0, NULL}
 };
 
