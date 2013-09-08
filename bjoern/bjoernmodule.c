@@ -18,7 +18,7 @@ listen(PyObject* self, PyObject* args, PyObject* kwds)
   static char* keywords[] = {"wsgi_app", "host", "port", "reuse_port", NULL};
 
   const char* host;
-  int port = 5;
+  int port = 0;
   int reuse_port = false; // see footnote (1)
 
   if(wsgi_app) {
