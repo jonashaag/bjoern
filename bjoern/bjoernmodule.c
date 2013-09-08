@@ -107,7 +107,7 @@ PyMODINIT_FUNC initbjoern(void)
   assert(StartResponse_Type.tp_flags & Py_TPFLAGS_READY);
 
   PyObject* bjoern_module = Py_InitModule("bjoern", Bjoern_FunctionTable);
-  PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(iii)", 1, 3, 2));
+  PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(iii)", 1, 3, 3));
 }
 
 /* (1) Don't use bool here because we use the "i" type specifier in the call to
