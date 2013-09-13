@@ -1,7 +1,7 @@
-bjoern: Fast And Ultra-Lightweight Asynchronous HTTP/1.1 WSGI Server
-====================================================================
+bjoern: Fast And Ultra-Lightweight HTTP/1.1 WSGI Server
+=======================================================
 
-A screamingly fast, ultra-lightweight asynchronous WSGI_ server for CPython,
+A screamingly fast, ultra-lightweight WSGI_ server for CPython,
 written in C using Marc Lehmann's high performance libev_ event loop and
 Ryan Dahl's http-parser_.
 
