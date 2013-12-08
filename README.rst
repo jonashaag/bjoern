@@ -76,6 +76,7 @@ You can also simply pass a Python socket(-like) object. Note that you are respon
 for initializing and cleaning up the socket in that case. ::
 
    bjoern.server_run(socket_object, wsgi_application)
+   bjoern.server_run(filedescriptor_as_integer, wsgi_application)
 
 .. _WSGI:         http://www.python.org/dev/peps/pep-0333/
 .. _libev:        http://software.schmorp.de/pkg/libev.html

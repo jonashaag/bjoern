@@ -21,16 +21,17 @@ run(PyObject* self, PyObject* args)
     return NULL;
   }
 
-  PyObject* sockname = PyObject_CallMethod(socket, "getsockname", NULL);
-  if (sockname == NULL) {
-    return NULL;
-  }
-  if (PyTuple_CheckExact(sockname) && PyTuple_GET_SIZE(sockname) == 2) {
-    /* Standard (ipaddress, port) case */
-    info.host = PyTuple_GET_ITEM(sockname, 0);
-    info.port = PyTuple_GET_ITEM(sockname, 1);
-  } else {
-    info.host = NULL;
+  info.host = NULL;
+  if (PyObject_HasAttrString(socket, "getsockname")) {
+    PyObject* sockname = PyObject_CallMethod(socket, "getsockname", NULL);
+    if (sockname == NULL) {
+      return NULL;
+    }
+    if (PyTuple_CheckExact(sockname) && PyTuple_GET_SIZE(sockname) == 2) {
+      /* Standard (ipaddress, port) case */
+      info.host = PyTuple_GET_ITEM(sockname, 0);
+      info.port = PyTuple_GET_ITEM(sockname, 1);
+    }
   }
 
   _initialize_request_module();
