@@ -1,7 +1,7 @@
 #include <Python.h>
 #include "server.h"
 #include "wsgi.h"
-#include "bjoernmodule.h"
+#include "_bjoernmodule.h"
 #include "filewrapper.h"
 
 

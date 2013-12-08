@@ -1,5 +1,4 @@
 #include "common.h"
-#include "bjoernmodule.h"
 #include "filewrapper.h"
 #include "wsgi.h"
 

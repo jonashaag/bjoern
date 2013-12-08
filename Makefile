@@ -24,7 +24,7 @@ ifneq ($(WANT_SIGINT_HANDLING), no)
 FEATURES	+= -D WANT_SIGINT_HANDLING
 endif
 
-all: prepare-build $(objects) bjoernmodule
+all: prepare-build $(objects) _bjoernmodule
 
 print-env:
 	@echo CFLAGS=$(CFLAGS)
@@ -38,7 +38,7 @@ opt: clean
 small: clean
 	CFLAGS='-Os' make
 
-bjoernmodule:
+_bjoernmodule:
 	@$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(objects) -o $(BUILD_DIR)/_bjoern.so
 	@PYTHONPATH=$$PYTHONPATH:$(BUILD_DIR) python2 -c "import bjoern"
 
