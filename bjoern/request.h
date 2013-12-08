@@ -4,8 +4,9 @@
 #include <ev.h>
 #include "http_parser.h"
 #include "common.h"
+#include "server.h"
 
-void _initialize_request_module(const char* host, const int port);
+void _initialize_request_module();
 
 typedef struct {
   unsigned error_code : 2;
@@ -32,6 +33,7 @@ typedef struct {
   bj_parser parser;
   ev_io ev_watcher;
 
+  ServerInfo* server_info;
   int client_fd;
   PyObject* client_addr;
 
@@ -48,7 +50,7 @@ typedef struct {
 #define REQUEST_FROM_WATCHER(watcher) \
   (Request*)((size_t)watcher - (size_t)(&(((Request*)NULL)->ev_watcher)));
 
-Request* Request_new(int client_fd, const char* client_addr);
+Request* Request_new(ServerInfo*, int client_fd, const char* client_addr);
 void Request_parse(Request*, const char*, const size_t);
 void Request_reset(Request*);
 void Request_clean(Request*);

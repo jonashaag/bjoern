@@ -39,7 +39,7 @@ small: clean
 	CFLAGS='-Os' make
 
 bjoernmodule:
-	@$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(objects) -o $(BUILD_DIR)/bjoern.so
+	@$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(objects) -o $(BUILD_DIR)/_bjoern.so
 	@PYTHONPATH=$$PYTHONPATH:$(BUILD_DIR) python2 -c "import bjoern"
 
 again: clean all
@@ -79,9 +79,6 @@ ab4:
 
 wget:
 	wget -O - -q -S $(TEST_URL)
-
-test:
-	cd tests && python2 ~/dev/wsgitest/runner.py
 
 valgrind:
 	valgrind --leak-check=full --show-reachable=yes python2 tests/empty.py

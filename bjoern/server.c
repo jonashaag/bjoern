@@ -1,18 +1,15 @@
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <fcntl.h>
 #ifdef WANT_SIGINT_HANDLING
 # include <sys/signal.h>
 #endif
+#include <arpa/inet.h>
+#include <fcntl.h>
 #include <ev.h>
 #include "portable_sendfile.h"
 #include "common.h"
 #include "wsgi.h"
 #include "server.h"
 
-#define LISTEN_BACKLOG  1024
+#define SERVER_INFO(loop) ((ServerInfo*)ev_userdata(loop))
 #define READ_BUFFER_SIZE 64*1024
 #define Py_XCLEAR(obj) do { if(obj) { Py_DECREF(obj); obj = NULL; } } while(0)
 #define GIL_LOCK(n) PyGILState_STATE _gilstate_##n = PyGILState_Ensure()
@@ -37,14 +34,14 @@ static bool send_chunk(Request*);
 static bool do_sendfile(Request*);
 static bool handle_nonzero_errno(Request*);
 
-static struct { int fd; const char* filename; } sockinfo;
 
-void server_run(void)
+void server_run(ServerInfo* server_info)
 {
-  struct ev_loop* mainloop = ev_default_loop(0);
+  struct ev_loop* mainloop = ev_loop_new(0);
+  ev_set_userdata(mainloop, server_info);
 
   ev_io accept_watcher;
-  ev_io_init(&accept_watcher, ev_io_on_request, sockinfo.fd, EV_READ);
+  ev_io_init(&accept_watcher, ev_io_on_request, server_info->sockfd, EV_READ);
   ev_io_start(mainloop, &accept_watcher);
 
 #if WANT_SIGINT_HANDLING
@@ -60,89 +57,16 @@ void server_run(void)
   Py_END_ALLOW_THREADS
 }
 
-static void cleanup(void) {
-  close(sockinfo.fd);
-  if(sockinfo.filename)
-    unlink(sockinfo.filename);
-}
-
 #if WANT_SIGINT_HANDLING
 static void
 ev_signal_on_sigint(struct ev_loop* mainloop, ev_signal* watcher, const int events)
 {
   /* Clean up and shut down this thread.
    * (Shuts down the Python interpreter if this is the main thread) */
-  cleanup();
   ev_unloop(mainloop, EVUNLOOP_ALL);
   PyErr_SetInterrupt();
 }
 #endif
-
-bool server_init(const char* hostaddr, const int port, const int reuse_port)
-{
-  if(!port) {
-    /* Unix socket */
-    if((sockinfo.fd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0)
-      return false;
-
-    struct sockaddr_un sockaddr;
-    sockaddr.sun_family = PF_UNIX;
-    strcpy(sockaddr.sun_path, hostaddr);
-
-    /* Use @ for abstract (Linux) */
-    if(hostaddr[0] == '@')
-      sockaddr.sun_path[0] = '\0';
-    else
-      sockinfo.filename = hostaddr;
-
-    if(bind(sockinfo.fd, (struct sockaddr*)&sockaddr, sizeof(sockaddr)) < 0)
-      goto err;
-  }
-  else {
-    /* IP bind */
-    if((sockinfo.fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
-      return false;
-
-    struct sockaddr_in sockaddr;
-    memset(&sockaddr, 0, sizeof(sockaddr));
-    sockaddr.sin_family = PF_INET;
-    inet_pton(AF_INET, hostaddr, &sockaddr.sin_addr);
-    sockaddr.sin_port = htons(port);
-
-    /* Socket options */
-    int true_ref = true;
-
-    /* Set SO_REUSEADDR t make the IP address available for reuse */
-    setsockopt(sockinfo.fd, SOL_SOCKET, SO_REUSEADDR, &true_ref, sizeof(true_ref));
-
-    /* Enable "receive steering" on FreeBSD and Linux >=3.9. This allows
-     * multiple independent bjoerns to bind to the same port (and ideally also
-     * set their CPU affinity), resulting in more efficient load distribution.
-     * https://lwn.net/Articles/542629/
-     */
-    if(reuse_port) {
-#ifdef SO_REUSEPORT
-      setsockopt(sockinfo.fd, SOL_SOCKET, SO_REUSEPORT, &true_ref, sizeof(true_ref));
-#else
-      PyErr_SetString(PyExc_RuntimeError, "SO_REUSEPORT is not available.");
-      goto err;
-#endif
-    }
-
-    if(bind(sockinfo.fd, (struct sockaddr*)&sockaddr, sizeof(sockaddr)) < 0)
-      goto err;
-  }
-
-  if(listen(sockinfo.fd, LISTEN_BACKLOG) < 0)
-    goto err;
-
-  DBG("Listening on %s:%d...", hostaddr, port);
-  return true;
-
-err:
-  cleanup();
-  return false;
-}
 
 static void
 ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
@@ -164,9 +88,11 @@ ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
     return;
   }
 
-  GIL_LOCK(0);
-  Request* request = Request_new(client_fd, inet_ntoa(sockaddr.sin_addr));
-  GIL_UNLOCK(0);
+  Request* request = Request_new(
+    SERVER_INFO(mainloop),
+    client_fd,
+    inet_ntoa(sockaddr.sin_addr)
+  );
 
   DBG_REQ(request, "Accepted client %s:%d on fd %d",
           inet_ntoa(sockaddr.sin_addr), ntohs(sockaddr.sin_port), client_fd);
