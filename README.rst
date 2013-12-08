@@ -71,6 +71,11 @@ Alternatively, the mainloop can be run separately::
 
    bjoern.listen(wsgi_application, host, port)
    bjoern.run()
+   
+You can also simply pass a Python socket(-like) object. Note that you are responsible
+for initializing and cleanup up the socket in that case::
+
+   bjoern.server_run(socket_object, wsgi_application)
 
 .. _WSGI:         http://www.python.org/dev/peps/pep-0333/
 .. _libev:        http://software.schmorp.de/pkg/libev.html
