@@ -1,1 +1,0 @@
-PyObject* wsgi_app;

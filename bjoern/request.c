@@ -16,13 +16,14 @@ typedef struct {
   PyObject *pbuf;
 } Iobject;
 
-Request* Request_new(int client_fd, const char* client_addr)
+Request* Request_new(ServerInfo* server_info, int client_fd, const char* client_addr)
 {
   Request* request = malloc(sizeof(Request));
 #ifdef DEBUG
   static unsigned long request_id = 0;
   request->id = request_id++;
 #endif
+  request->server_info = server_info;
   request->client_fd = client_fd;
   request->client_addr = PyString_FromString(client_addr);
   http_parser_init((http_parser*)&request->parser, HTTP_REQUEST);
@@ -209,6 +210,12 @@ on_message_complete(http_parser* parser)
   /* SERVER_PROTOCOL (REQUEST_PROTOCOL) */
   _set_header(_SERVER_PROTOCOL, parser->http_minor == 1 ? _HTTP_1_1 : _HTTP_1_0);
 
+  /* SERVER_NAME and SERVER_PORT */
+  if (REQUEST->server_info->host) {
+    _set_header(_SERVER_NAME, REQUEST->server_info->host);
+    _set_header(_SERVER_PORT, REQUEST->server_info->port);
+  }
+
   /* REQUEST_METHOD */
   if(parser->method == HTTP_GET) {
     /* I love useless micro-optimizations. */
@@ -282,7 +289,7 @@ parser_settings = {
   on_header_value, on_headers_complete, on_body, on_message_complete
 };
 
-void _initialize_request_module(const char* server_host, const int server_port)
+void _initialize_request_module()
 {
   if(wsgi_base_dict == NULL) {
     PycString_IMPORT;
@@ -348,16 +355,4 @@ void _initialize_request_module(const char* server_host, const int server_port)
       Py_False
     );
   }
-
-  PyDict_SetItemString(
-    wsgi_base_dict,
-    "SERVER_NAME",
-    PyString_FromString(server_host)
-  );
-
-  PyDict_SetItemString(
-    wsgi_base_dict,
-    "SERVER_PORT",
-    server_port ? PyString_FromFormat("%d", server_port) : _empty_string
-  );
 }

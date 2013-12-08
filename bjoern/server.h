@@ -1,4 +1,13 @@
-#include "request.h"
+#ifndef __server_h__
+#define __server_h__
 
-bool server_init(const char* hostaddr, const int port, const int reuseport);
-void server_run(void);
+typedef struct {
+  int sockfd;
+  PyObject* wsgi_app;
+  PyObject* host;
+  PyObject* port;
+} ServerInfo;
+
+void server_run(ServerInfo*);
+
+#endif
