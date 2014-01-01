@@ -110,7 +110,7 @@ wsgi_call_application(Request* request)
       PyExc_RuntimeError,
       "wsgi application returned before start_response was called"
     );
-    Py_DECREF(first_chunk);
+    Py_XDECREF(first_chunk);
     return false;
   }
   
@@ -142,11 +142,6 @@ wsgi_call_application(Request* request)
    * booster because less kernel calls means less kernel call overhead. */
   PyObject* buf = PyString_FromStringAndSize(NULL, 1024);
   Py_ssize_t length = wsgi_getheaders(request, buf);
-  if(length == 0) {
-    Py_DECREF(first_chunk);
-    Py_DECREF(buf);
-    return false;
-  }
 
   if(first_chunk == NULL) {
     _PyString_Resize(&buf, length);
