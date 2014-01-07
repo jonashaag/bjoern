@@ -19,7 +19,7 @@ def bind_and_listen(host, port=None, reuse_port=False):
     else:
         # IP socket
         sock = socket.socket(socket.AF_INET)
-        # Set SO_REUSEADDR t make the IP address available for reuse
+        # Set SO_REUSEADDR to make the IP address available for reuse
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         if reuse_port:
             # Enable "receive steering" on FreeBSD and Linux >=3.9. This allows
