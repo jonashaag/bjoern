@@ -3,7 +3,7 @@
 #define UNHEX(c) ((c >= '0' && c <= '9') ? (c - '0') : \
                   (c >= 'a' && c <= 'f') ? (c - 'a' + 10) : \
                   (c >= 'A' && c <= 'F') ? (c - 'A' + 10) : NOHEX)
-#define NOHEX -1
+#define NOHEX ((char) -1)
 
 size_t unquote_url_inplace(char* url, size_t len)
 {
