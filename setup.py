@@ -6,7 +6,7 @@ SOURCE_FILES = [os.path.join('http-parser', 'http_parser.c')] + \
                glob.glob(os.path.join('bjoern', '*.c'))
 
 bjoern_extension = Extension(
-    'bjoern',
+    '_bjoern',
     sources       = SOURCE_FILES,
     libraries     = ['ev'],
     include_dirs  = ['http-parser', '/usr/include/libev'],
@@ -30,5 +30,6 @@ setup(
                     'Programming Language :: C',
                     'Programming Language :: Python',
                     'Topic :: Internet :: WWW/HTTP :: WSGI :: Server'],
+    py_modules   = ['bjoern'],
     ext_modules  = [bjoern_extension]
 )
