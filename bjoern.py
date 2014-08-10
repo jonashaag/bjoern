@@ -8,6 +8,7 @@ LISTEN_BACKLOG = 1024
 
 
 def bind_and_listen(host, port=None, reuse_port=False):
+    listen = True
     if host.startswith("unix:@"):
         # Abstract UNIX socket: "unix:@foobar"
         sock = socket.socket(socket.AF_UNIX)
@@ -17,8 +18,16 @@ def bind_and_listen(host, port=None, reuse_port=False):
         sock = socket.socket(socket.AF_UNIX)
         sock.bind(host[5:])
     else:
-        # IP socket
-        sock = socket.socket(socket.AF_INET)
+        if host.startswith("fd://"):
+            # existing FD
+            fd = int(host.split('://')[1])
+            listen = False
+            sock = socket.fromfd(fd, socket.AF_INET, socket.SOCK_STREAM)
+        else:
+            # IP socket
+            sock = socket.socket(socket.AF_INET)
+            sock.bind((host, port))
+
         # Set SO_REUSEADDR to make the IP address available for reuse
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         if reuse_port:
@@ -27,9 +36,9 @@ def bind_and_listen(host, port=None, reuse_port=False):
             # also set their CPU affinity), resulting in more efficient load
             # distribution.  https://lwn.net/Articles/542629/
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-        sock.bind((host, port))
 
-    sock.listen(LISTEN_BACKLOG)
+    if listen:
+        sock.listen(LISTEN_BACKLOG)
 
     return sock
 
@@ -78,7 +87,7 @@ def run(*args, **kwargs):
     finally:
         if sock.type == socket.AF_UNIX:
             filename = sock.getsockname()
-            if filename[0] != '\0':
+            if filename[0] != '\0' and os.path.exists(filename[0]):
                 os.unlink(sock.getsockname())
         sock.close()
         _default_instance = None
