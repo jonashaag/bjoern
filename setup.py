@@ -24,7 +24,7 @@ setup(
     license      = '2-clause BSD',
     url          = 'https://github.com/jonashaag/bjoern',
     description  = 'A screamingly fast Python WSGI server written in C.',
-    version      = '1.3.4',
+    version      = '1.4.0',
     classifiers  = ['Development Status :: 4 - Beta',
                     'License :: OSI Approved :: BSD License',
                     'Programming Language :: C',
