@@ -40,16 +40,6 @@ For most users, the easiest way to install bjoern is using ``pip``. Make sure
 
    pip install bjoern
 
-You can also build bjoern by directly using the provided ``setup.py`` file (this
-is probably most useful if you actually want to hack on bjoern)::
-
-   python setup.py install
-
-On some Linux systems (notably Fedora and CentOS), the libev headers may be installed
-outside of the default include path. In order to build bjoern you will need to
-export ``CFLAGS`` when running ``setup.py``, for instance::
-
-   CFLAGS=-I/usr/include/libev python setup.py install
 
 Usage
 ~~~~~
