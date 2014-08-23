@@ -56,5 +56,5 @@ PyMODINIT_FUNC init_bjoern(void)
   assert(StartResponse_Type.tp_flags & Py_TPFLAGS_READY);
 
   PyObject* bjoern_module = Py_InitModule("_bjoern", Bjoern_FunctionTable);
-  PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(iii)", 1, 4, 0));
+  PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(iii)", 1, 4, 1));
 }
