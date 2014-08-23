@@ -1,9 +1,17 @@
-#ifdef WANT_SIGINT_HANDLING
-# include <sys/signal.h>
-#endif
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <ev.h>
+
+#if defined __FreeBSD__
+# include <netinet/in.h> /* for struct sockaddr_in */
+# include <sys/types.h>
+# include <sys/socket.h>
+#endif
+
+#ifdef WANT_SIGINT_HANDLING
+# include <sys/signal.h>
+#endif
+
 #include "portable_sendfile.h"
 #include "common.h"
 #include "wsgi.h"
