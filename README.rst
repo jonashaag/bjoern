@@ -19,27 +19,7 @@ featuring
 
 Installation
 ~~~~~~~~~~~~
-libev
------
-Arch Linux
-   ``pacman -S libev``
-Ubuntu
-   ``apt-get install libev-dev``
-Fedora, CentOS
-   ``yum install libev-devel``
-Mac OS X (using homebrew_)
-   ``brew install libev``
-Your Contribution Here
-   Fork me and send a pull request
-
-bjoern
-------
-
-For most users, the easiest way to install bjoern is using ``pip``. Make sure
-*libev* is installed and then::
-
-   pip install bjoern
-
+``pip install bjoern``. See `wiki <https://github.com/jonashaag/bjoern/wiki/Installation>`_ for details.
 
 Usage
 ~~~~~
