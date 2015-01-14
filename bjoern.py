@@ -76,7 +76,7 @@ def run(*args, **kwargs):
     try:
         server_run(sock, wsgi_app)
     finally:
-        if sock.type == socket.AF_UNIX:
+        if sock.family == socket.AF_UNIX:
             filename = sock.getsockname()
             if filename[0] != '\0':
                 os.unlink(sock.getsockname())
