@@ -100,14 +100,15 @@ void Request_parse(Request* request, const char* data, const size_t data_len)
     _set_header(k, val); \
     Py_DECREF(val); \
   } while(0)
-#define _set_header_free_both(k, v) \
+
+#define _set_header_from_http_header() \
   do { \
-    PyObject* key = (k); \
-    PyObject* val = (v); \
-    _set_header(key, val); \
-    Py_DECREF(key); \
-    Py_DECREF(val); \
-  } while(0)
+    PyObject* key = wsgi_http_header(PARSER->field); \
+    if (key) { \
+      _set_header_free_value(key, PyString_FromStringAndSize(PARSER->value.data, PARSER->value.len)); \
+      Py_DECREF(key); \
+    } \
+  } while(0) \
 
 static int
 on_message_begin(http_parser* parser)
@@ -139,10 +140,7 @@ on_header_field(http_parser* parser, const char* field, size_t len)
 {
   if(PARSER->value.data) {
     /* Store previous header and start a new one */
-    _set_header_free_both(
-      wsgi_http_header(PARSER->field),
-      PyString_FromStringAndSize(PARSER->value.data, PARSER->value.len)
-    );
+    _set_header_from_http_header();
   } else if(PARSER->field.data) {
     UPDATE_LENGTH(field);
     return 0;
@@ -168,10 +166,7 @@ static int
 on_headers_complete(http_parser* parser)
 {
   if(PARSER->field.data) {
-    _set_header_free_both(
-      wsgi_http_header(PARSER->field),
-      PyString_FromStringAndSize(PARSER->value.data, PARSER->value.len)
-    );
+    _set_header_from_http_header();
   }
   return 0;
 }
@@ -259,7 +254,12 @@ wsgi_http_header(string header)
 
   while(header.len--) {
     char c = *header.data++;
-    if(c == '-')
+    if (c == '_') {
+      // CVE-2015-0219
+      Py_DECREF(obj);
+      return NULL;
+    }
+    else if(c == '-')
       *dest++ = '_';
     else if(c >= 'a' && c <= 'z')
       *dest++ = c - ('a'-'A');
