@@ -1,5 +1,8 @@
+1.4.2 (Jan 2015)
+    - CVE-2015-0219, see https://www.djangoproject.com/weblog/2015/jan/13/security/
+
 1.4.1 (Aug 2014)
-	- Fix FreeBSD build (Olivier Duchateau)
+    - Fix FreeBSD build (Olivier Duchateau)
 
 1.4 (Aug 2014)
     - Rewrite socket initialization/handling in Python. Makes it possible to
