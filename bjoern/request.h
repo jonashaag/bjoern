@@ -6,7 +6,7 @@
 #include "common.h"
 #include "server.h"
 
-void _initialize_request_module();
+void _initialize_request_module(void);
 
 typedef struct {
   unsigned error_code : 2;

@@ -2,9 +2,7 @@
 #include "filewrapper.h"
 #include "wsgi.h"
 
-static PyObject* (start_response)(PyObject* self, PyObject* args, PyObject *kwargs);
 static size_t wsgi_getheaders(Request*, PyObject* buf);
-static inline bool inspect_headers(Request*);
 
 typedef struct {
   PyObject_HEAD
