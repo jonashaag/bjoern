@@ -17,7 +17,6 @@
 #include "wsgi.h"
 #include "server.h"
 
-#define SERVER_INFO(loop) ((ServerInfo*)ev_userdata(loop))
 #define READ_BUFFER_SIZE 64*1024
 #define Py_XCLEAR(obj) do { if(obj) { Py_DECREF(obj); obj = NULL; } } while(0)
 #define GIL_LOCK(n) PyGILState_STATE _gilstate_##n = PyGILState_Ensure()
@@ -35,6 +34,11 @@ enum write_state {
   done,
   aborted,
 };
+
+typedef struct {
+  ServerInfo* server_info;
+  ev_io accept_watcher;
+} ThreadInfo;
 
 typedef void ev_io_callback(struct ev_loop*, ev_io*, const int);
 
@@ -56,11 +60,13 @@ static bool handle_nonzero_errno(Request*);
 void server_run(ServerInfo* server_info)
 {
   struct ev_loop* mainloop = ev_loop_new(0);
-  ev_set_userdata(mainloop, server_info);
 
-  ev_io accept_watcher;
-  ev_io_init(&accept_watcher, ev_io_on_request, server_info->sockfd, EV_READ);
-  ev_io_start(mainloop, &accept_watcher);
+  ThreadInfo thread_info;
+  thread_info.server_info = server_info;
+  ev_set_userdata(mainloop, &thread_info);
+
+  ev_io_init(&thread_info.accept_watcher, ev_io_on_request, server_info->sockfd, EV_READ);
+  ev_io_start(mainloop, &thread_info.accept_watcher);
 
 #if WANT_SIGINT_HANDLING
   ev_signal signal_watcher;
@@ -70,19 +76,30 @@ void server_run(ServerInfo* server_info)
 
   /* This is the program main loop */
   Py_BEGIN_ALLOW_THREADS
-  ev_loop(mainloop, 0);
-  ev_default_destroy();
+  ev_run(mainloop, 0);
+  ev_loop_destroy(mainloop);
   Py_END_ALLOW_THREADS
 }
 
 #if WANT_SIGINT_HANDLING
 static void
+pyerr_set_interrupt(struct ev_loop* mainloop, struct ev_cleanup* watcher, const int events)
+{
+  PyErr_SetInterrupt();
+  free(watcher);
+}
+
+static void
 ev_signal_on_sigint(struct ev_loop* mainloop, ev_signal* watcher, const int events)
 {
   /* Clean up and shut down this thread.
    * (Shuts down the Python interpreter if this is the main thread) */
-  ev_unloop(mainloop, EVUNLOOP_ALL);
-  PyErr_SetInterrupt();
+  ev_cleanup* cleanup_watcher = malloc(sizeof(ev_cleanup));
+  ev_cleanup_init(cleanup_watcher, pyerr_set_interrupt);
+  ev_cleanup_start(mainloop, cleanup_watcher);
+
+  ev_io_stop(mainloop, &((ThreadInfo*)ev_userdata(mainloop))->accept_watcher);
+  ev_signal_stop(mainloop, watcher);
 }
 #endif
 
@@ -107,7 +124,7 @@ ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
   }
 
   Request* request = Request_new(
-    SERVER_INFO(mainloop),
+    ((ThreadInfo*)ev_userdata(mainloop))->server_info,
     client_fd,
     inet_ntoa(sockaddr.sin_addr)
   );
