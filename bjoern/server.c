@@ -30,15 +30,25 @@ static const char* http_error_messages[4] = {
   "HTTP/1.1 500 Internal Server Error\r\n\r\n"
 };
 
+enum write_state {
+  not_yet_done = 1,
+  done,
+  aborted,
+};
+
 typedef void ev_io_callback(struct ev_loop*, ev_io*, const int);
+
 #if WANT_SIGINT_HANDLING
 typedef void ev_signal_callback(struct ev_loop*, ev_signal*, const int);
 static ev_signal_callback ev_signal_on_sigint;
 #endif
+
 static ev_io_callback ev_io_on_request;
 static ev_io_callback ev_io_on_read;
 static ev_io_callback ev_io_on_write;
-static bool send_chunk(Request*);
+static enum write_state on_write_sendfile(struct ev_loop*, Request*);
+static enum write_state on_write_chunk(struct ev_loop*, Request*);
+static bool do_send_chunk(Request*);
 static bool do_sendfile(Request*);
 static bool handle_nonzero_errno(Request*);
 
@@ -167,93 +177,168 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
 
 out:
   GIL_UNLOCK(0);
-  return;
 }
 
-/* XXX too many gotos */
 static void
 ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
 {
+  /* Since the response writing code is fairly complex, I'll try to give a short
+   * overview of the different control flow paths etc.:
+   *
+   * On the very top level, there are two types of responses to distinguish:
+   * A) sendfile responses
+   * B) iterator/other responses
+   *
+   * These cases are handled by the 'on_write_sendfile' and 'on_write_chunk'
+   * routines, respectively.  They use the 'do_sendfile' and 'do_send_chunk'
+   * routines to do the actual write()-ing. The 'do_*' routines return true if
+   * there's some data left to send in the current chunk (or, in the case of
+   * sendfile, the end of the file has not been reached yet).
+   *
+   * When the 'do_*' routines return false, the 'on_write_*' routines have to
+   * figure out if there's a next chunk to send (e.g. in the case of a response iterator).
+   */
   Request* request = REQUEST_FROM_WATCHER(watcher);
 
   GIL_LOCK(0);
 
+  enum write_state write_state;
   if(request->state.use_sendfile) {
-    /* sendfile */
-    if(request->current_chunk) {
-      /* current_chunk contains the HTTP headers */
-      if(send_chunk(request))
-        goto out;
-      assert(request->current_chunk_p == 0);
-      /* abuse current_chunk_p to store the file fd */
-      request->current_chunk_p = PyObject_AsFileDescriptor(request->iterable);
-      goto out;
-    }
-
-    if(do_sendfile(request))
-      goto out;
-
+    write_state = on_write_sendfile(mainloop, request);
   } else {
-    /* iterable */
-    if(send_chunk(request))
-      goto out;
-
-    if(request->iterator) {
-      PyObject* next_chunk;
-      next_chunk = wsgi_iterable_get_next_chunk(request);
-      if(next_chunk) {
-        if(request->state.chunked_response) {
-          request->current_chunk = wrap_http_chunk_cruft_around(next_chunk);
-          Py_DECREF(next_chunk);
-        } else {
-          request->current_chunk = next_chunk;
-        }
-        assert(request->current_chunk_p == 0);
-        goto out;
-      } else {
-        if(PyErr_Occurred()) {
-          PyErr_Print();
-          /* We can't do anything graceful here because at least one
-           * chunk is already sent... just close the connection */
-          DBG_REQ(request, "Exception in iterator, can not recover");
-          ev_io_stop(mainloop, &request->ev_watcher);
-          close(request->client_fd);
-          Request_free(request);
-          goto out;
-        }
-        Py_CLEAR(request->iterator);
-      }
-    }
-
-    if(request->state.chunked_response) {
-      /* We have to send a terminating empty chunk + \r\n */
-      request->current_chunk = PyString_FromString("0\r\n\r\n");
-      assert(request->current_chunk_p == 0);
-      request->state.chunked_response = false;
-      goto out;
-    }
+    write_state = on_write_chunk(mainloop, request);
   }
 
-  ev_io_stop(mainloop, &request->ev_watcher);
-  if(request->state.keep_alive) {
-    DBG_REQ(request, "done, keep-alive");
-    Request_clean(request);
-    Request_reset(request);
-    ev_io_init(&request->ev_watcher, &ev_io_on_read,
-               request->client_fd, EV_READ);
-    ev_io_start(mainloop, &request->ev_watcher);
-  } else {
-    DBG_REQ(request, "done, close");
+  switch(write_state) {
+  case not_yet_done:
+    break;
+  case done:
+    /* Done with the response. */
+    ev_io_stop(mainloop, &request->ev_watcher);
+
+    if(request->state.keep_alive) {
+      DBG_REQ(request, "done, keep-alive");
+      Request_clean(request);
+      Request_reset(request);
+      ev_io_init(&request->ev_watcher, &ev_io_on_read,
+                 request->client_fd, EV_READ);
+      ev_io_start(mainloop, &request->ev_watcher);
+    } else {
+      DBG_REQ(request, "done, close");
+      close(request->client_fd);
+      Request_free(request);
+    }
+    break;
+  case aborted:
+    /* Response was aborted due to an error. We can't do anything graceful here
+     * because at least one chunk is already sent... just close the connection. */
+    ev_io_stop(mainloop, &request->ev_watcher);
     close(request->client_fd);
     Request_free(request);
+    break;
   }
 
-out:
   GIL_UNLOCK(0);
 }
 
+static enum write_state
+on_write_sendfile(struct ev_loop* mainloop, Request* request)
+{
+  /* A sendfile response is split into two phases:
+   * Phase A) sending HTTP headers
+   * Phase B) sending the actual file contents
+   */
+  if(request->current_chunk) {
+    /* Phase A) -- current_chunk contains the HTTP headers */
+    if (do_send_chunk(request)) {
+      // data left to send in the current chunk
+      return not_yet_done;
+    } else {
+      assert(request->current_chunk == NULL);
+      assert(request->current_chunk_p == 0);
+      /* Transition to Phase B) -- abuse current_chunk_p to store the file fd */
+      request->current_chunk_p = PyObject_AsFileDescriptor(request->iterable);
+      // don't stop yet, Phase B is still missing
+      return not_yet_done;
+    }
+  } else {
+    /* Phase B) -- current_chunk_p contains file fd */
+    if (do_sendfile(request)) {
+      // Haven't reached the end of file yet
+      return not_yet_done;
+    } else {
+      // Done with the file
+      return done;
+    }
+  }
+}
+
+
+static enum write_state
+on_write_chunk(struct ev_loop* mainloop, Request* request)
+{
+  if (do_send_chunk(request))
+    // data left to send in the current chunk
+    return not_yet_done;
+
+  if(request->iterator) {
+    /* Reached the end of a chunk in the response iterator. Get next chunk. */
+    PyObject* next_chunk;
+    next_chunk = wsgi_iterable_get_next_chunk(request);
+    if(next_chunk) {
+      /* We found another chunk to send. */
+      if(request->state.chunked_response) {
+        request->current_chunk = wrap_http_chunk_cruft_around(next_chunk);
+        Py_DECREF(next_chunk);
+      } else {
+        request->current_chunk = next_chunk;
+      }
+      assert(request->current_chunk_p == 0);
+      return not_yet_done;
+
+    } else {
+      if(PyErr_Occurred()) {
+        /* Trying to get the next chunk raised an exception. */
+        PyErr_Print();
+        DBG_REQ(request, "Exception in iterator, can not recover");
+        return aborted;
+      } else {
+        /* This was the last chunk; cleanup. */
+        Py_CLEAR(request->iterator);
+        goto send_terminator_chunk;
+      }
+    }
+  } else {
+    /* We have no iterator to get more chunks from, so we're done.
+     * Reasons we might end up in this place:
+     * A) A parse or server error occurred
+     * C) We just finished a chunked response with the call to 'do_send_chunk'
+     *    above and now maybe have to send the terminating empty chunk.
+     * B) We used chunked responses earlier in the response and
+     *    are now sending the terminating empty chunk.
+     */
+    goto send_terminator_chunk;
+  }
+
+  assert(0); // unreachable
+
+send_terminator_chunk:
+  if(request->state.chunked_response) {
+    /* We have to send a terminating empty chunk + \r\n */
+    request->current_chunk = PyString_FromString("0\r\n\r\n");
+    assert(request->current_chunk_p == 0);
+    // Next time we get here, don't send the terminating empty chunk again.
+    // XXX This is kind of a hack and should be refactored for easier understanding.
+    request->state.chunked_response = false;
+    return not_yet_done;
+  } else {
+    return done;
+  }
+}
+
+/* Return true if there's data left to send, false if we reached the end of the chunk. */
 static bool
-send_chunk(Request* request)
+do_send_chunk(Request* request)
 {
   Py_ssize_t bytes_sent;
 
@@ -279,6 +364,7 @@ send_chunk(Request* request)
   return true;
 }
 
+/* Return true if there's data left to send, false if we reached the end of the file. */
 static bool
 do_sendfile(Request* request)
 {
