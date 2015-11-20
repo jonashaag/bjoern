@@ -1,6 +1,6 @@
 import os
 import glob
-from distutils.core import setup, Extension
+from setuptools import setup, Extension
 
 SOURCE_FILES = [os.path.join('http-parser', 'http_parser.c')] + \
                glob.glob(os.path.join('bjoern', '*.c'))
