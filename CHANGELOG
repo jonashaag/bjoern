@@ -1,3 +1,6 @@
+1.4.3 (Apr 2016)
+    - Fix #88: Infinite loop due to misuse of POSIX API
+
 1.4.2 (Jan 2015)
     - CVE-2015-0219, see https://www.djangoproject.com/weblog/2015/jan/13/security/
 
