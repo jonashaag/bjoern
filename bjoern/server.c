@@ -29,11 +29,13 @@ static const char* http_error_messages[4] = {
   "HTTP/1.1 500 Internal Server Error\r\n\r\n"
 };
 
-enum write_state {
+enum _rw_state {
   not_yet_done = 1,
   done,
   aborted,
 };
+typedef enum _rw_state read_state;
+typedef enum _rw_state write_state;
 
 typedef struct {
   ServerInfo* server_info;
@@ -50,11 +52,12 @@ static ev_signal_callback ev_signal_on_sigint;
 static ev_io_callback ev_io_on_request;
 static ev_io_callback ev_io_on_read;
 static ev_io_callback ev_io_on_write;
-static enum write_state on_write_sendfile(struct ev_loop*, Request*);
-static enum write_state on_write_chunk(struct ev_loop*, Request*);
+static write_state on_write_sendfile(struct ev_loop*, Request*);
+static write_state on_write_chunk(struct ev_loop*, Request*);
 static bool do_send_chunk(Request*);
 static bool do_sendfile(Request*);
 static bool handle_nonzero_errno(Request*);
+static void close_connection(struct ev_loop*, Request*);
 
 
 void server_run(ServerInfo* server_info)
@@ -143,6 +146,7 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
   static char read_buf[READ_BUFFER_SIZE];
 
   Request* request = REQUEST_FROM_WATCHER(watcher);
+  read_state read_state;
 
   ssize_t read_bytes = read(
     request->client_fd,
@@ -152,47 +156,63 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
 
   GIL_LOCK(0);
 
-  if(read_bytes <= 0) {
-    if(errno != EAGAIN && errno != EWOULDBLOCK) {
-      if(read_bytes == 0)
-        DBG_REQ(request, "Client disconnected");
-      else
-        DBG_REQ(request, "Hit errno %d while read()ing", errno);
-      close(request->client_fd);
-      ev_io_stop(mainloop, &request->ev_watcher);
-      Request_free(request);
-    }
-    goto out;
-  }
-
-  Request_parse(request, read_buf, (size_t)read_bytes);
-
-  if(request->state.error_code) {
-    DBG_REQ(request, "Parse error");
-    request->current_chunk = PyString_FromString(
-      http_error_messages[request->state.error_code]);
-    assert(request->iterator == NULL);
-  }
-  else if(request->state.parse_finished) {
-    if(!wsgi_call_application(request)) {
-      assert(PyErr_Occurred());
-      PyErr_Print();
-      assert(!request->state.chunked_response);
-      Py_XCLEAR(request->iterator);
-      request->current_chunk = PyString_FromString(
-        http_error_messages[HTTP_SERVER_ERROR]);
+  if (read_bytes == 0) {
+    /* Client disconnected */
+    read_state = aborted;
+    DBG_REQ(request, "Client disconnected");
+  } else if (read_bytes < 0) {
+    /* Would block or error */
+    if(errno == EAGAIN || errno == EWOULDBLOCK) {
+      read_state = not_yet_done;
+    } else {
+      read_state = aborted;
+      DBG_REQ(request, "Hit errno %d while read()ing", errno);
     }
   } else {
-    /* Wait for more data */
-    goto out;
+    /* OK, either expect more data or done reading */
+    Request_parse(request, read_buf, (size_t)read_bytes);
+    if(request->state.error_code) {
+      /* HTTP parse error */
+      read_state = done;
+      DBG_REQ(request, "Parse error");
+      request->current_chunk = PyString_FromString(
+        http_error_messages[request->state.error_code]);
+      assert(request->iterator == NULL);
+    } else if(request->state.parse_finished) {
+      /* HTTP parse successful */
+      read_state = done;
+      bool wsgi_ok = wsgi_call_application(request);
+      if (!wsgi_ok) {
+        /* Response is "HTTP 500 Internal Server Error" */
+        DBG_REQ(request, "WSGI app error");
+        assert(PyErr_Occurred());
+        PyErr_Print();
+        assert(!request->state.chunked_response);
+        Py_XCLEAR(request->iterator);
+        request->current_chunk = PyString_FromString(
+          http_error_messages[HTTP_SERVER_ERROR]);
+      }
+    } else {
+      /* Wait for more data */
+      read_state = not_yet_done;
+    }
   }
 
-  ev_io_stop(mainloop, &request->ev_watcher);
-  ev_io_init(&request->ev_watcher, &ev_io_on_write,
-             request->client_fd, EV_WRITE);
-  ev_io_start(mainloop, &request->ev_watcher);
+  switch (read_state) {
+  case not_yet_done:
+    break;
+  case done:
+    DBG_REQ(request, "Stop read watcher, start write watcher");
+    ev_io_stop(mainloop, &request->ev_watcher);
+    ev_io_init(&request->ev_watcher, &ev_io_on_write,
+               request->client_fd, EV_WRITE);
+    ev_io_start(mainloop, &request->ev_watcher);
+    break;
+  case aborted:
+    close_connection(mainloop, request);
+    break;
+  }
 
-out:
   GIL_UNLOCK(0);
 }
 
@@ -219,7 +239,7 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
 
   GIL_LOCK(0);
 
-  enum write_state write_state;
+  write_state write_state;
   if(request->state.use_sendfile) {
     write_state = on_write_sendfile(mainloop, request);
   } else {
@@ -230,11 +250,9 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
   case not_yet_done:
     break;
   case done:
-    /* Done with the response. */
-    ev_io_stop(mainloop, &request->ev_watcher);
-
     if(request->state.keep_alive) {
       DBG_REQ(request, "done, keep-alive");
+      ev_io_stop(mainloop, &request->ev_watcher);
       Request_clean(request);
       Request_reset(request);
       ev_io_init(&request->ev_watcher, &ev_io_on_read,
@@ -242,23 +260,20 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
       ev_io_start(mainloop, &request->ev_watcher);
     } else {
       DBG_REQ(request, "done, close");
-      close(request->client_fd);
-      Request_free(request);
+      close_connection(mainloop, request);
     }
     break;
   case aborted:
     /* Response was aborted due to an error. We can't do anything graceful here
      * because at least one chunk is already sent... just close the connection. */
-    ev_io_stop(mainloop, &request->ev_watcher);
-    close(request->client_fd);
-    Request_free(request);
+    close_connection(mainloop, request);
     break;
   }
 
   GIL_UNLOCK(0);
 }
 
-static enum write_state
+static write_state
 on_write_sendfile(struct ev_loop* mainloop, Request* request)
 {
   /* A sendfile response is split into two phases:
@@ -291,7 +306,7 @@ on_write_sendfile(struct ev_loop* mainloop, Request* request)
 }
 
 
-static enum write_state
+static write_state
 on_write_chunk(struct ev_loop* mainloop, Request* request)
 {
   if (do_send_chunk(request))
@@ -300,8 +315,7 @@ on_write_chunk(struct ev_loop* mainloop, Request* request)
 
   if(request->iterator) {
     /* Reached the end of a chunk in the response iterator. Get next chunk. */
-    PyObject* next_chunk;
-    next_chunk = wsgi_iterable_get_next_chunk(request);
+    PyObject* next_chunk = wsgi_iterable_get_next_chunk(request);
     if(next_chunk) {
       /* We found another chunk to send. */
       if(request->state.chunked_response) {
@@ -408,4 +422,13 @@ handle_nonzero_errno(Request* request)
     request->state.keep_alive = false;
     return false;
   }
+}
+
+static void
+close_connection(struct ev_loop *mainloop, Request* request)
+{
+  DBG_REQ(request, "Closing socket");
+  ev_io_stop(mainloop, &request->ev_watcher);
+  close(request->client_fd);
+  Request_free(request);
 }
