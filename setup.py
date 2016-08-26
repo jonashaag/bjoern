@@ -28,7 +28,7 @@ setup(
     classifiers  = ['Development Status :: 4 - Beta',
                     'License :: OSI Approved :: BSD License',
                     'Programming Language :: C',
-                    'Programming Language :: Python',
+                    'Programming Language :: Python :: 2',
                     'Topic :: Internet :: WWW/HTTP :: WSGI :: Server'],
     py_modules   = ['bjoern'],
     ext_modules  = [bjoern_extension]
