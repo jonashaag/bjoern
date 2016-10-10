@@ -331,24 +331,26 @@ void _initialize_request_module()
       PySys_GetObject("stderr")
     );
 
-    /* dct['wsgi.multithread'] = True
-     * If I correctly interpret the WSGI specs, this means
-     * "Can the server be ran in a thread?" */
+    /* dct['wsgi.multithread'] = False
+     * (Tell the application that it is being run
+     *  in a single-threaded environment.) */
     PyDict_SetItemString(
       wsgi_base_dict,
       "wsgi.multithread",
-      Py_True
+      Py_False
     );
 
     /* dct['wsgi.multiprocess'] = True
-     * ... and this one "Can the server process be forked?" */
+     * (Tell the application that it is being run
+     *  in a multi-process environment.) */
     PyDict_SetItemString(
       wsgi_base_dict,
       "wsgi.multiprocess",
       Py_True
     );
 
-    /* dct['wsgi.run_once'] = False (bjoern is no CGI gateway) */
+    /* dct['wsgi.run_once'] = False
+     * (bjoern is no CGI gateway) */
     PyDict_SetItemString(
       wsgi_base_dict,
       "wsgi.run_once",
