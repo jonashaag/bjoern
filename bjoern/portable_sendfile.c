@@ -18,9 +18,7 @@
     return len;
   }
 
-#elif defined __FreeBSD__
-
-  /* FreeBSD */
+#elif defined(__FreeBSD__) || defined(__DragonFly__)
 
   #include <sys/socket.h>
   #include <sys/types.h>
