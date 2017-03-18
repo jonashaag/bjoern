@@ -21,6 +21,13 @@ featuring
 * Full persistent connection ("*keep-alive*") support in both HTTP/1.0 and 1.1,
   including support for HTTP/1.1 chunked responses
 
+Why It's Not Cool
+~~~~~~~~~~~~~~~~~
+
+* Entirely written as a C extension, so portability may be a concern.
+* Not HTTP/1.1 capable (yet).
+
+
 Installation
 ~~~~~~~~~~~~
 ``pip install bjoern``. See `wiki <https://github.com/jonashaag/bjoern/wiki/Installation>`_ for details.
