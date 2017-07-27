@@ -1,4 +1,5 @@
 #include "filewrapper.h"
+#include "py2py3.h"
 
 static PyObject*
 FileWrapper_New(PyTypeObject* cls, PyObject* args, PyObject* kwargs)
@@ -9,7 +10,7 @@ FileWrapper_New(PyTypeObject* cls, PyObject* args, PyObject* kwargs)
   if(!PyArg_ParseTuple(args, "O|I:FileWrapper", &file, &ignored_blocksize))
     return NULL;
 
-  if(!PyFile_Check(file)) {
+  if(!_File_Check(file)) {
     TYPE_ERROR("FileWrapper argument", "file", file);
     return NULL;
   }

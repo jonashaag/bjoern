@@ -8,15 +8,15 @@ def start():
     def return_tuple(environ, start_response):
         start_response('200 OK', [('Content-Type','text/plain')])
         print 'tuple'
-        return ('Hello,', " it's me, ", 'Bob!')
+        return (b'Hello,', b" it's me, ", b'Bob!')
 
     def return_huge_answer(environ, start_response):
         start_response('200 OK', [('Content-Type','text/plain')])
-        return ['x'*(1024*1024)]
+        return [b'x'*(1024*1024)]
 
     def return_404(environ, start_response):
         start_response('404 Not Found', (('Content-Type','text/plain'), ))
-        return "URL %s not found" % environ.get('PATH_INFO', 'UNKNOWN')
+        return b"URL %s not found" % environ.get('PATH_INFO', 'UNKNOWN')
 
     dispatch = {
         '/tuple': return_tuple,

@@ -11,10 +11,10 @@ request_completed = False
 
 def application(environ, start_response):
     start_response('200 ok', [])
-    yield "chunk1"
+    yield b"chunk1"
     os.kill(os.getpid(), signal.SIGINT)
-    yield "chunk2"
-    yield "chunk3"
+    yield b"chunk2"
+    yield b"chunk3"
     global request_completed
     request_completed = True
 
