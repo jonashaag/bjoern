@@ -3,7 +3,6 @@
 #include "wsgi.h"
 #include "filewrapper.h"
 
-
 static PyObject*
 run(PyObject* self, PyObject* args)
 {
@@ -44,7 +43,25 @@ static PyMethodDef Bjoern_FunctionTable[] = {
   {NULL, NULL, 0, NULL}
 };
 
-PyMODINIT_FUNC init_bjoern(void)
+#if PY_MAJOR_VERSION >= 3
+static struct PyModuleDef module = {
+	PyModuleDef_HEAD_INIT,
+	"bjoern",   /* name of module */
+	"wsgi server in C", /* module documentation, may be NULL */
+	-1,       /* size of per-interpreter state of the module,
+		     or -1 if the module keeps state
+		     in global variables. */
+	Bjoern_FunctionTable,
+	NULL, NULL, NULL, NULL,
+};
+#endif
+
+#if PY_MAJOR_VERSION >= 3
+#define INIT_BJOERN PyInit__bjoern
+#else
+#define INIT_BJOERN init_bjoern
+#endif
+PyMODINIT_FUNC INIT_BJOERN(void)
 {
   _init_common();
   _init_filewrapper();
@@ -53,7 +70,22 @@ PyMODINIT_FUNC init_bjoern(void)
   assert(FileWrapper_Type.tp_flags & Py_TPFLAGS_READY);
   PyType_Ready(&StartResponse_Type);
   assert(StartResponse_Type.tp_flags & Py_TPFLAGS_READY);
+  Py_INCREF(&FileWrapper_Type);
+  Py_INCREF(&StartResponse_Type);
 
+#if PY_MAJOR_VERSION >= 3
+  PyObject* bjoern_module = PyModule_Create(&module);
+  if (bjoern_module == NULL) {
+	  return NULL;
+  }
+
+  PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(iii)", 1, 4, 3));
+  PyModule_AddObject(bjoern_module, "FileWrapper", (PyObject *)&FileWrapper_Type);
+  PyModule_AddObject(bjoern_module, "StartResponse", (PyObject *)&StartResponse_Type);
+  return bjoern_module;
+#else
   PyObject* bjoern_module = Py_InitModule("_bjoern", Bjoern_FunctionTable);
   PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(iii)", 1, 4, 3));
+#endif
+
 }

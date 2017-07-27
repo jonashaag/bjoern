@@ -1,5 +1,7 @@
 *.pyc
+*.swp
 *~
 build/
 dist/
 MANIFEST
+bjoern.egg-info/

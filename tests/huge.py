@@ -1,10 +1,10 @@
 N = 1024
-CHUNK = 'a' * 1024
+CHUNK = b'a' * 1024
 DATA_LEN = N * len(CHUNK)
 
 class _iter(object):
     def __iter__(self):
-        for i in xrange(N):
+        for i in range(N):
             yield CHUNK
 
 def app(e, s):

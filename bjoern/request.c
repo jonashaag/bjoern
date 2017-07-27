@@ -1,20 +1,23 @@
 #include <Python.h>
+#if PY_MAJOR_VERSION >= 3
+#else
 #include <cStringIO.h>
+#endif
 #include "request.h"
 #include "filewrapper.h"
+
+#include "py2py3.h"
+
+typedef struct {
+    PyObject_HEAD
+    char *buf;
+    Py_ssize_t pos;
+} bytesio;
 
 static inline void PyDict_ReplaceKey(PyObject* dict, PyObject* k1, PyObject* k2);
 static PyObject* wsgi_http_header(string header);
 static http_parser_settings parser_settings;
 static PyObject* wsgi_base_dict = NULL;
-
-/* Non-public type from cStringIO I abuse in on_body */
-typedef struct {
-  PyObject_HEAD
-  char *buf;
-  Py_ssize_t pos, string_size;
-  PyObject *pbuf;
-} Iobject;
 
 Request* Request_new(ServerInfo* server_info, int client_fd, const char* client_addr)
 {
@@ -25,7 +28,7 @@ Request* Request_new(ServerInfo* server_info, int client_fd, const char* client_
 #endif
   request->server_info = server_info;
   request->client_fd = client_fd;
-  request->client_addr = PyString_FromString(client_addr);
+  request->client_addr = _Unicode_FromString(client_addr);
   http_parser_init((http_parser*)&request->parser, HTTP_REQUEST);
   request->parser.parser.data = request;
   Request_reset(request);
@@ -101,11 +104,12 @@ void Request_parse(Request* request, const char* data, const size_t data_len)
     Py_DECREF(val); \
   } while(0)
 
+
 #define _set_header_from_http_header() \
   do { \
     PyObject* key = wsgi_http_header(PARSER->field); \
     if (key) { \
-      _set_header_free_value(key, PyString_FromStringAndSize(PARSER->value.data, PARSER->value.len)); \
+      _set_header_free_value(key, _Unicode_FromStringAndSize(PARSER->value.data, PARSER->value.len)); \
       Py_DECREF(key); \
     } \
   } while(0) \
@@ -124,14 +128,14 @@ on_path(http_parser* parser, const char* path, size_t len)
 {
   if(!(len = unquote_url_inplace((char*)path, len)))
     return 1;
-  _set_header_free_value(_PATH_INFO, PyString_FromStringAndSize(path, len));
+  _set_header_free_value(_PATH_INFO, _Unicode_FromStringAndSize(path, len));
   return 0;
 }
 
 static int
 on_query_string(http_parser* parser, const char* query, size_t len)
 {
-  _set_header_free_value(_QUERY_STRING, PyString_FromStringAndSize(query, len));
+  _set_header_free_value(_QUERY_STRING, _Unicode_FromStringAndSize(query, len));
   return 0;
 }
 
@@ -174,17 +178,18 @@ on_headers_complete(http_parser* parser)
 static int
 on_body(http_parser* parser, const char* data, const size_t len)
 {
-  Iobject* body;
+  bytesio* body;
 
-  body = (Iobject*)PyDict_GetItem(REQUEST->headers, _wsgi_input);
+  body = (bytesio*)PyDict_GetItem(REQUEST->headers, _wsgi_input);
   if(body == NULL) {
     if(!parser->content_length) {
       REQUEST->state.error_code = HTTP_LENGTH_REQUIRED;
       return 1;
     }
-    PyObject* buf = PyString_FromStringAndSize(NULL, parser->content_length);
-    body = (Iobject*)PycStringIO->NewInput(buf);
+    PyObject* buf = _Bytes_FromStringAndSize(NULL, parser->content_length);
+    body = (bytesio *)buf;
     Py_XDECREF(buf);
+    
     if(body == NULL)
       return 1;
     _set_header(_wsgi_input, (PyObject*)body);
@@ -217,7 +222,8 @@ on_message_complete(http_parser* parser)
     _set_header(_REQUEST_METHOD, _GET);
   } else {
     _set_header_free_value(_REQUEST_METHOD,
-      PyString_FromString(http_method_str(parser->method)));
+      _Unicode_FromString(http_method_str(parser->method))
+      );
   }
 
   /* REMOTE_ADDR */
@@ -227,10 +233,13 @@ on_message_complete(http_parser* parser)
   if(body) {
     /* We abused the `pos` member for tracking the amount of data copied from
      * the buffer in on_body, so reset it to zero here. */
-    ((Iobject*)body)->pos = 0;
+    ((bytesio*)body)->pos = 0;
   } else {
     /* Request has no body */
+#if PY_MAJOR_VERSION >= 3
+#else
     _set_header_free_value(_wsgi_input, PycStringIO->NewInput(_empty_string));
+#endif
   }
 
   PyDict_Update(REQUEST->headers, wsgi_base_dict);
@@ -243,31 +252,31 @@ on_message_complete(http_parser* parser)
 static PyObject*
 wsgi_http_header(string header)
 {
-  PyObject* obj = PyString_FromStringAndSize(NULL, header.len+strlen("HTTP_"));
-  char* dest = PyString_AS_STRING(obj);
+  int size = header.len+strlen("HTTP_");
+  char dest[size];
+  int i = 0;
 
-  *dest++ = 'H';
-  *dest++ = 'T';
-  *dest++ = 'T';
-  *dest++ = 'P';
-  *dest++ = '_';
+  dest[i++] = 'H';
+  dest[i++] = 'T';
+  dest[i++] = 'T';
+  dest[i++] = 'P';
+  dest[i++] = '_';
 
   while(header.len--) {
     char c = *header.data++;
     if (c == '_') {
       // CVE-2015-0219
-      Py_DECREF(obj);
       return NULL;
     }
     else if(c == '-')
-      *dest++ = '_';
+      dest[i++] = '_';
     else if(c >= 'a' && c <= 'z')
-      *dest++ = c - ('a'-'A');
+      dest[i++] = c - ('a'-'A');
     else
-      *dest++ = c;
+      dest[i++] = c;
   }
 
-  return obj;
+  return (PyObject *)_Unicode_FromStringAndSize(dest, size);
 }
 
 static inline void
@@ -292,7 +301,10 @@ parser_settings = {
 void _initialize_request_module()
 {
   if(wsgi_base_dict == NULL) {
+#if PY_MAJOR_VERSION >=3
+#else
     PycString_IMPORT;
+#endif
     wsgi_base_dict = PyDict_New();
 
     /* dct['wsgi.file_wrapper'] = FileWrapper */
@@ -313,7 +325,7 @@ void _initialize_request_module()
     PyDict_SetItemString(
       wsgi_base_dict,
       "wsgi.version",
-      PyTuple_Pack(2, PyInt_FromLong(1), PyInt_FromLong(0))
+      PyTuple_Pack(2, _FromLong(1), _FromLong(0))
     );
 
     /* dct['wsgi.url_scheme'] = 'http'
@@ -321,7 +333,7 @@ void _initialize_request_module()
     PyDict_SetItemString(
       wsgi_base_dict,
       "wsgi.url_scheme",
-      PyString_FromString("http")
+      _Unicode_FromString("http")
     );
 
     /* dct['wsgi.errors'] = sys.stderr */

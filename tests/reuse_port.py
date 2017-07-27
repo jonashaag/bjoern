@@ -40,7 +40,7 @@ def cmd_test():
 def cmd_app():
     def app(environ, start_response):
         start_response('200 OK', [])
-        return ["Hello from process %d\n" % os.getpid()]
+        return [b"Hello from process %d\n" % os.getpid()]
 
     import bjoern
     bjoern.run(app, "localhost", 8080, True)

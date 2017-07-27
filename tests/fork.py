@@ -8,11 +8,11 @@ worker_pids = []
 
 def app(environ, start_response):
     start_response('200 OK', [])
-    yield 'Hello world from worker %d' % os.getpid()
+    yield b'Hello world from worker %d' % os.getpid()
 
 
 bjoern.listen(app, '0.0.0.0', 8080)
-for _ in xrange(NUM_WORKERS):
+for _ in range(NUM_WORKERS):
     pid = os.fork()
     if pid > 0:
         # in master
@@ -26,7 +26,7 @@ for _ in xrange(NUM_WORKERS):
         exit()
 
 try:
-    for _ in xrange(NUM_WORKERS):
+    for _ in range(NUM_WORKERS):
         os.wait()
 except KeyboardInterrupt:
     for pid in worker_pids:
