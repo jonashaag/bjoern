@@ -33,7 +33,7 @@
 #define _Bytes_Resize(obj, len) _PyString_Resize(obj, len)
 #define _Unicode_Resize(obj, len) _PyString_Resize(obj, len)
 #define _FromLong(n) PyInt_FromLong(n)
-#define _File_Check(file, temp_obj) PyFile_Check(file)
+#define _File_Check(file) PyFile_Check(file)
 #endif
 
 #endif /* _PY2PY3_H */
