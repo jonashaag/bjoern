@@ -2,6 +2,9 @@
 #define _PY2PY3_H
 
 #if PY_MAJOR_VERSION >= 3
+#define NOP do{}while(0)
+#define PyFile_IncUseCount(file) NOP
+#define PyFile_DecUseCount(file) NOP
 #define _Bytes_AS_DATA(obj) PyBytes_AS_STRING(obj)
 #define _Unicode_AS_DATA(obj) PyUnicode_AsUTF8(obj)
 #define _Bytes_FromString(name) PyBytes_FromString(name)
@@ -16,9 +19,8 @@
 #define _Unicode_Resize(obj, len) PyUnicode_Resize(obj, len)
 #define _FromLong(n) PyLong_FromLong(n)
 #define _Callable_Check(obj)
-#define _fileno_name "fileno"
-#define _File_Check(file) (PyObject_HasAttrString(file, _fileno_name) && \
-		PyCallable_Check(PyObject_GetAttrString(file, _fileno_name)))
+#define _File_Check(file) (PyObject_HasAttrString(file, "fileno") && \
+		PyCallable_Check(PyObject_GetAttrString(file, "fileno")))
 #else
 #define _Bytes_AS_DATA(obj) PyString_AS_STRING(obj)
 #define _Unicode_AS_DATA(obj) PyString_AS_STRING(obj)

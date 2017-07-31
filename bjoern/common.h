@@ -7,10 +7,6 @@
 #include <stdbool.h>
 #include <string.h>
 
-#if PY_MINOR_VERSION < 6
-# include "25compat.h"
-#endif
-
 #define TYPE_ERROR_INNER(what, expected, ...) \
   PyErr_Format(PyExc_TypeError, what " must be " expected " " __VA_ARGS__)
 #define TYPE_ERROR(what, expected, got) \
