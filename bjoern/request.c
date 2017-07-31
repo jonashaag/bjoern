@@ -1,8 +1,4 @@
 #include <Python.h>
-#if PY_MAJOR_VERSION >= 3
-#else
-#include <cStringIO.h>
-#endif
 #include "request.h"
 #include "filewrapper.h"
 
@@ -236,10 +232,6 @@ on_message_complete(http_parser* parser)
     ((bytesio*)body)->pos = 0;
   } else {
     /* Request has no body */
-#if PY_MAJOR_VERSION >= 3
-#else
-    _set_header_free_value(_wsgi_input, PycStringIO->NewInput(_empty_string));
-#endif
   }
 
   PyDict_Update(REQUEST->headers, wsgi_base_dict);
@@ -301,10 +293,6 @@ parser_settings = {
 void _initialize_request_module()
 {
   if(wsgi_base_dict == NULL) {
-#if PY_MAJOR_VERSION >=3
-#else
-    PycString_IMPORT;
-#endif
     wsgi_base_dict = PyDict_New();
 
     /* dct['wsgi.file_wrapper'] = FileWrapper */
