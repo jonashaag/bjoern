@@ -5,7 +5,6 @@
 #include "py2py3.h"
 
 typedef struct {
-    PyObject_HEAD
     char *buf;
     Py_ssize_t pos;
 } bytesio;
@@ -182,14 +181,19 @@ on_body(http_parser* parser, const char* data, const size_t len)
       REQUEST->state.error_code = HTTP_LENGTH_REQUIRED;
       return 1;
     }
-    PyObject* buf = _Bytes_FromStringAndSize(NULL, parser->content_length);
-    body = (bytesio *)buf;
-    Py_XDECREF(buf);
+    body = malloc(sizeof (bytesio));
+    if (body == NULL) {
+	    return 1;
+    }
+    body->pos = 0;
+    body->buf = malloc(parser->content_length);
+    if (body->buf == NULL) {
+	    free(body);
+	    return 1;
+    }
     
-    if(body == NULL)
-      return 1;
-    _set_header(_wsgi_input, (PyObject*)body);
-    Py_DECREF(body);
+    PyObject *as_long = _FromLong((unsigned long)body);
+    _set_header(_wsgi_input, as_long);
   }
   memcpy(body->buf + body->pos, data, len);
   body->pos += len;
@@ -232,6 +236,8 @@ on_message_complete(http_parser* parser)
     ((bytesio*)body)->pos = 0;
   } else {
     /* Request has no body */
+    PyObject *as_long = _FromLong(0);
+    _set_header_free_value(_wsgi_input, as_long);
   }
 
   PyDict_Update(REQUEST->headers, wsgi_base_dict);
