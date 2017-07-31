@@ -12,10 +12,13 @@
 #define _Unicode_GET_SIZE(obj) PyUnicode_GET_LENGTH(obj)
 #define _Bytes_Check(obj) PyBytes_Check(obj)
 #define _Unicode_Check(obj) PyUnicode_Check(obj)
-#define _Bytes_Resize(obj, len) _PyBytes_Resize(obj, len);
-#define _Unicode_Resize(obj, len) PyUnicode_Resize(obj, len);
+#define _Bytes_Resize(obj, len) _PyBytes_Resize(obj, len)
+#define _Unicode_Resize(obj, len) PyUnicode_Resize(obj, len)
 #define _FromLong(n) PyLong_FromLong(n)
-#define _File_Check(file) 1 /* To Be Fixed */
+#define _Callable_Check(obj)
+#define _fileno_name "fileno"
+#define _File_Check(file) (PyObject_HasAttrString(file, _fileno_name) && \
+		PyCallable_Check(PyObject_GetAttrString(file, _fileno_name)))
 #else
 #define _Bytes_AS_DATA(obj) PyString_AS_STRING(obj)
 #define _Unicode_AS_DATA(obj) PyString_AS_STRING(obj)
@@ -30,7 +33,7 @@
 #define _Bytes_Resize(obj, len) _PyString_Resize(obj, len)
 #define _Unicode_Resize(obj, len) _PyString_Resize(obj, len)
 #define _FromLong(n) PyInt_FromLong(n)
-#define _File_Check(file) PyFile_Check(file)
+#define _File_Check(file, temp_obj) PyFile_Check(file)
 #endif
 
 #endif /* _PY2PY3_H */
