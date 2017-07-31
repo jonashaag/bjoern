@@ -40,7 +40,7 @@ small: clean
 
 _bjoernmodule:
 	@$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(objects) -o $(BUILD_DIR)/_bjoern.so
-	@PYTHONPATH=$$PYTHONPATH:$(BUILD_DIR) python3 -c "import bjoern"
+	@PYTHONPATH=$$PYTHONPATH:$(BUILD_DIR) python -c "import bjoern"
 
 again: clean all
 

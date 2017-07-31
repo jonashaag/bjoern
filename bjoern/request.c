@@ -252,15 +252,15 @@ on_message_complete(http_parser* parser)
 static PyObject*
 wsgi_http_header(string header)
 {
-  int size = header.len+strlen("HTTP_");
+  const char *http_ = "HTTP_";
+  int size = header.len+strlen(http_);
   char dest[size];
   int i = 0;
 
-  dest[i++] = 'H';
-  dest[i++] = 'T';
-  dest[i++] = 'T';
-  dest[i++] = 'P';
-  dest[i++] = '_';
+  while (*(http_ + i) != '\0') {
+	  dest[i] = http_[i];
+	  i++;
+  }
 
   while(header.len--) {
     char c = *header.data++;

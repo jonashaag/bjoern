@@ -80,8 +80,6 @@ PyMODINIT_FUNC INIT_BJOERN(void)
   }
 
   PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(iii)", 1, 4, 3));
-  PyModule_AddObject(bjoern_module, "FileWrapper", (PyObject *)&FileWrapper_Type);
-  PyModule_AddObject(bjoern_module, "StartResponse", (PyObject *)&StartResponse_Type);
   return bjoern_module;
 #else
   PyObject* bjoern_module = Py_InitModule("_bjoern", Bjoern_FunctionTable);

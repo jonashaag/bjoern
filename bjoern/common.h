@@ -1,8 +1,6 @@
 #ifndef __common_h__
 #define __common_h__
 
-#define DEBUG 1
-
 #include <Python.h>
 #include <stdlib.h>
 #include <stddef.h>
