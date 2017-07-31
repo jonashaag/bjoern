@@ -247,12 +247,9 @@ wsgi_http_header(string header)
   const char *http_ = "HTTP_";
   int size = header.len+strlen(http_);
   char dest[size];
-  int i = 0;
+  int i = 5;
 
-  while (*(http_ + i) != '\0') {
-	  dest[i] = http_[i];
-	  i++;
-  }
+  memcpy(dest, http_, i);
 
   while(header.len--) {
     char c = *header.data++;
