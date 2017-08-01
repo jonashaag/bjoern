@@ -7,12 +7,20 @@
 typedef struct {
     char *buf;
     Py_ssize_t pos;
+    int clean;
 } bytesio;
 
 static inline void PyDict_ReplaceKey(PyObject* dict, PyObject* k1, PyObject* k2);
 static PyObject* wsgi_http_header(string header);
 static http_parser_settings parser_settings;
 static PyObject* wsgi_base_dict = NULL;
+
+static PyObject *IO;
+static PyObject *STR_bytesio;
+static PyObject *STR_write;
+static PyObject *STR_read;
+static PyObject *STR_seek;
+static PyObject *VALUE_zero;
 
 Request* Request_new(ServerInfo* server_info, int client_fd, const char* client_addr)
 {
@@ -173,30 +181,25 @@ on_headers_complete(http_parser* parser)
 static int
 on_body(http_parser* parser, const char* data, const size_t len)
 {
-  bytesio* body;
+  PyObject *body;
 
-  body = (bytesio*)PyDict_GetItem(REQUEST->headers, _wsgi_input);
+  body = PyDict_GetItem(REQUEST->headers, _wsgi_input);
   if(body == NULL) {
     if(!parser->content_length) {
       REQUEST->state.error_code = HTTP_LENGTH_REQUIRED;
       return 1;
     }
-    body = malloc(sizeof (bytesio));
+    body = PyObject_CallMethodObjArgs(IO, STR_bytesio, NULL);
     if (body == NULL) {
+	    printf("call io.BytesIO failed\n");
 	    return 1;
     }
-    body->pos = 0;
-    body->buf = malloc(parser->content_length);
-    if (body->buf == NULL) {
-	    free(body);
-	    return 1;
-    }
-    
-    PyObject *as_long = _FromLong((unsigned long)body);
-    _set_header(_wsgi_input, as_long);
+    _set_header(_wsgi_input, body);
+    Py_DECREF(body);
   }
-  memcpy(body->buf + body->pos, data, len);
-  body->pos += len;
+  PyObject *temp_data = _Bytes_FromString(data);
+  PyObject_CallMethodObjArgs(body, STR_write, temp_data, NULL);
+  Py_DECREF(temp_data);
   return 0;
 }
 
@@ -233,11 +236,15 @@ on_message_complete(http_parser* parser)
   if(body) {
     /* We abused the `pos` member for tracking the amount of data copied from
      * the buffer in on_body, so reset it to zero here. */
-    ((bytesio*)body)->pos = 0;
+    PyObject_CallMethodObjArgs(body, STR_seek, VALUE_zero, NULL);
   } else {
     /* Request has no body */
-    PyObject *as_long = _FromLong(0);
-    _set_header_free_value(_wsgi_input, as_long);
+    PyObject *body = PyObject_CallMethodObjArgs(IO, STR_bytesio, NULL);
+    if (body == NULL) {
+	    printf("call io.BytesIO failed\n");
+	    return 1;
+    }
+    _set_header_free_value(_wsgi_input, body);
   }
 
   PyDict_Update(REQUEST->headers, wsgi_base_dict);
@@ -295,6 +302,18 @@ parser_settings = {
 
 void _initialize_request_module()
 {
+    printf("Initializing request module ...\n");
+    IO = PyImport_ImportModule("io");
+    if (IO == NULL) {
+	    printf("ERROR: importing io.BytesIO failed\n");
+	    return;
+    }
+    STR_bytesio = _Unicode_FromString("BytesIO");
+    STR_write = _Unicode_FromString("write");
+    STR_read = _Unicode_FromString("read");
+    STR_seek = _Unicode_FromString("seek");
+    VALUE_zero = _FromLong(0);
+
   if(wsgi_base_dict == NULL) {
     wsgi_base_dict = PyDict_New();
 
