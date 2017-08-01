@@ -194,11 +194,11 @@ on_body(http_parser* parser, const char* data, const size_t len)
 	    printf("call io.BytesIO failed\n");
 	    return 1;
     }
-    _set_header(_wsgi_input, body);
-    Py_DECREF(body);
+    _set_header_free_value(_wsgi_input, body);
   }
-  PyObject *temp_data = _Bytes_FromString(data);
-  PyObject_CallMethodObjArgs(body, STR_write, temp_data, NULL);
+  PyObject *temp_data = _Bytes_FromStringAndSize(data, len);
+  PyObject *tmp = PyObject_CallMethodObjArgs(body, STR_write, temp_data, NULL);
+  Py_DECREF(tmp); /* Never throw away return objects from py-api */
   Py_DECREF(temp_data);
   return 0;
 }
@@ -236,10 +236,15 @@ on_message_complete(http_parser* parser)
   if(body) {
     /* We abused the `pos` member for tracking the amount of data copied from
      * the buffer in on_body, so reset it to zero here. */
-    PyObject_CallMethodObjArgs(body, STR_seek, VALUE_zero, NULL);
+    PyObject *buf = PyObject_CallMethodObjArgs(body, STR_seek, VALUE_zero,
+		    NULL);
+    Py_DECREF(buf);
+    buf = PyObject_CallMethodObjArgs(body, STR_read, NULL);
+    Py_DECREF(body);
+    _set_header_free_value(_wsgi_input, buf);
   } else {
     /* Request has no body */
-    PyObject *body = PyObject_CallMethodObjArgs(IO, STR_bytesio, NULL);
+    body = PyObject_CallMethodObjArgs(IO, STR_bytesio, NULL);
     if (body == NULL) {
 	    printf("call io.BytesIO failed\n");
 	    return 1;
