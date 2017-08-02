@@ -100,6 +100,7 @@ void Request_parse(Request* request, const char* data, const size_t data_len)
   do { PARSER->name.len = (name - PARSER->name.data) + len; } while(0)
 
 #define _set_header(k, v) PyDict_SetItem(REQUEST->headers, k, v);
+  /* PyDict_SetItem() increases the ref-count for value */
 #define _set_header_free_value(k, v) \
   do { \
     PyObject* val = (v); \
@@ -234,17 +235,16 @@ on_message_complete(http_parser* parser)
 
   PyObject* body = PyDict_GetItem(REQUEST->headers, _wsgi_input);
   if(body) {
-    /* We abused the `pos` member for tracking the amount of data copied from
-     * the buffer in on_body, so reset it to zero here. */
+    /* first do a seek(0) and then read() returns all data */
     PyObject *buf = PyObject_CallMethodObjArgs(body, STR_seek, VALUE_zero,
 		    NULL);
-    Py_DECREF(buf);
+    Py_DECREF(buf); /* Discard the return value */
     buf = PyObject_CallMethodObjArgs(body, STR_read, NULL);
-    Py_DECREF(body);
-    _set_header_free_value(_wsgi_input, buf);
+    Py_DECREF(body); /* Discard the BytesIO body object */
+    _set_header_free_value(_wsgi_input, buf); /* return the bytes to wsgi app */
   } else {
     /* Request has no body */
-    body = PyObject_CallMethodObjArgs(IO, STR_bytesio, NULL);
+    body = _Bytes_FromString(NULL);
     if (body == NULL) {
 	    printf("call io.BytesIO failed\n");
 	    return 1;
