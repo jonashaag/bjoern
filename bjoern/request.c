@@ -192,7 +192,6 @@ on_body(http_parser* parser, const char* data, const size_t len)
     }
     body = PyObject_CallMethodObjArgs(IO, STR_bytesio, NULL);
     if (body == NULL) {
-	    printf("call io.BytesIO failed\n");
 	    return 1;
     }
     _set_header_free_value(_wsgi_input, body);
@@ -302,10 +301,9 @@ parser_settings = {
 
 void _initialize_request_module()
 {
-    printf("Initializing request module ...\n");
     IO = PyImport_ImportModule("io");
     if (IO == NULL) {
-	    printf("ERROR: importing io.BytesIO failed\n");
+	    /* PyImport_ImportModule should have exception set already */
 	    return;
     }
     STR_bytesio = _Unicode_FromString("BytesIO");

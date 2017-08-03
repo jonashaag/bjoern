@@ -18,7 +18,6 @@
 #define _Bytes_Resize(obj, len) _PyBytes_Resize(obj, len)
 #define _Unicode_Resize(obj, len) PyUnicode_Resize(obj, len)
 #define _FromLong(n) PyLong_FromLong(n)
-#define _Callable_Check(obj)
 #define _File_Check(file) (PyObject_HasAttrString(file, "fileno") && \
 		PyCallable_Check(PyObject_GetAttrString(file, "fileno")))
 #else
