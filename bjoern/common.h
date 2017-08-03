@@ -22,7 +22,8 @@ void _init_common(void);
 PyObject *_REMOTE_ADDR, *_PATH_INFO, *_QUERY_STRING, *_REQUEST_METHOD, *_GET,
          *_HTTP_CONTENT_LENGTH, *_CONTENT_LENGTH, *_HTTP_CONTENT_TYPE,
          *_CONTENT_TYPE, *_SERVER_PROTOCOL, *_SERVER_NAME, *_SERVER_PORT,
-         *_HTTP_1_1, *_HTTP_1_0, *_wsgi_input, *_close, *_empty_string;
+         *_HTTP_1_1, *_HTTP_1_0, *_wsgi_input, *_close, *_empty_string,
+	 *_empty_bytes;
 
 #ifdef DEBUG
   #define DBG_REQ(request, ...) \

@@ -244,7 +244,7 @@ on_message_complete(http_parser* parser)
     _set_header_free_value(_wsgi_input, buf); /* return the bytes to wsgi app */
   } else {
     /* Request has no body */
-    _set_header(_wsgi_input, _empty_string);
+    _set_header(_wsgi_input, _empty_bytes);
   }
 
   PyDict_Update(REQUEST->headers, wsgi_base_dict);

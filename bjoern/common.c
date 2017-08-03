@@ -51,4 +51,5 @@ void _init_common()
   _HTTP_1_0 = _Unicode_FromString("HTTP/1.0");
   _wsgi_input = _Unicode_FromString("wsgi.input");
   _empty_string = _Unicode_FromString("");
+  _empty_bytes = _Bytes_FromString("");
 }
