@@ -12,8 +12,8 @@ bjoern_extension = Extension(
     include_dirs  = ['http-parser', '/usr/include/libev'],
     define_macros = [('WANT_SENDFILE', '1'),
                      ('WANT_SIGINT_HANDLING', '1')],
-    extra_compile_args = ['-fno-strict-aliasing', '-fcommon',
-                          '-fPIC', '-Wall', '-Wextra', '-Wno-unused-parameter',
+    extra_compile_args = ['-fno-strict-aliasing',
+                          '-Wall', '-Wextra', '-Wno-unused-parameter',
                           '-Wno-missing-field-initializers', '-g']
 )
 
