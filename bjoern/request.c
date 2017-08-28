@@ -15,6 +15,7 @@ static PyObject *STR_write;
 static PyObject *STR_read;
 static PyObject *STR_seek;
 static PyObject *VALUE_zero;
+static PyObject *OBJECT_empty_bytesio;
 
 Request* Request_new(ServerInfo* server_info, int client_fd, const char* client_addr)
 {
@@ -232,12 +233,10 @@ on_message_complete(http_parser* parser)
     PyObject *buf = PyObject_CallMethodObjArgs(body, STR_seek, VALUE_zero,
 		    NULL);
     Py_DECREF(buf); /* Discard the return value */
-    buf = PyObject_CallMethodObjArgs(body, STR_read, NULL);
-    Py_DECREF(body); /* Discard the BytesIO body object */
-    _set_header_free_value(_wsgi_input, buf); /* return the bytes to wsgi app */
+    _set_header_free_value(_wsgi_input, body); /* return the bytes to wsgi app */
   } else {
     /* Request has no body */
-    _set_header(_wsgi_input, _empty_bytes);
+    _set_header(_wsgi_input, OBJECT_empty_bytesio);
   }
 
   PyDict_Update(REQUEST->headers, wsgi_base_dict);
@@ -305,6 +304,7 @@ void _initialize_request_module()
     STR_read = _Unicode_FromString("read");
     STR_seek = _Unicode_FromString("seek");
     VALUE_zero = _FromLong(0);
+    OBJECT_empty_bytesio = PyObject_CallMethodObjArgs(IO, STR_bytesio, NULL);
 
   if(wsgi_base_dict == NULL) {
     wsgi_base_dict = PyDict_New();
