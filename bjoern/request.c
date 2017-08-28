@@ -4,12 +4,6 @@
 
 #include "py2py3.h"
 
-typedef struct {
-    char *buf;
-    Py_ssize_t pos;
-    int clean;
-} bytesio;
-
 static inline void PyDict_ReplaceKey(PyObject* dict, PyObject* k1, PyObject* k2);
 static PyObject* wsgi_http_header(string header);
 static http_parser_settings parser_settings;
