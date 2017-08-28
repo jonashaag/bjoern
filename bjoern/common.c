@@ -45,6 +45,11 @@ void _init_common()
   _(CONTENT_LENGTH);
   _(HTTP_CONTENT_TYPE);
   _(CONTENT_TYPE);
+
+  _(BytesIO);
+  _(write);
+  _(read);
+  _(seek);
 #undef _
 
   _HTTP_1_1 = _Unicode_FromString("HTTP/1.1");
