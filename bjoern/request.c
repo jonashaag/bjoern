@@ -10,7 +10,6 @@ static http_parser_settings parser_settings;
 static PyObject* wsgi_base_dict = NULL;
 
 static PyObject *IO;
-static PyObject *OBJECT_empty_bytesio;
 
 Request* Request_new(ServerInfo* server_info, int client_fd, const char* client_addr)
 {
@@ -228,11 +227,11 @@ on_message_complete(http_parser* parser)
     PyObject *buf = PyObject_CallMethodObjArgs(body, _seek, _FromLong(0),
 		    NULL);
     Py_DECREF(buf); /* Discard the return value */
-    _set_header_free_value(_wsgi_input, body); /* return the bytes to wsgi app */
   } else {
     /* Request has no body */
-    _set_header(_wsgi_input, OBJECT_empty_bytesio);
+    body = PyObject_CallMethodObjArgs(IO, _BytesIO, NULL);
   }
+  _set_header_free_value(_wsgi_input, body);
 
   PyDict_Update(REQUEST->headers, wsgi_base_dict);
 
@@ -294,7 +293,6 @@ void _initialize_request_module()
 	    /* PyImport_ImportModule should have exception set already */
 	    return;
     }
-    OBJECT_empty_bytesio = PyObject_CallMethodObjArgs(IO, _BytesIO, NULL);
 
   if(wsgi_base_dict == NULL) {
     wsgi_base_dict = PyDict_New();
