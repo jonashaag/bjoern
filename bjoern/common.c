@@ -1,4 +1,5 @@
 #include "common.h"
+#include "py2py3.h"
 
 #define UNHEX(c) ((c >= '0' && c <= '9') ? (c - '0') : \
                   (c >= 'a' && c <= 'f') ? (c - 'a' + 10) : \
@@ -28,7 +29,8 @@ size_t unquote_url_inplace(char* url, size_t len)
 
 void _init_common()
 {
-#define _(name) _##name = PyString_FromString(#name)
+
+#define _(name) _##name = _Unicode_FromString(#name)
   _(REMOTE_ADDR);
   _(PATH_INFO);
   _(QUERY_STRING);
@@ -43,10 +45,16 @@ void _init_common()
   _(CONTENT_LENGTH);
   _(HTTP_CONTENT_TYPE);
   _(CONTENT_TYPE);
+
+  _(BytesIO);
+  _(write);
+  _(read);
+  _(seek);
 #undef _
 
-  _HTTP_1_1 = PyString_FromString("HTTP/1.1");
-  _HTTP_1_0 = PyString_FromString("HTTP/1.0");
-  _wsgi_input = PyString_FromString("wsgi.input");
-  _empty_string = PyString_FromString("");
+  _HTTP_1_1 = _Unicode_FromString("HTTP/1.1");
+  _HTTP_1_0 = _Unicode_FromString("HTTP/1.0");
+  _wsgi_input = _Unicode_FromString("wsgi.input");
+  _empty_string = _Unicode_FromString("");
+  _empty_bytes = _Bytes_FromString("");
 }

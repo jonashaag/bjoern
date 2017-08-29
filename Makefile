@@ -1,8 +1,9 @@
 SOURCE_DIR	= bjoern
 BUILD_DIR	= build
+PYTHON	?= python2
 
-PYTHON_INCLUDE	= $(shell python2-config --include)
-PYTHON_LDFLAGS	= $(shell python2-config --ldflags)
+PYTHON_INCLUDE	= $(shell ${PYTHON}-config --include)
+PYTHON_LDFLAGS	= $(shell ${PYTHON}-config --ldflags)
 
 HTTP_PARSER_DIR	= http-parser
 HTTP_PARSER_OBJ = $(HTTP_PARSER_DIR)/http_parser.o
@@ -40,7 +41,7 @@ small: clean
 
 _bjoernmodule:
 	@$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(objects) -o $(BUILD_DIR)/_bjoern.so
-	@PYTHONPATH=$$PYTHONPATH:$(BUILD_DIR) python2 -c "import bjoern"
+	@PYTHONPATH=$$PYTHONPATH:$(BUILD_DIR) ${PYTHON} -c "import bjoern"
 
 again: clean all
 
@@ -81,19 +82,19 @@ wget:
 	wget -O - -q -S $(TEST_URL)
 
 valgrind:
-	valgrind --leak-check=full --show-reachable=yes python2 tests/empty.py
+	valgrind --leak-check=full --show-reachable=yes ${PYTHON} tests/empty.py
 
 callgrind:
-	valgrind --tool=callgrind python2 tests/wsgitest-round-robin.py
+	valgrind --tool=callgrind ${PYTHON} tests/wsgitest-round-robin.py
 
 memwatch:
 	watch -n 0.5 \
-	  'cat /proc/$$(pgrep -n python2)/cmdline | tr "\0" " " | head -c -1; \
+	  'cat /proc/$$(pgrep -n ${PYTHON})/cmdline | tr "\0" " " | head -c -1; \
 	   echo; echo; \
-	   tail -n +25 /proc/$$(pgrep -n python2)/smaps'
+	   tail -n +25 /proc/$$(pgrep -n ${PYTHON})/smaps'
 
 upload:
-	python2 setup.py sdist upload
+	${PYTHON} setup.py sdist upload
 
 $(HTTP_PARSER_OBJ):
 	$(MAKE) -C $(HTTP_PARSER_DIR) http_parser.o CFLAGS_DEBUG_EXTRA=-fPIC CFLAGS_FAST_EXTRA=-fPIC

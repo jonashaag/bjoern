@@ -22,7 +22,7 @@ def app(env, start_response):
         import sys
         x = sys.exc_info()
         start_response('500 error', alist, x)
-    return ['hello']
+    return [b'hello']
 
 import bjoern
 bjoern.run(app, '0.0.0.0', 8080)

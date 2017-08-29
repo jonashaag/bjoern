@@ -7,10 +7,6 @@
 #include <stdbool.h>
 #include <string.h>
 
-#if PY_MINOR_VERSION < 6
-# include "25compat.h"
-#endif
-
 #define TYPE_ERROR_INNER(what, expected, ...) \
   PyErr_Format(PyExc_TypeError, what " must be " expected " " __VA_ARGS__)
 #define TYPE_ERROR(what, expected, got) \
@@ -26,7 +22,8 @@ void _init_common(void);
 PyObject *_REMOTE_ADDR, *_PATH_INFO, *_QUERY_STRING, *_REQUEST_METHOD, *_GET,
          *_HTTP_CONTENT_LENGTH, *_CONTENT_LENGTH, *_HTTP_CONTENT_TYPE,
          *_CONTENT_TYPE, *_SERVER_PROTOCOL, *_SERVER_NAME, *_SERVER_PORT,
-         *_HTTP_1_1, *_HTTP_1_0, *_wsgi_input, *_close, *_empty_string;
+         *_HTTP_1_1, *_HTTP_1_0, *_wsgi_input, *_close, *_empty_string,
+	 *_empty_bytes, *_BytesIO, *_write, *_read, *_seek;
 
 #ifdef DEBUG
   #define DBG_REQ(request, ...) \
