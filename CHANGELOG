@@ -1,3 +1,7 @@
+2.0.0 (Aug 31, 2017)
+    - Python 3 support (Hua Yanghao, Isaiah Peng). Note that due to the size
+      of this update, version 2.0.0 may be less stable than version 1.4.3.
+
 1.4.3 (Apr 2016)
     - Fix #88: Infinite loop due to misuse of POSIX API
 

@@ -5,7 +5,7 @@ bjoern: Fast And Ultra-Lightweight HTTP/1.1 WSGI Server
    :alt: Join the chat at https://gitter.im/jonashaag/bjoern
    :target: https://gitter.im/jonashaag/bjoern?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
 
-A screamingly fast, ultra-lightweight WSGI_ server for CPython,
+A screamingly fast, ultra-lightweight WSGI_ server for CPython 2 and CPython 3,
 written in C using Marc Lehmann's high performance libev_ event loop and
 Ryan Dahl's http-parser_.
 
@@ -16,6 +16,7 @@ featuring
 
 * ~ 1000 lines of C code
 * Memory footprint ~ 600KB
+* Python 2 and Python 3 support (thanks @yanghao!)
 * Single-threaded and without coroutines or other crap
 * Can bind to TCP `host:port` addresses and Unix sockets (thanks @k3d3!)
 * Full persistent connection ("*keep-alive*") support in both HTTP/1.0 and 1.1,
