@@ -290,7 +290,7 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
      * throw away any previous status and headers. */
     Py_CLEAR(request->status);
     Py_CLEAR(request->headers);
-    request->state.response_length_unknown = false;
+    request->state.response_length_unknown = true;
   }
 
   PyObject* status = NULL;
