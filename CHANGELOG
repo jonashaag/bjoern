@@ -1,3 +1,6 @@
+2.0.1 (Sep 1, 2017)
+    - Fix setup.py and `bjoern.version` attribute
+
 2.0.0 (Aug 31, 2017)
     - Python 3 support (Hua Yanghao, Isaiah Peng). Note that due to the size
       of this update, version 2.0.0 may be less stable than version 1.4.3.

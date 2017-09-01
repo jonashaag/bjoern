@@ -12,7 +12,7 @@ bjoern_extension = Extension(
     include_dirs  = ['http-parser', '/usr/include/libev'],
     define_macros = [('WANT_SENDFILE', '1'),
                      ('WANT_SIGINT_HANDLING', '1')],
-    extra_compile_args = ['-std=c99', '-fno-strict-aliasing', '-fcommon'
+    extra_compile_args = ['-std=c99', '-fno-strict-aliasing', '-fcommon',
                           '-fPIC', '-Wall', '-Wextra', '-Wno-unused-parameter',
                           '-Wno-missing-field-initializers', '-g']
 )
@@ -24,7 +24,7 @@ setup(
     license      = '2-clause BSD',
     url          = 'https://github.com/jonashaag/bjoern',
     description  = 'A screamingly fast Python 2 + 3 WSGI server written in C.',
-    version      = '2.0.0',
+    version      = '2.0.1',
     classifiers  = ['Development Status :: 4 - Beta',
                     'License :: OSI Approved :: BSD License',
                     'Programming Language :: C',

@@ -79,11 +79,11 @@ PyMODINIT_FUNC INIT_BJOERN(void)
     return NULL;
   }
 
-  PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(iii)", 1, 4, 3));
+  PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(iii)", 2, 0, 1));
   return bjoern_module;
 #else
   PyObject* bjoern_module = Py_InitModule("_bjoern", Bjoern_FunctionTable);
-  PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(iii)", 1, 4, 3));
+  PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(iii)", 2, 0, 1));
 #endif
 
 }
