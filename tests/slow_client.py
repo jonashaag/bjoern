@@ -10,7 +10,7 @@ import time
 import threading
 
 if len(sys.argv) > 2:
-    print "usage: %s [host[:port]]" % sys.argv[0]
+    print("usage: %s [host[:port]]" % sys.argv[0])
     sys.exit(1)
 
 hostname = 'localhost'
@@ -29,7 +29,7 @@ def timed(func):
         try:
             return func(*args, **kwargs)
         finally:
-            print '%s took %.2f sec' % (repr(func), time.time() - start)
+            print('%s took %.2f sec' % (repr(func), time.time() - start))
     return wrapper
 
 lock = threading.Lock()
@@ -42,7 +42,7 @@ def long_request():
         s.recv(80)
         time.sleep(0.1)
     lock.release()
-    print 'release'
+    print('release')
     for i in range(10):
         s.recv(80)
         time.sleep(0.1)
@@ -51,7 +51,7 @@ def long_request():
 @timed
 def time_request():
     lock.acquire()
-    print 'acquire'
+    print('acquire')
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((hostname, port))
     s.send('GET /tuple HTTP/1.0' + headers)

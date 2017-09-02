@@ -13,7 +13,7 @@ F = len(sys.argv) > 1 and sys.argv[1] or 'README.rst'
 W = len(sys.argv) > 2 and W[sys.argv[2]] or W['filewrapper']
 
 def app(env, start_response):
-    f = open(F)
+    f = open(F, 'rb')
     wrapped = W(f, env)
     start_response('200 ok', [('Content-Length', str(os.path.getsize(F)))])
     return wrapped

@@ -29,12 +29,12 @@ msgs = [
     'GET / HTTP/1.1\r\nFoo_Bar: bad\r\n\r\n',
     'GET / HTTP/1.1\r\nFoo-Bar: good\r\nFoo_Bar: bad\r\n\r\n'
 ]
-conn.send(msgs[int(sys.argv[1])])
+conn.send(msgs[int(sys.argv[1])].encode())
 while 1:
     data = conn.recv(100)
     if not data: break
-    print repr(data)
-    if data.endswith('0\r\n\r\n'):
+    print(repr(data))
+    if data.endswith(b'0\r\n\r\n'):
         if raw_input('new request? Y/n') == 'n':
             exit()
-        conn.send('GET / HTTP/1.1\r\nConnection: Keep-Alive\r\n\r\n')
+        conn.send(b'GET / HTTP/1.1\r\nConnection: Keep-Alive\r\n\r\n')
