@@ -174,25 +174,41 @@ inspect_headers(Request* request)
   Py_ssize_t i;
   PyObject* tuple;
 
+  if(!PyList_Check(request->headers)) {
+    TYPE_ERROR("start response argument 2", "a list of 2-tuples", request->headers);
+    return NULL;
+  }
+
   for(i=0; i<PyList_GET_SIZE(request->headers); ++i) {
     tuple = PyList_GET_ITEM(request->headers, i);
 
     if(!PyTuple_Check(tuple) || PyTuple_GET_SIZE(tuple) != 2)
       goto err;
 
-    PyObject* field = PyTuple_GET_ITEM(tuple, 0);
-    PyObject* value = PyTuple_GET_ITEM(tuple, 1);
+    PyObject* unicode_field = PyTuple_GET_ITEM(tuple, 0);
+    PyObject* unicode_value = PyTuple_GET_ITEM(tuple, 1);
 
-    if(!_Unicode_Check(field) || !_Unicode_Check(value))
+    PyObject* bytes_field = _Unicode_EncodeLatin1(unicode_field);
+    PyObject* bytes_value = _Unicode_EncodeLatin1(unicode_value);
+
+    if (bytes_field == NULL || bytes_value == NULL) {
+      Py_XDECREF(bytes_field);
+      Py_XDECREF(bytes_value);
       goto err;
+    }
 
-    if(!strncasecmp(_Unicode_AS_DATA(field), "Content-Length", _Unicode_GET_SIZE(field)))
+    PyList_SET_ITEM(request->headers, i, PyTuple_Pack(2, bytes_field, bytes_value));
+    Py_DECREF(bytes_field);
+    Py_DECREF(bytes_value);
+    Py_DECREF(tuple);
+
+    if(!strncasecmp(_Bytes_AS_DATA(bytes_field), "Content-Length", _Bytes_GET_SIZE(bytes_field)))
       request->state.response_length_unknown = false;
   }
   return true;
 
 err:
-  TYPE_ERROR_INNER("start_response argument 2", "a list of 2-tuples",
+  TYPE_ERROR_INNER("start_response argument 2", "a list of 2-tuples (field: str, value: str)",
     "(found invalid '%.200s' object at position %zd)", Py_TYPE(tuple)->tp_name, i);
   return false;
 }
@@ -213,21 +229,21 @@ wsgi_getheaders(Request* request, PyObject* buf)
 
   /* First line, e.g. "HTTP/1.1 200 Ok" */
   buf_write2("HTTP/1.1 ");
-  buf_write(_Unicode_AS_DATA(request->status),
-        _Unicode_GET_SIZE(request->status));
+  buf_write(_Bytes_AS_DATA(request->status),
+        _Bytes_GET_SIZE(request->status));
 
   /* Headers, from the `request->headers` mapping.
    * [("Header1", "value1"), ("Header2", "value2")]
    * --> "Header1: value1\r\nHeader2: value2"
    */
   for(Py_ssize_t i=0; i<PyList_GET_SIZE(request->headers); ++i) {
-    PyObject *tuple = PyList_GET_ITEM(request->headers, i);
-    PyObject *field = PyTuple_GET_ITEM(tuple, 0),
-         *value = PyTuple_GET_ITEM(tuple, 1);
+    PyObject* tuple = PyList_GET_ITEM(request->headers, i);
+    PyObject* field = PyTuple_GET_ITEM(tuple, 0);
+    PyObject* value = PyTuple_GET_ITEM(tuple, 1);
     buf_write2("\r\n");
-    buf_write(_Unicode_AS_DATA(field), _Unicode_GET_SIZE(field));
+    buf_write(_Bytes_AS_DATA(field), _Bytes_GET_SIZE(field));
     buf_write2(": ");
-    buf_write(_Unicode_AS_DATA(value), _Unicode_GET_SIZE(value));
+    buf_write(_Bytes_AS_DATA(value), _Bytes_GET_SIZE(value));
   }
 
   /* See `wsgi_call_application` */
@@ -293,10 +309,9 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
     request->state.response_length_unknown = true;
   }
 
-  PyObject* status = NULL;
-  PyObject* headers = NULL;
   PyObject* exc_info = NULL;
-  if(!PyArg_UnpackTuple(args, "start_response", 2, 3, &status, &headers, &exc_info))
+  PyObject* status_unicode = NULL;
+  if(!PyArg_UnpackTuple(args, "start_response", 2, 3, &status_unicode, &request->headers, &exc_info))
     return NULL;
 
   if(exc_info && exc_info != Py_None) {
@@ -323,25 +338,16 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
     return NULL;
   }
 
-  if(!_Unicode_Check(status)) {
-    TYPE_ERROR("start_response argument 1", "a 'status reason' string", status);
+  request->status = _Unicode_EncodeLatin1(status_unicode);
+  if (request->status == NULL) {
     return NULL;
   }
-  if(!PyList_Check(headers)) {
-    TYPE_ERROR("start response argument 2", "a list of 2-tuples", headers);
-    return NULL;
-  }
-
-  request->headers = headers;
 
   if(!inspect_headers(request)) {
     request->headers = NULL;
     return NULL;
   }
 
-  request->status = status;
-
-  Py_INCREF(request->status);
   Py_INCREF(request->headers);
 
   request->state.start_response_called = true;
