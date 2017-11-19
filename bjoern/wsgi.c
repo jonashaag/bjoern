@@ -3,7 +3,7 @@
 #include "wsgi.h"
 #include "py2py3.h"
 
-static size_t wsgi_getheaders(Request*, PyObject* buf);
+static void wsgi_getheaders(Request*, PyObject** buf, Py_ssize_t* length);
 
 typedef struct {
   PyObject_HEAD
@@ -139,8 +139,9 @@ wsgi_call_application(Request* request)
    * At least for small responses, the complete response could be sent with
    * one send() call (in server.c:ev_io_on_write) which is a (tiny) performance
    * booster because less kernel calls means less kernel call overhead. */
-  PyObject* buf = _Bytes_FromStringAndSize(NULL, 1024);
-  Py_ssize_t length = wsgi_getheaders(request, buf);
+  Py_ssize_t length;
+  PyObject* buf;
+  wsgi_getheaders(request, &buf, &length);
 
   if(first_chunk == NULL) {
     _Bytes_Resize(&buf, length);
@@ -154,11 +155,9 @@ wsgi_call_application(Request* request)
     first_chunk = new_chunk;
   }
 
-  assert(buf);
   _Bytes_Resize(&buf, length + _Bytes_GET_SIZE(first_chunk));
   memcpy((void *)(_Bytes_AS_DATA(buf)+length), _Bytes_AS_DATA(first_chunk),
          _Bytes_GET_SIZE(first_chunk));
-
   Py_DECREF(first_chunk);
 
 out:
@@ -214,10 +213,19 @@ err:
 }
 
 
-static size_t
-wsgi_getheaders(Request* request, PyObject* buf)
+static void
+wsgi_getheaders(Request* request, PyObject** buf, Py_ssize_t *length)
 {
-  char* bufp = (char *)_Bytes_AS_DATA(buf);
+  Py_ssize_t length_upperbound = strlen("HTTP/1.1 ") + _Bytes_GET_SIZE(request->status) + strlen("\r\nTransfer-Encoding: chunked") + strlen("\r\n\rn");
+  for(Py_ssize_t i=0; i<PyList_GET_SIZE(request->headers); ++i) {
+    PyObject* tuple = PyList_GET_ITEM(request->headers, i);
+    PyObject* field = PyTuple_GET_ITEM(tuple, 0);
+    PyObject* value = PyTuple_GET_ITEM(tuple, 1);
+    length_upperbound += strlen("\r\n") + _Bytes_GET_SIZE(field) + strlen(": ") + _Bytes_GET_SIZE(value);
+  }
+
+  PyObject* bufobj = _Bytes_FromStringAndSize(NULL, length_upperbound);
+  char* bufp = (char *)_Bytes_AS_DATA(bufobj);
 
   #define buf_write(src, len) \
     do { \
@@ -258,7 +266,8 @@ wsgi_getheaders(Request* request, PyObject* buf)
 
   buf_write2("\r\n\r\n");
 
-  return bufp - _Bytes_AS_DATA(buf);
+  *buf = bufobj;
+  *length = bufp - _Bytes_AS_DATA(bufobj);
 }
 
 inline PyObject*
