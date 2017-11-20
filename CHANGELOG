@@ -1,5 +1,5 @@
 2.0.3 (Nov 20, 2017)
-    - Fix segfault with HTTP header
+    - Fix segfault with HTTP header (晏旭瑞)
 
 2.0.2 (Nov 19, 2017)
     - Fix segfault with large HTTP header
