@@ -216,7 +216,7 @@ err:
 static void
 wsgi_getheaders(Request* request, PyObject** buf, Py_ssize_t *length)
 {
-  Py_ssize_t length_upperbound = strlen("HTTP/1.1 ") + _Bytes_GET_SIZE(request->status) + strlen("\r\nTransfer-Encoding: chunked") + strlen("\r\n\rn");
+  Py_ssize_t length_upperbound = strlen("HTTP/1.1 ") + _Bytes_GET_SIZE(request->status) + strlen("\r\nConnection: Keep-Alive") + strlen("\r\nTransfer-Encoding: chunked") + strlen("\r\n\r\n");
   for(Py_ssize_t i=0; i<PyList_GET_SIZE(request->headers); ++i) {
     PyObject* tuple = PyList_GET_ITEM(request->headers, i);
     PyObject* field = PyTuple_GET_ITEM(tuple, 0);
@@ -357,6 +357,7 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
     return NULL;
   }
 
+  Py_INCREF(request->status);
   Py_INCREF(request->headers);
 
   request->state.start_response_called = true;
