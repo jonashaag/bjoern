@@ -1,3 +1,6 @@
+2.0.4 (Nov 22, 2017)
+    - Fix Python 2 segfault
+
 2.0.3 (Nov 20, 2017)
     - Fix segfault with HTTP header (晏旭瑞)
 
