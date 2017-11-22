@@ -30,7 +30,7 @@
 #define _Bytes_Resize(obj, len) _PyString_Resize(obj, len)
 #define _FromLong(n) PyInt_FromLong(n)
 #define _File_Check(file) PyFile_Check(file)
-#define _Unicode_EncodeLatin1(u) u
+#define _Unicode_EncodeLatin1(u) (Py_INCREF(u),u)
 #endif
 
 #endif /* _PY2PY3_H */
