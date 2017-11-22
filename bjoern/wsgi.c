@@ -197,12 +197,13 @@ inspect_headers(Request* request)
     }
 
     PyList_SET_ITEM(request->headers, i, PyTuple_Pack(2, bytes_field, bytes_value));
-    Py_DECREF(bytes_field);
-    Py_DECREF(bytes_value);
     Py_DECREF(tuple);
 
     if(!strncasecmp(_Bytes_AS_DATA(bytes_field), "Content-Length", _Bytes_GET_SIZE(bytes_field)))
       request->state.response_length_unknown = false;
+
+    Py_DECREF(bytes_field);
+    Py_DECREF(bytes_value);
   }
   return true;
 
