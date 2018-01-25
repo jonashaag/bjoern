@@ -205,7 +205,18 @@ on_message_complete(http_parser* parser)
   /* SERVER_NAME and SERVER_PORT */
   if (REQUEST->server_info->host) {
     _set_header(_SERVER_NAME, REQUEST->server_info->host);
-    _set_header(_SERVER_PORT, REQUEST->server_info->port);
+    if (REQUEST->server_info->port == Py_None) {
+      _set_header(_SERVER_PORT,
+                  PyUnicode_FromFormat(""));
+    } else {
+      _set_header(_SERVER_PORT,
+                  PyUnicode_FromFormat("%i", REQUEST->server_info->port));
+    }
+  }
+  /* SERVER_NAME is required */
+  else {
+    _set_header(_SERVER_NAME, PyUnicode_FromFormat(""));
+    _set_header(_SERVER_PORT, PyUnicode_FromFormat(""));
   }
 
   /* REQUEST_METHOD */
