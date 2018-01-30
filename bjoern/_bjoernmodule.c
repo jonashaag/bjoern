@@ -32,7 +32,7 @@ run(PyObject* self, PyObject* args)
     }
   }
 
-  _initialize_request_module();
+  _initialize_request_module(&info);
   server_run(&info);
 
   Py_RETURN_NONE;

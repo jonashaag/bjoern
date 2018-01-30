@@ -202,12 +202,6 @@ on_message_complete(http_parser* parser)
   /* SERVER_PROTOCOL (REQUEST_PROTOCOL) */
   _set_header(_SERVER_PROTOCOL, parser->http_minor == 1 ? _HTTP_1_1 : _HTTP_1_0);
 
-  /* SERVER_NAME and SERVER_PORT */
-  if (REQUEST->server_info->host) {
-    _set_header(_SERVER_NAME, REQUEST->server_info->host);
-    _set_header(_SERVER_PORT, REQUEST->server_info->port);
-  }
-
   /* REQUEST_METHOD */
   if(parser->method == HTTP_GET) {
     /* I love useless micro-optimizations. */
@@ -285,7 +279,7 @@ parser_settings = {
   on_header_value, on_headers_complete, on_body, on_message_complete
 };
 
-void _initialize_request_module()
+void _initialize_request_module(ServerInfo* server_info)
 {
   IO_module = PyImport_ImportModule("io");
   if (IO_module == NULL) {
@@ -357,5 +351,22 @@ void _initialize_request_module()
       "wsgi.run_once",
       Py_False
     );
+
+    /* dct['SERVER_NAME'] = '...'
+     * dct['SERVER_PORT'] = '...'
+     * Both are required by WSGI specs. */
+    if (server_info->host) {
+      PyDict_SetItemString(wsgi_base_dict, "SERVER_NAME", server_info->host);
+
+      if (server_info->port == Py_None) {
+      PyDict_SetItemString(wsgi_base_dict, "SERVER_PORT", PyUnicode_FromFormat(""));
+      } else {
+        PyDict_SetItemString(wsgi_base_dict, "SERVER_PORT", PyUnicode_FromFormat("%i", server_info->port));
+      }
+     } else {
+      /* SERVER_NAME is required, but not usefull with UNIX type sockets */
+      PyDict_SetItemString(wsgi_base_dict, "SERVER_NAME", PyUnicode_FromFormat(""));
+      PyDict_SetItemString(wsgi_base_dict, "SERVER_PORT", PyUnicode_FromFormat(""));
+    }
   }
 }
