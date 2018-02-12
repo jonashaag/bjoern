@@ -128,11 +128,15 @@ ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
     return;
   }
 
+  GIL_LOCK(0);
+
   Request* request = Request_new(
     ((ThreadInfo*)ev_userdata(mainloop))->server_info,
     client_fd,
     inet_ntoa(sockaddr.sin_addr)
   );
+
+  GIL_UNLOCK(0);
 
   DBG_REQ(request, "Accepted client %s:%d on fd %d",
           inet_ntoa(sockaddr.sin_addr), ntohs(sockaddr.sin_port), client_fd);
