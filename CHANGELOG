@@ -1,3 +1,8 @@
+2.0.5 (Feb 14, 2018)
+    - Fix #122: WSGI environ SERVER_PORT is now a str (Simon Biewald)
+    - Fix #122: WSGI environ SERVER_{PORT,HOST} are now always set (Simon Biewald)
+    - Fix #125: Missing GIL locking (@szabolcsbalogh)
+
 2.0.4 (Nov 22, 2017)
     - Fix Python 2 segfault
 
