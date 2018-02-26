@@ -401,13 +401,19 @@ do_sendfile(Request* request)
 {
   Py_ssize_t bytes_sent = portable_sendfile(
       request->client_fd,
-      ((FileWrapper*)request->iterable)->fd,
+      FileWrapper_GetFd(request->iterable),
       request->current_chunk_p
   );
   switch(bytes_sent) {
   case -1:
-    return handle_nonzero_errno(request);
+    if (handle_nonzero_errno(request)) {
+      return true;
+    } else {
+      FileWrapper_Done(request->iterable);
+      return false;
+    }
   case 0:
+    FileWrapper_Done(request->iterable);
     return false;
   default:
     request->current_chunk_p += bytes_sent;
