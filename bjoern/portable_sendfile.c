@@ -11,9 +11,9 @@
   #include <sys/socket.h>
   #include <sys/types.h>
 
-  Py_ssize_t portable_sendfile(int out_fd, int in_fd) {
+  Py_ssize_t portable_sendfile(int out_fd, int in_fd, off_t offset) {
     off_t len = SENDFILE_CHUNK_SIZE;
-    if(sendfile(in_fd, out_fd, 0, &len, NULL, 0) == -1)
+    if(sendfile(in_fd, out_fd, offset, &len, NULL, 0) == -1)
       return -1;
     return len;
   }
@@ -23,9 +23,9 @@
   #include <sys/socket.h>
   #include <sys/types.h>
 
-  Py_ssize_t portable_sendfile(int out_fd, int in_fd) {
+  Py_ssize_t portable_sendfile(int out_fd, int in_fd, off_t offset) {
     off_t len;
-    if (sendfile(in_fd, out_fd, 0, SENDFILE_CHUNK_SIZE, NULL, &len, 0) == -1) {
+    if(sendfile(in_fd, out_fd, offset, SENDFILE_CHUNK_SIZE, NULL, &len, 0) == -1) {
       return -1;
     }
     return len;
@@ -37,8 +37,8 @@
 
   #include <sys/sendfile.h>
 
-  Py_ssize_t portable_sendfile(int out_fd, int in_fd) {
-    return sendfile(out_fd, in_fd, NULL, SENDFILE_CHUNK_SIZE);
+  Py_ssize_t portable_sendfile(int out_fd, int in_fd, off_t offset) {
+    return sendfile(out_fd, in_fd, &offset, SENDFILE_CHUNK_SIZE);
   }
 
 #endif
