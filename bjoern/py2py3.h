@@ -15,10 +15,10 @@
 #define _Bytes_Check(obj) PyBytes_Check(obj)
 #define _Bytes_Resize(obj, len) _PyBytes_Resize(obj, len)
 #define _FromLong(n) PyLong_FromLong(n)
-#define _File_Check(file) (PyObject_HasAttrString(file, "fileno") && \
-                           PyCallable_Check(PyObject_GetAttrString(file, "fileno")))
 #define _Unicode_EncodeLatin1(u) PyUnicode_AsLatin1String(u)
+
 #else
+
 #define _Bytes_AS_DATA(obj) PyString_AS_STRING(obj)
 #define _Bytes_FromString(name) PyString_FromString(name)
 #define _Unicode_FromString(name) PyString_FromString(name)
@@ -29,7 +29,6 @@
 #define _Bytes_Check(obj) PyString_Check(obj)
 #define _Bytes_Resize(obj, len) _PyString_Resize(obj, len)
 #define _FromLong(n) PyInt_FromLong(n)
-#define _File_Check(file) PyFile_Check(file)
 #define _Unicode_EncodeLatin1(u) (Py_INCREF(u),u)
 #endif
 

@@ -12,6 +12,7 @@
 # include <sys/signal.h>
 #endif
 
+#include "filewrapper.h"
 #include "portable_sendfile.h"
 #include "common.h"
 #include "wsgi.h"
@@ -246,7 +247,7 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
   GIL_LOCK(0);
 
   write_state write_state;
-  if(request->state.use_sendfile) {
+  if(FileWrapper_CheckExact(request->iterable)) {
     write_state = on_write_sendfile(mainloop, request);
   } else {
     write_state = on_write_chunk(mainloop, request);
@@ -288,19 +289,12 @@ on_write_sendfile(struct ev_loop* mainloop, Request* request)
    */
   if(request->current_chunk) {
     /* Phase A) -- current_chunk contains the HTTP headers */
-    if (do_send_chunk(request)) {
-      // data left to send in the current chunk
-      return not_yet_done;
-    } else {
-      assert(request->current_chunk == NULL);
-      assert(request->current_chunk_p == 0);
-      /* Transition to Phase B) -- abuse current_chunk_p to store the file fd */
-      request->current_chunk_p = PyObject_AsFileDescriptor(request->iterable);
-      // don't stop yet, Phase B is still missing
-      return not_yet_done;
-    }
+    do_send_chunk(request);
+    // Either we have headers left to send, or current_chunk has been set to
+    // NULL and we'll fall into Phase B) on the next invocation.
+    return not_yet_done;
   } else {
-    /* Phase B) -- current_chunk_p contains file fd */
+    /* Phase B) */
     if (do_sendfile(request)) {
       // Haven't reached the end of file yet
       return not_yet_done;
@@ -407,7 +401,7 @@ do_sendfile(Request* request)
 {
   Py_ssize_t bytes_sent = portable_sendfile(
       request->client_fd,
-      request->current_chunk_p /* current_chunk_p stores the file fd */
+      ((FileWrapper*)request->iterable)->fd
   );
   if(bytes_sent == -1)
     return handle_nonzero_errno(request);

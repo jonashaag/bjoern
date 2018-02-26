@@ -7,6 +7,7 @@ PyTypeObject FileWrapper_Type;
 typedef struct {
   PyObject_HEAD
   PyObject* file;
+  int fd;
 } FileWrapper;
 
 void _init_filewrapper(void);
