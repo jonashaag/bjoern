@@ -46,7 +46,7 @@ _bjoernmodule:
 again: clean all
 
 debug:
-	CFLAGS='-D DEBUG' make again
+	CFLAGS='-D DEBUG -g' make again
 
 $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.c
 	@echo ' -> ' $(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
