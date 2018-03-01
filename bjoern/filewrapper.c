@@ -9,7 +9,6 @@ int FileWrapper_GetFd(PyObject *self)
 void FileWrapper_Done(PyObject *self)
 {
   PyFile_DecUseCount((PyFileObject*)((FileWrapper*)self)->file);
-  Py_DECREF(((FileWrapper*)self)->file);
 }
 
 static PyObject*
@@ -49,10 +48,18 @@ FileWrapper_Iter(PyObject* self)
   return PyObject_GetIter(((FileWrapper*)self)->file);
 }
 
+void FileWrapper_dealloc(PyObject* self)
+{
+  Py_DECREF(((FileWrapper*)self)->file);
+  PyObject_FREE(self);
+}
+
 PyTypeObject FileWrapper_Type = {
   PyVarObject_HEAD_INIT(NULL, 0)
   "FileWrapper",                    /* tp_name (__name__)                     */
-  sizeof(FileWrapper)               /* tp_basicsize                           */
+  sizeof(FileWrapper),              /* tp_basicsize                           */
+  0,                                /* tp_itemsize                            */
+  (destructor)FileWrapper_dealloc,  /* tp_dealloc                             */
 };
 
 void _init_filewrapper(void)

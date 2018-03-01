@@ -1,6 +1,9 @@
 import os
 import random
-import httplib
+try:
+    import httplib
+except ImportError:
+    import http.client as httplib
 import socket
 
 HOST = ('127.0.0.1', 9000)
@@ -87,14 +90,14 @@ class Testcase(object):
 
     def _tinker_request(self):
         if self.http_minor == 0:
-            req = 'GET / HTTP/1.0\r\n'
+            req = b'GET / HTTP/1.0\r\n'
             if self.want_keep_alive:
-                req += 'Connection: Keep-Alive\r\n'
+                req += b'Connection: Keep-Alive\r\n'
         else:
-            req = 'GET / HTTP/1.1\r\n'
+            req = b'GET / HTTP/1.1\r\n'
             if not self.want_keep_alive:
-                req += 'Connection: close\r\n'
-        req += '\r\n'
+                req += b'Connection: close\r\n'
+        req += b'\r\n'
         return req
 
     def send_request(self, data):
@@ -115,9 +118,12 @@ class Testcase(object):
             raise ValueError('bar')
         start_response('200 ok', headers)
         # second item is to trick bjoern's internal optimizations:
-        return [self.body, '']
+        return [self.body, b'']
 
-import thread
+try:
+    import thread
+except ImportError:
+    import _thread as thread
 import bjoern
 thread.start_new_thread(bjoern.run, (dispatcher,)+HOST)
 
@@ -160,7 +166,7 @@ for index, tpl in enumerate([
     (       1,      1,          1,              0,          0,          0),
     (       1,      1,          1,              1,          0,          0)
 ]):
-    print 'Running test %d: %r' % (index, tpl)
+    print('Running test %d: %r' % (index, tpl))
     class _test(Testcase):
         http_minor, \
         raise_error, \
@@ -170,4 +176,4 @@ for index, tpl in enumerate([
         expect_keep_alive = tpl
     _test().run()
 
-print '--- SUCCESS! ---'
+print('--- SUCCESS! ---')
