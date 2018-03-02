@@ -1,3 +1,7 @@
+2.1.0 (Mar 1, 2018)
+    - Fix #128: Fix support for io.BytesIO and other pseudo-files
+    - Fix sendfile on BSD and OSX
+
 2.0.5 (Feb 14, 2018)
     - Fix #122: WSGI environ SERVER_PORT is now a str (Simon Biewald)
     - Fix #122: WSGI environ SERVER_{PORT,HOST} are now always set (Simon Biewald)
