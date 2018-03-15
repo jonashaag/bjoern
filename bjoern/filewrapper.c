@@ -1,56 +1,72 @@
 #include "filewrapper.h"
 #include "py2py3.h"
 
+#define FW_self ((FileWrapper*)self)
+
 int FileWrapper_GetFd(PyObject *self)
 {
-  return ((FileWrapper*)self)->fd;
+  return FW_self->fd;
 }
 
 void FileWrapper_Done(PyObject *self)
 {
-  PyFile_DecUseCount((PyFileObject*)((FileWrapper*)self)->file);
+  if (FW_self->fd != -1) {
+    PyFile_DecUseCount((PyFileObject*)FW_self->file);
+  }
 }
 
 static PyObject*
 FileWrapper_New(PyTypeObject* cls, PyObject* args, PyObject* kwargs)
 {
   PyObject* file;
-  int fd;
-  unsigned int ignored_blocksize;
+  PyObject* blocksize = NULL;
 
-  if(!PyArg_ParseTuple(args, "O|I:FileWrapper", &file, &ignored_blocksize))
+  if(!PyArg_ParseTuple(args, "O|O:FileWrapper", &file, &blocksize))
     return NULL;
-
-  fd = PyObject_AsFileDescriptor(file);
-  if (fd == -1) {
-    return NULL;
-  }
 
   Py_INCREF(file);
-  PyFile_IncUseCount((PyFileObject*)file);
+  Py_XINCREF(blocksize);
+
+  int fd = PyObject_AsFileDescriptor(file);
+  if (fd == -1) {
+    PyErr_Clear();
+  } else {
+    PyFile_IncUseCount((PyFileObject*)file);
+  }
 
   FileWrapper* wrapper = PyObject_NEW(FileWrapper, cls);
   wrapper->file = file;
+  wrapper->blocksize = blocksize;
   wrapper->fd = fd;
 
   return (PyObject*)wrapper;
 }
 
 static PyObject*
-FileWrapper_GetAttrO(PyObject* self, PyObject* name)
+FileWrapper_Iter(PyObject* self)
 {
-  return PyObject_GetAttr(((FileWrapper*)self)->file, name);
+  Py_INCREF(self);
+  return self;
 }
 
 static PyObject*
-FileWrapper_Iter(PyObject* self)
+FileWrapper_IterNext(PyObject* self)
 {
-  return PyObject_GetIter(((FileWrapper*)self)->file);
+  PyObject* data = PyObject_CallMethodObjArgs(FW_self->file, _read, FW_self->blocksize, NULL);
+  if (data == NULL) {
+    return NULL;
+  } else if (PyObject_IsTrue(data)) {
+    return data;
+  } else {
+    PyErr_SetNone(PyExc_IndexError);
+    return NULL;
+  }
 }
 
 void FileWrapper_dealloc(PyObject* self)
 {
-  Py_DECREF(((FileWrapper*)self)->file);
+  Py_DECREF(FW_self->file);
+  Py_XDECREF(FW_self->blocksize);
   PyObject_FREE(self);
 }
 
@@ -66,6 +82,6 @@ void _init_filewrapper(void)
 {
   FileWrapper_Type.tp_new = FileWrapper_New;
   FileWrapper_Type.tp_iter = FileWrapper_Iter;
-  FileWrapper_Type.tp_getattro = FileWrapper_GetAttrO;
+  FileWrapper_Type.tp_iternext = FileWrapper_IterNext;
   FileWrapper_Type.tp_flags |= Py_TPFLAGS_DEFAULT;
 }

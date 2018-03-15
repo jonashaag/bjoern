@@ -82,7 +82,7 @@ wsgi_call_application(Request* request)
       Py_DECREF(retval);
       first_chunk = NULL;
     }
-  } else if(FileWrapper_CheckExact(retval)) {
+  } else if(FileWrapper_CheckExact(retval) && FileWrapper_GetFd(retval) != -1) {
     request->iterable = retval;
     request->iterator = NULL;
     first_chunk = NULL;

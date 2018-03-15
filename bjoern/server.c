@@ -247,7 +247,7 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
   GIL_LOCK(0);
 
   write_state write_state;
-  if(request->iterable && FileWrapper_CheckExact(request->iterable)) {
+  if(request->iterable && FileWrapper_CheckExact(request->iterable) && FileWrapper_GetFd(request->iterable) != -1) {
     write_state = on_write_sendfile(mainloop, request);
   } else {
     write_state = on_write_chunk(mainloop, request);

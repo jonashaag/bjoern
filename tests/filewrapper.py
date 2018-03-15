@@ -3,14 +3,20 @@ import os
 import bjoern
 
 W = {
-    'callable-iterator': lambda f, e: iter(lambda: f.read(64*1024), ''),
-    'xreadlines': lambda f, e: f,
+    'callable-iterator': lambda f, _: iter(lambda: f.read(64*1024), b''),
+    'xreadlines': lambda f, _: f,
     'filewrapper': lambda f, env: env['wsgi.file_wrapper'](f),
-    'filewrapper2': lambda f, env: env['wsgi.file_wrapper'](f, 1)
+    'filewrapper2': lambda f, env: env['wsgi.file_wrapper'](f, 1),
+    'pseudo-file': lambda f, env: env['wsgi.file_wrapper'](PseudoFile())
 }
 
 F = len(sys.argv) > 1 and sys.argv[1] or 'README.rst'
 W = len(sys.argv) > 2 and W[sys.argv[2]] or W['filewrapper']
+
+
+class PseudoFile:
+    def read(self, *ignored):
+        return b'ab'
 
 def app(env, start_response):
     f = open(F, 'rb')
