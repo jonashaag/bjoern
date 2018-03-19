@@ -1,3 +1,6 @@
+2.2.0 (Mar 19, 2018)
+    - Fix #130: filewrapper must work with any read()able object
+
 2.1.0 (Mar 1, 2018)
     - Fix #128: Fix support for io.BytesIO and other pseudo-files
     - Fix sendfile on BSD and OSX
