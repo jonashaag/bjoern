@@ -53,12 +53,9 @@ static PyObject*
 FileWrapper_IterNext(PyObject* self)
 {
   PyObject* data = PyObject_CallMethodObjArgs(FW_self->file, _read, FW_self->blocksize, NULL);
-  if (data == NULL) {
-    return NULL;
-  } else if (PyObject_IsTrue(data)) {
+  if (data != NULL && PyObject_IsTrue(data)) {
     return data;
   } else {
-    PyErr_SetNone(PyExc_IndexError);
     return NULL;
   }
 }
