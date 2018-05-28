@@ -16,6 +16,7 @@
 #define _Bytes_Resize(obj, len) _PyBytes_Resize(obj, len)
 #define _FromLong(n) PyLong_FromLong(n)
 #define _Unicode_EncodeLatin1(u) PyUnicode_AsLatin1String(u)
+#define _Unicode_Concat(a, b) PyUnicode_Concat(a, b)
 
 #else
 
@@ -30,6 +31,18 @@
 #define _Bytes_Resize(obj, len) _PyString_Resize(obj, len)
 #define _FromLong(n) PyInt_FromLong(n)
 #define _Unicode_EncodeLatin1(u) (Py_INCREF(u),u)
+
+#ifdef __GNUC__
+static PyObject *_Unicode_Concat(PyObject *l, PyObject *r) __attribute__ ((unused));
+#endif
+static PyObject *_Unicode_Concat(PyObject *l, PyObject *r) {
+    PyObject *ret = l;
+
+    Py_INCREF(l);  /* reference to old left will be stolen */
+    PyString_Concat(&ret, r);
+
+    return ret ? ret:NULL;
+}
 #endif
 
 #endif /* _PY2PY3_H */

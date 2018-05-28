@@ -5,11 +5,16 @@
 #include "py2py3.h"
 
 static inline void PyDict_ReplaceKey(PyObject* dict, PyObject* k1, PyObject* k2);
-static PyObject* wsgi_http_header(string header);
 static http_parser_settings parser_settings;
 static PyObject* wsgi_base_dict = NULL;
 
 static PyObject *IO_module;
+
+#define _free_and_unset_if_set(v) \
+  do { \
+    Py_XDECREF(v); \
+    v = NULL; \
+  } while(0)
 
 Request* Request_new(ServerInfo* server_info, int client_fd, const char* client_addr)
 {
@@ -23,6 +28,7 @@ Request* Request_new(ServerInfo* server_info, int client_fd, const char* client_
   request->client_addr = _Unicode_FromString(client_addr);
   http_parser_init((http_parser*)&request->parser, HTTP_REQUEST);
   request->parser.parser.data = request;
+  request->parser.field = NULL;
   Request_reset(request);
   return request;
 }
@@ -31,7 +37,9 @@ void Request_reset(Request* request)
 {
   memset(&request->state, 0, sizeof(Request) - (size_t)&((Request*)NULL)->state);
   request->state.response_length_unknown = true;
-  request->parser.body = (string){NULL, 0};
+  request->parser.last_was_data = true;
+  request->parser.invalid_header = false;
+  _free_and_unset_if_set(request->parser.field);
 }
 
 void Request_free(Request* request)
@@ -59,6 +67,7 @@ void Request_clean(Request* request)
   Py_XDECREF(request->iterator);
   Py_XDECREF(request->headers);
   Py_XDECREF(request->status);
+  _free_and_unset_if_set(request->parser.field);
 }
 
 /* Parse stuff */
@@ -74,19 +83,6 @@ void Request_parse(Request* request, const char* data, const size_t data_len)
 
 #define REQUEST ((Request*)parser->data)
 #define PARSER  ((bj_parser*)parser)
-#define UPDATE_LENGTH(name) \
-  /* Update the len of a header field/value.
-   *
-   * Short explaination of the pointer arithmetics fun used here:
-   *
-   *   [old header data ] ...stuff... [ new header data ]
-   *   ^-------------- A -------------^--------B--------^
-   *
-   * A = XXX- PARSER->XXX.data
-   * B = len
-   * A + B = old header start to new header end
-   */ \
-  do { PARSER->name.len = (name - PARSER->name.data) + len; } while(0)
 
 #define _set_header(k, v) PyDict_SetItem(REQUEST->headers, k, v);
   /* PyDict_SetItem() increases the ref-count for value */
@@ -97,22 +93,26 @@ void Request_parse(Request* request, const char* data, const size_t data_len)
     Py_DECREF(val); \
   } while(0)
 
-
-#define _set_header_from_http_header() \
+#define _set_or_append_header(k, val, len) \
   do { \
-    PyObject* key = wsgi_http_header(PARSER->field); \
-    if (key) { \
-      _set_header_free_value(key, _Unicode_FromStringAndSize(PARSER->value.data, PARSER->value.len)); \
-      Py_DECREF(key); \
+    PyObject *py_val = _Unicode_FromStringAndSize(val, len); \
+    PyObject *py_val_old = PyDict_GetItem(REQUEST->headers, k); \
+    \
+    if(py_val_old) { \
+      PyObject *py_val_new = _Unicode_Concat(py_val_old, py_val); \
+      PyDict_SetItem(REQUEST->headers, k, py_val_new); \
+      Py_DECREF(py_val_new); \
+    } else { \
+      PyDict_SetItem(REQUEST->headers, k, py_val); \
     } \
-  } while(0) \
+    Py_DECREF(py_val); \
+  } while(0)
 
 static int
 on_message_begin(http_parser* parser)
 {
   REQUEST->headers = PyDict_New();
-  PARSER->field = (string){NULL, 0};
-  PARSER->value = (string){NULL, 0};
+  PARSER->field = NULL;
   return 0;
 }
 
@@ -121,40 +121,62 @@ on_path(http_parser* parser, const char* path, size_t len)
 {
   if(!(len = unquote_url_inplace((char*)path, len)))
     return 1;
-  _set_header_free_value(_PATH_INFO, _Unicode_FromStringAndSize(path, len));
+  _set_or_append_header(_PATH_INFO, path, len);
   return 0;
 }
 
 static int
 on_query_string(http_parser* parser, const char* query, size_t len)
 {
-  _set_header_free_value(_QUERY_STRING, _Unicode_FromStringAndSize(query, len));
+  _set_or_append_header(_QUERY_STRING, query, len);
   return 0;
 }
 
 static int
 on_header_field(http_parser* parser, const char* field, size_t len)
 {
-  if(PARSER->value.data) {
-    /* Store previous header and start a new one */
-    _set_header_from_http_header();
-  } else if(PARSER->field.data) {
-    UPDATE_LENGTH(field);
+  if(PARSER->last_was_data) {
+    _free_and_unset_if_set(PARSER->field);
+    PARSER->field = _Unicode_FromStringAndSize("HTTP_", 5);
+    PARSER->last_was_data = false;
+    PARSER->invalid_header = false;
+  }
+
+  if(PARSER->invalid_header) {
     return 0;
   }
-  PARSER->field = (string){(char*)field, len};
-  PARSER->value = (string){NULL, 0};
+
+  char field_processed[len];
+  for(size_t i=0; i<len; i++) {
+    char c = field[i];
+    if(c == '_') {
+      // CVE-2015-0219
+      PARSER->invalid_header = true;
+      return 0;
+    } else if (c == '-') {
+      field_processed[i] = '_';
+    } else if(c >= 'a' && c <= 'z') {
+      field_processed[i] = c - ('a'-'A');
+    } else {
+      field_processed[i] = c;
+    }
+  }
+
+  PyObject *field_old = PARSER->field;
+  PyObject *field_new = _Unicode_FromStringAndSize(field_processed, len);
+  PARSER->field = _Unicode_Concat(field_old, field_new);
+  Py_DECREF(field_old);
+  Py_DECREF(field_new);
+
   return 0;
 }
 
 static int
 on_header_value(http_parser* parser, const char* value, size_t len)
 {
-  if(PARSER->value.data) {
-    UPDATE_LENGTH(value);
-  } else {
-    /* Start a new value */
-    PARSER->value = (string){(char*)value, len};
+  PARSER->last_was_data = true;
+  if(!PARSER->invalid_header) {
+    _set_or_append_header(PARSER->field, value, len);
   }
   return 0;
 }
@@ -162,9 +184,7 @@ on_header_value(http_parser* parser, const char* value, size_t len)
 static int
 on_headers_complete(http_parser* parser)
 {
-  if(PARSER->field.data) {
-    _set_header_from_http_header();
-  }
+  _free_and_unset_if_set(PARSER->field);
   return 0;
 }
 
@@ -230,34 +250,6 @@ on_message_complete(http_parser* parser)
 
   REQUEST->state.parse_finished = true;
   return 0;
-}
-
-
-static PyObject*
-wsgi_http_header(string header)
-{
-  const char *http_ = "HTTP_";
-  int size = header.len+strlen(http_);
-  char dest[size];
-  int i = 5;
-
-  memcpy(dest, http_, i);
-
-  while(header.len--) {
-    char c = *header.data++;
-    if (c == '_') {
-      // CVE-2015-0219
-      return NULL;
-    }
-    else if(c == '-')
-      dest[i++] = '_';
-    else if(c >= 'a' && c <= 'z')
-      dest[i++] = c - ('a'-'A');
-    else
-      dest[i++] = c;
-  }
-
-  return (PyObject *)_Unicode_FromStringAndSize(dest, size);
 }
 
 static inline void

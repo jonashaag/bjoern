@@ -20,9 +20,9 @@ typedef struct {
 
 typedef struct {
   http_parser parser;
-  string field;
-  string value;
-  string body;
+  PyObject* field;
+  int last_was_data;
+  int invalid_header;
 } bj_parser;
 
 typedef struct {
