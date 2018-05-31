@@ -41,7 +41,7 @@ static PyObject *_Unicode_Concat(PyObject *l, PyObject *r) {
     Py_INCREF(l);  /* reference to old left will be stolen */
     PyString_Concat(&ret, r);
 
-    return ret ? ret:NULL;
+    return ret;
 }
 #endif
 
