@@ -93,20 +93,20 @@ void Request_parse(Request* request, const char* data, const size_t data_len)
     Py_DECREF(val); \
   } while(0)
 
-#define _set_or_append_header(k, val, len) \
-  do { \
-    PyObject *py_val = _Unicode_FromStringAndSize(val, len); \
-    PyObject *py_val_old = PyDict_GetItem(REQUEST->headers, k); \
-    \
-    if(py_val_old) { \
-      PyObject *py_val_new = _Unicode_Concat(py_val_old, py_val); \
-      PyDict_SetItem(REQUEST->headers, k, py_val_new); \
-      Py_DECREF(py_val_new); \
-    } else { \
-      PyDict_SetItem(REQUEST->headers, k, py_val); \
-    } \
-    Py_DECREF(py_val); \
-  } while(0)
+static void
+_set_or_append_header(PyObject* headers, PyObject* k, const char* val, size_t len) {
+    PyObject *py_val = _Unicode_FromStringAndSize(val, len);
+    PyObject *py_val_old = PyDict_GetItem(headers, k);
+
+    if (py_val_old) {
+      PyObject *py_val_new = _Unicode_Concat(py_val_old, py_val);
+      PyDict_SetItem(headers, k, py_val_new);
+      Py_DECREF(py_val_new);
+    } else {
+      PyDict_SetItem(headers, k, py_val);
+    }
+    Py_DECREF(py_val);
+}
 
 static int
 on_message_begin(http_parser* parser)
@@ -121,14 +121,14 @@ on_path(http_parser* parser, const char* path, size_t len)
 {
   if(!(len = unquote_url_inplace((char*)path, len)))
     return 1;
-  _set_or_append_header(_PATH_INFO, path, len);
+  _set_or_append_header(REQUEST->headers, _PATH_INFO, path, len);
   return 0;
 }
 
 static int
 on_query_string(http_parser* parser, const char* query, size_t len)
 {
-  _set_or_append_header(_QUERY_STRING, query, len);
+  _set_or_append_header(REQUEST->headers, _QUERY_STRING, query, len);
   return 0;
 }
 
@@ -176,7 +176,7 @@ on_header_value(http_parser* parser, const char* value, size_t len)
 {
   PARSER->last_was_data = true;
   if(!PARSER->invalid_header) {
-    _set_or_append_header(PARSER->field, value, len);
+    _set_or_append_header(REQUEST->headers, PARSER->field, value, len);
   }
   return 0;
 }
