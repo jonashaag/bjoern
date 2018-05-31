@@ -37,7 +37,7 @@ void Request_reset(Request* request)
 {
   memset(&request->state, 0, sizeof(Request) - (size_t)&((Request*)NULL)->state);
   request->state.response_length_unknown = true;
-  request->parser.last_was_data = true;
+  request->parser.last_call_was_header_value = true;
   request->parser.invalid_header = false;
   _free_and_unset_if_set(request->parser.field);
 }
@@ -135,10 +135,10 @@ on_query_string(http_parser* parser, const char* query, size_t len)
 static int
 on_header_field(http_parser* parser, const char* field, size_t len)
 {
-  if(PARSER->last_was_data) {
+  if(PARSER->last_call_was_header_value) {
     _free_and_unset_if_set(PARSER->field);
     PARSER->field = _Unicode_FromStringAndSize("HTTP_", 5);
-    PARSER->last_was_data = false;
+    PARSER->last_call_was_header_value = false;
     PARSER->invalid_header = false;
   }
 
@@ -174,7 +174,7 @@ on_header_field(http_parser* parser, const char* field, size_t len)
 static int
 on_header_value(http_parser* parser, const char* value, size_t len)
 {
-  PARSER->last_was_data = true;
+  PARSER->last_call_was_header_value = true;
   if(!PARSER->invalid_header) {
     _set_or_append_header(REQUEST->headers, PARSER->field, value, len);
   }

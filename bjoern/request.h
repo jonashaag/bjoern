@@ -21,7 +21,7 @@ typedef struct {
 typedef struct {
   http_parser parser;
   PyObject* field;
-  int last_was_data;
+  int last_call_was_header_value;
   int invalid_header;
 } bj_parser;
 
