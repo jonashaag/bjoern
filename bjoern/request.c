@@ -10,12 +10,6 @@ static PyObject* wsgi_base_dict = NULL;
 
 static PyObject *IO_module;
 
-#define _free_and_unset_if_set(v) \
-  do { \
-    Py_XDECREF(v); \
-    v = NULL; \
-  } while(0)
-
 Request* Request_new(ServerInfo* server_info, int client_fd, const char* client_addr)
 {
   Request* request = malloc(sizeof(Request));
@@ -28,18 +22,18 @@ Request* Request_new(ServerInfo* server_info, int client_fd, const char* client_
   request->client_addr = _Unicode_FromString(client_addr);
   http_parser_init((http_parser*)&request->parser, HTTP_REQUEST);
   request->parser.parser.data = request;
-  request->parser.field = NULL;
   Request_reset(request);
   return request;
 }
 
+/* should not be called without `Request_clean` when `request->parser.field` can contain an object */
 void Request_reset(Request* request)
 {
   memset(&request->state, 0, sizeof(Request) - (size_t)&((Request*)NULL)->state);
   request->state.response_length_unknown = true;
   request->parser.last_call_was_header_value = true;
   request->parser.invalid_header = false;
-  _free_and_unset_if_set(request->parser.field);
+  request->parser.field = NULL;
 }
 
 void Request_free(Request* request)
@@ -49,6 +43,7 @@ void Request_free(Request* request)
   free(request);
 }
 
+/* Request_reset should be called after this, to reset request->parser.field to NULL */
 void Request_clean(Request* request)
 {
   if(request->iterable) {
@@ -67,7 +62,7 @@ void Request_clean(Request* request)
   Py_XDECREF(request->iterator);
   Py_XDECREF(request->headers);
   Py_XDECREF(request->status);
-  _free_and_unset_if_set(request->parser.field);
+  Py_XDECREF(request->parser.field);
 }
 
 /* Parse stuff */
@@ -112,7 +107,6 @@ static int
 on_message_begin(http_parser* parser)
 {
   REQUEST->headers = PyDict_New();
-  PARSER->field = NULL;
   return 0;
 }
 
@@ -136,12 +130,14 @@ static int
 on_header_field(http_parser* parser, const char* field, size_t len)
 {
   if(PARSER->last_call_was_header_value) {
-    _free_and_unset_if_set(PARSER->field);
+    /* We are starting a new header */
+    Py_Clear(PARSER->field);
     PARSER->field = _Unicode_FromStringAndSize("HTTP_", 5);
     PARSER->last_call_was_header_value = false;
     PARSER->invalid_header = false;
   }
 
+  /* Ignore invalid header */
   if(PARSER->invalid_header) {
     return 0;
   }
@@ -162,6 +158,7 @@ on_header_field(http_parser* parser, const char* field, size_t len)
     }
   }
 
+  /* Append field name to the part we got from previous call */
   PyObject *field_old = PARSER->field;
   PyObject *field_new = _Unicode_FromStringAndSize(field_processed, len);
   PARSER->field = _Unicode_Concat(field_old, field_new);
@@ -176,15 +173,9 @@ on_header_value(http_parser* parser, const char* value, size_t len)
 {
   PARSER->last_call_was_header_value = true;
   if(!PARSER->invalid_header) {
+    /* Set header, or append data to header if this is not the first call */
     _set_or_append_header(REQUEST->headers, PARSER->field, value, len);
   }
-  return 0;
-}
-
-static int
-on_headers_complete(http_parser* parser)
-{
-  _free_and_unset_if_set(PARSER->field);
   return 0;
 }
 
@@ -268,7 +259,7 @@ PyDict_ReplaceKey(PyObject* dict, PyObject* old_key, PyObject* new_key)
 static http_parser_settings
 parser_settings = {
   on_message_begin, on_path, on_query_string, NULL, NULL, on_header_field,
-  on_header_value, on_headers_complete, on_body, on_message_complete
+  on_header_value, NULL, on_body, on_message_complete
 };
 
 void _initialize_request_module(ServerInfo* server_info)
