@@ -32,9 +32,6 @@
 #define _FromLong(n) PyInt_FromLong(n)
 #define _Unicode_EncodeLatin1(u) (Py_INCREF(u),u)
 
-#ifdef __GNUC__
-static PyObject *_Unicode_Concat(PyObject *l, PyObject *r) __attribute__ ((unused));
-#endif
 static PyObject *_Unicode_Concat(PyObject *l, PyObject *r) {
     PyObject *ret = l;
 
