@@ -26,7 +26,9 @@ Request* Request_new(ServerInfo* server_info, int client_fd, const char* client_
   return request;
 }
 
-/* should not be called without `Request_clean` when `request->parser.field` can contain an object */
+/* Initialize Requests, or re-initialize for reuse on connection keep alive.
+   Should not be called without `Request_clean` when `request->parser.field`
+   can contain an object */
 void Request_reset(Request* request)
 {
   memset(&request->state, 0, sizeof(Request) - (size_t)&((Request*)NULL)->state);
@@ -43,7 +45,8 @@ void Request_free(Request* request)
   free(request);
 }
 
-/* Request_reset should be called after this, to reset request->parser.field to NULL */
+/* Close and DECREF all the Python objects in Request.
+   Request_reset should be called after this if connection keep alive */
 void Request_clean(Request* request)
 {
   if(request->iterable) {
@@ -106,6 +109,7 @@ _set_or_append_header(PyObject* headers, PyObject* k, const char* val, size_t le
 static int
 on_message_begin(http_parser* parser)
 {
+  assert(PARSER->field == NULL);
   REQUEST->headers = PyDict_New();
   return 0;
 }
@@ -131,7 +135,7 @@ on_header_field(http_parser* parser, const char* field, size_t len)
 {
   if(PARSER->last_call_was_header_value) {
     /* We are starting a new header */
-    Py_Clear(PARSER->field);
+    Py_XDECREF(PARSER->field);
     PARSER->field = _Unicode_FromStringAndSize("HTTP_", 5);
     PARSER->last_call_was_header_value = false;
     PARSER->invalid_header = false;
