@@ -1,3 +1,6 @@
+2.2.0 (June 4, 2018)
+    - Fix #133: Segmentation fault with very long HTTP headers (@szabolcsbalogh)
+
 2.2.0 (Mar 19, 2018)
     - Fix #130: filewrapper must work with any read()able object
 
