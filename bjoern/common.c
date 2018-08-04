@@ -30,7 +30,7 @@ size_t unquote_url_inplace(char* url, size_t len)
 void _init_common()
 {
 
-#define _(name) _##name = _Unicode_FromString(#name)
+#define _(name) _##name = _UnicodeUTF8_FromString(#name)
   _(REMOTE_ADDR);
   _(PATH_INFO);
   _(QUERY_STRING);
@@ -45,6 +45,8 @@ void _init_common()
   _(CONTENT_LENGTH);
   _(HTTP_CONTENT_TYPE);
   _(CONTENT_TYPE);
+  _(HTTP_);
+  _(http);
 
   _(BytesIO);
   _(write);
@@ -52,9 +54,9 @@ void _init_common()
   _(seek);
 #undef _
 
-  _HTTP_1_1 = _Unicode_FromString("HTTP/1.1");
-  _HTTP_1_0 = _Unicode_FromString("HTTP/1.0");
-  _wsgi_input = _Unicode_FromString("wsgi.input");
-  _empty_string = _Unicode_FromString("");
+  _HTTP_1_1 = _UnicodeUTF8_FromString("HTTP/1.1");
+  _HTTP_1_0 = _UnicodeUTF8_FromString("HTTP/1.0");
+  _wsgi_input = _UnicodeUTF8_FromString("wsgi.input");
+  _empty_string = _UnicodeUTF8_FromString("");
   _empty_bytes = _Bytes_FromString("");
 }

@@ -19,7 +19,7 @@ Request* Request_new(ServerInfo* server_info, int client_fd, const char* client_
 #endif
   request->server_info = server_info;
   request->client_fd = client_fd;
-  request->client_addr = _Unicode_FromString(client_addr);
+  request->client_addr = _UnicodeUTF8_FromString(client_addr);
   http_parser_init((http_parser*)&request->parser, HTTP_REQUEST);
   request->parser.parser.data = request;
   Request_reset(request);
@@ -93,7 +93,7 @@ void Request_parse(Request* request, const char* data, const size_t data_len)
 
 static void
 _set_or_append_header(PyObject* headers, PyObject* k, const char* val, size_t len) {
-    PyObject *py_val = _Unicode_FromStringAndSize(val, len);
+    PyObject *py_val = _UnicodeLatin1_FromStringAndSize(val, len);
     PyObject *py_val_old = PyDict_GetItem(headers, k);
 
     if (py_val_old) {
@@ -136,7 +136,8 @@ on_header_field(http_parser* parser, const char* field, size_t len)
   if(PARSER->last_call_was_header_value) {
     /* We are starting a new header */
     Py_XDECREF(PARSER->field);
-    PARSER->field = _Unicode_FromStringAndSize("HTTP_", 5);
+    Py_INCREF(_HTTP_);
+    PARSER->field = _HTTP_;
     PARSER->last_call_was_header_value = false;
     PARSER->invalid_header = false;
   }
@@ -164,12 +165,12 @@ on_header_field(http_parser* parser, const char* field, size_t len)
 
   /* Append field name to the part we got from previous call */
   PyObject *field_old = PARSER->field;
-  PyObject *field_new = _Unicode_FromStringAndSize(field_processed, len);
+  PyObject *field_new = _UnicodeLatin1_FromStringAndSize(field_processed, len);
   PARSER->field = _Unicode_Concat(field_old, field_new);
   Py_DECREF(field_old);
   Py_DECREF(field_new);
 
-  return 0;
+  return PARSER->field == NULL;
 }
 
 static int
@@ -223,7 +224,7 @@ on_message_complete(http_parser* parser)
     _set_header(_REQUEST_METHOD, _GET);
   } else {
     _set_header_free_value(_REQUEST_METHOD,
-      _Unicode_FromString(http_method_str(parser->method))
+      _UnicodeUTF8_FromString(http_method_str(parser->method))
       );
   }
 
@@ -300,10 +301,11 @@ void _initialize_request_module(ServerInfo* server_info)
 
     /* dct['wsgi.url_scheme'] = 'http'
      * (This can be hard-coded as there is no TLS support in bjoern.) */
+    Py_INCREF(_http);
     PyDict_SetItemString(
       wsgi_base_dict,
       "wsgi.url_scheme",
-      _Unicode_FromString("http")
+      _http
     );
 
     /* dct['wsgi.errors'] = sys.stderr */

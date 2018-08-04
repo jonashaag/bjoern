@@ -184,8 +184,8 @@ inspect_headers(Request* request)
     PyObject* unicode_field = PyTuple_GET_ITEM(tuple, 0);
     PyObject* unicode_value = PyTuple_GET_ITEM(tuple, 1);
 
-    PyObject* bytes_field = _Unicode_EncodeLatin1(unicode_field);
-    PyObject* bytes_value = _Unicode_EncodeLatin1(unicode_value);
+    PyObject* bytes_field = _BytesLatin1_FromUnicode(unicode_field);
+    PyObject* bytes_value = _BytesLatin1_FromUnicode(unicode_value);
 
     if (bytes_field == NULL || bytes_value == NULL) {
       Py_XDECREF(bytes_field);
@@ -345,7 +345,7 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
     return NULL;
   }
 
-  request->status = _Unicode_EncodeLatin1(status_unicode);
+  request->status = _BytesLatin1_FromUnicode(status_unicode);
   if (request->status == NULL) {
     return NULL;
   }
