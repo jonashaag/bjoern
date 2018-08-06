@@ -63,7 +63,7 @@ wsgi_call_application(Request* request)
   PyObject* first_chunk;
 
   if(PyList_Check(retval) && PyList_GET_SIZE(retval) == 1 &&
-     _Bytes_Check(PyList_GET_ITEM(retval, 0)))
+     _PEP3333_Bytes_Check(PyList_GET_ITEM(retval, 0)))
   {
     /* Optimize the most common case, a single string in a list: */
     PyObject* tmp = PyList_GET_ITEM(retval, 0);
@@ -71,12 +71,12 @@ wsgi_call_application(Request* request)
     Py_DECREF(retval);
     retval = tmp;
     goto string; /* eeevil */
-  } else if(_Bytes_Check(retval)) {
+  } else if(_PEP3333_Bytes_Check(retval)) {
     /* According to PEP 333 strings should be handled like any other iterable,
      * i.e. sending the response item for item. "item for item" means
      * "char for char" if you have a string. -- I'm not that stupid. */
     string:
-    if(_Bytes_GET_SIZE(retval)) {
+    if(_PEP3333_Bytes_GET_SIZE(retval)) {
       first_chunk = retval;
     } else {
       Py_DECREF(retval);
@@ -141,20 +141,20 @@ wsgi_call_application(Request* request)
   wsgi_getheaders(request, &buf, &length);
 
   if(first_chunk == NULL) {
-    _Bytes_Resize(&buf, length);
+    _PEP3333_Bytes_Resize(&buf, length);
     goto out;
   }
 
   if(request->state.chunked_response) {
     PyObject* new_chunk = wrap_http_chunk_cruft_around(first_chunk);
     Py_DECREF(first_chunk);
-    assert(_Bytes_GET_SIZE(new_chunk) >= _Bytes_GET_SIZE(first_chunk) + 5);
+    assert(_PEP3333_Bytes_GET_SIZE(new_chunk) >= _PEP3333_Bytes_GET_SIZE(first_chunk) + 5);
     first_chunk = new_chunk;
   }
 
-  _Bytes_Resize(&buf, length + _Bytes_GET_SIZE(first_chunk));
-  memcpy((void *)(_Bytes_AS_DATA(buf)+length), _Bytes_AS_DATA(first_chunk),
-         _Bytes_GET_SIZE(first_chunk));
+  _PEP3333_Bytes_Resize(&buf, length + _PEP3333_Bytes_GET_SIZE(first_chunk));
+  memcpy((void *)(_PEP3333_Bytes_AS_DATA(buf)+length), _PEP3333_Bytes_AS_DATA(first_chunk),
+         _PEP3333_Bytes_GET_SIZE(first_chunk));
   Py_DECREF(first_chunk);
 
 out:
@@ -184,8 +184,8 @@ inspect_headers(Request* request)
     PyObject* unicode_field = PyTuple_GET_ITEM(tuple, 0);
     PyObject* unicode_value = PyTuple_GET_ITEM(tuple, 1);
 
-    PyObject* bytes_field = _BytesLatin1_FromUnicode(unicode_field);
-    PyObject* bytes_value = _BytesLatin1_FromUnicode(unicode_value);
+    PyObject* bytes_field = _PEP3333_BytesLatin1_FromUnicode(unicode_field);
+    PyObject* bytes_value = _PEP3333_BytesLatin1_FromUnicode(unicode_value);
 
     if (bytes_field == NULL || bytes_value == NULL) {
       Py_XDECREF(bytes_field);
@@ -196,7 +196,7 @@ inspect_headers(Request* request)
     PyList_SET_ITEM(request->headers, i, PyTuple_Pack(2, bytes_field, bytes_value));
     Py_DECREF(tuple);
 
-    if(!strncasecmp(_Bytes_AS_DATA(bytes_field), "Content-Length", _Bytes_GET_SIZE(bytes_field)))
+    if(!strncasecmp(_PEP3333_Bytes_AS_DATA(bytes_field), "Content-Length", _PEP3333_Bytes_GET_SIZE(bytes_field)))
       request->state.response_length_unknown = false;
 
     Py_DECREF(bytes_field);
@@ -214,16 +214,16 @@ err:
 static void
 wsgi_getheaders(Request* request, PyObject** buf, Py_ssize_t *length)
 {
-  Py_ssize_t length_upperbound = strlen("HTTP/1.1 ") + _Bytes_GET_SIZE(request->status) + strlen("\r\nConnection: Keep-Alive") + strlen("\r\nTransfer-Encoding: chunked") + strlen("\r\n\r\n");
+  Py_ssize_t length_upperbound = strlen("HTTP/1.1 ") + _PEP3333_Bytes_GET_SIZE(request->status) + strlen("\r\nConnection: Keep-Alive") + strlen("\r\nTransfer-Encoding: chunked") + strlen("\r\n\r\n");
   for(Py_ssize_t i=0; i<PyList_GET_SIZE(request->headers); ++i) {
     PyObject* tuple = PyList_GET_ITEM(request->headers, i);
     PyObject* field = PyTuple_GET_ITEM(tuple, 0);
     PyObject* value = PyTuple_GET_ITEM(tuple, 1);
-    length_upperbound += strlen("\r\n") + _Bytes_GET_SIZE(field) + strlen(": ") + _Bytes_GET_SIZE(value);
+    length_upperbound += strlen("\r\n") + _PEP3333_Bytes_GET_SIZE(field) + strlen(": ") + _PEP3333_Bytes_GET_SIZE(value);
   }
 
-  PyObject* bufobj = _Bytes_FromStringAndSize(NULL, length_upperbound);
-  char* bufp = (char *)_Bytes_AS_DATA(bufobj);
+  PyObject* bufobj = _PEP3333_Bytes_FromStringAndSize(NULL, length_upperbound);
+  char* bufp = (char *)_PEP3333_Bytes_AS_DATA(bufobj);
 
   #define buf_write(src, len) \
     do { \
@@ -235,8 +235,8 @@ wsgi_getheaders(Request* request, PyObject** buf, Py_ssize_t *length)
 
   /* First line, e.g. "HTTP/1.1 200 Ok" */
   buf_write2("HTTP/1.1 ");
-  buf_write(_Bytes_AS_DATA(request->status),
-        _Bytes_GET_SIZE(request->status));
+  buf_write(_PEP3333_Bytes_AS_DATA(request->status),
+            _PEP3333_Bytes_GET_SIZE(request->status));
 
   /* Headers, from the `request->headers` mapping.
    * [("Header1", "value1"), ("Header2", "value2")]
@@ -247,9 +247,9 @@ wsgi_getheaders(Request* request, PyObject** buf, Py_ssize_t *length)
     PyObject* field = PyTuple_GET_ITEM(tuple, 0);
     PyObject* value = PyTuple_GET_ITEM(tuple, 1);
     buf_write2("\r\n");
-    buf_write(_Bytes_AS_DATA(field), _Bytes_GET_SIZE(field));
+    buf_write(_PEP3333_Bytes_AS_DATA(field), _PEP3333_Bytes_GET_SIZE(field));
     buf_write2(": ");
-    buf_write(_Bytes_AS_DATA(value), _Bytes_GET_SIZE(value));
+    buf_write(_PEP3333_Bytes_AS_DATA(value), _PEP3333_Bytes_GET_SIZE(value));
   }
 
   /* See `wsgi_call_application` */
@@ -265,7 +265,7 @@ wsgi_getheaders(Request* request, PyObject** buf, Py_ssize_t *length)
   buf_write2("\r\n\r\n");
 
   *buf = bufobj;
-  *length = bufp - _Bytes_AS_DATA(bufobj);
+  *length = bufp - _PEP3333_Bytes_AS_DATA(bufobj);
 }
 
 inline PyObject*
@@ -277,12 +277,12 @@ wsgi_iterable_get_next_chunk(Request* request)
     next = PyIter_Next(request->iterator);
     if(next == NULL)
       return NULL;
-    if(!_Bytes_Check(next)) {
+    if(!_PEP3333_Bytes_Check(next)) {
       TYPE_ERROR("wsgi iterable items", "bytes", next);
       Py_DECREF(next);
       return NULL;
     }
-    if(_Bytes_GET_SIZE(next))
+    if(_PEP3333_Bytes_GET_SIZE(next))
       return next;
     Py_DECREF(next);
   }
@@ -345,7 +345,7 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
     return NULL;
   }
 
-  request->status = _BytesLatin1_FromUnicode(status_unicode);
+  request->status = _PEP3333_BytesLatin1_FromUnicode(status_unicode);
   if (request->status == NULL) {
     return NULL;
   }
@@ -379,17 +379,17 @@ wrap_http_chunk_cruft_around(PyObject* chunk)
 {
   /* Who the hell decided to use decimal representation for Content-Length
    * but hexadecimal representation for chunk lengths btw!?! Fuck W3C */
-  size_t chunklen = _Bytes_GET_SIZE(chunk);
+  size_t chunklen = _PEP3333_Bytes_GET_SIZE(chunk);
   assert(chunklen);
   char buf[strlen("ffffffff") + 2];
   size_t n = sprintf(buf, "%x\r\n", (unsigned int)chunklen);
-  PyObject* new_chunk = _Bytes_FromStringAndSize(NULL, n + chunklen + 2);
-  char * new_chunk_p = (char *)_Bytes_AS_DATA(new_chunk);
+  PyObject* new_chunk = _PEP3333_Bytes_FromStringAndSize(NULL, n + chunklen + 2);
+  char * new_chunk_p = (char *)_PEP3333_Bytes_AS_DATA(new_chunk);
   memcpy(new_chunk_p, buf, n);
   new_chunk_p += n;
-  memcpy(new_chunk_p, _Bytes_AS_DATA(chunk), chunklen);
+  memcpy(new_chunk_p, _PEP3333_Bytes_AS_DATA(chunk), chunklen);
   new_chunk_p += chunklen;
   *new_chunk_p++ = '\r'; *new_chunk_p = '\n';
-  assert(new_chunk_p == _Bytes_AS_DATA(new_chunk) + n + chunklen + 1);
+  assert(new_chunk_p == _PEP3333_Bytes_AS_DATA(new_chunk) + n + chunklen + 1);
   return new_chunk;
 }

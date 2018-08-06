@@ -19,7 +19,7 @@ Request* Request_new(ServerInfo* server_info, int client_fd, const char* client_
 #endif
   request->server_info = server_info;
   request->client_fd = client_fd;
-  request->client_addr = _UnicodeUTF8_FromString(client_addr);
+  request->client_addr = _PEP3333_String_FromUTF8String(client_addr);
   http_parser_init((http_parser*)&request->parser, HTTP_REQUEST);
   request->parser.parser.data = request;
   Request_reset(request);
@@ -93,11 +93,11 @@ void Request_parse(Request* request, const char* data, const size_t data_len)
 
 static void
 _set_or_append_header(PyObject* headers, PyObject* k, const char* val, size_t len) {
-    PyObject *py_val = _UnicodeLatin1_FromStringAndSize(val, len);
+    PyObject *py_val = _PEP3333_String_FromLatin1StringAndSize(val, len);
     PyObject *py_val_old = PyDict_GetItem(headers, k);
 
     if (py_val_old) {
-      PyObject *py_val_new = _Unicode_Concat(py_val_old, py_val);
+      PyObject *py_val_new = _PEP3333_String_Concat(py_val_old, py_val);
       PyDict_SetItem(headers, k, py_val_new);
       Py_DECREF(py_val_new);
     } else {
@@ -165,8 +165,8 @@ on_header_field(http_parser* parser, const char* field, size_t len)
 
   /* Append field name to the part we got from previous call */
   PyObject *field_old = PARSER->field;
-  PyObject *field_new = _UnicodeLatin1_FromStringAndSize(field_processed, len);
-  PARSER->field = _Unicode_Concat(field_old, field_new);
+  PyObject *field_new = _PEP3333_String_FromLatin1StringAndSize(field_processed, len);
+  PARSER->field = _PEP3333_String_Concat(field_old, field_new);
   Py_DECREF(field_old);
   Py_DECREF(field_new);
 
@@ -201,7 +201,7 @@ on_body(http_parser* parser, const char* data, const size_t len)
     }
     _set_header_free_value(_wsgi_input, body);
   }
-  PyObject *temp_data = _Bytes_FromStringAndSize(data, len);
+  PyObject *temp_data = _PEP3333_Bytes_FromStringAndSize(data, len);
   PyObject *tmp = PyObject_CallMethodObjArgs(body, _write, temp_data, NULL);
   Py_DECREF(tmp); /* Never throw away return objects from py-api */
   Py_DECREF(temp_data);
@@ -224,7 +224,7 @@ on_message_complete(http_parser* parser)
     _set_header(_REQUEST_METHOD, _GET);
   } else {
     _set_header_free_value(_REQUEST_METHOD,
-      _UnicodeUTF8_FromString(http_method_str(parser->method))
+      _PEP3333_String_FromUTF8String(http_method_str(parser->method))
       );
   }
 

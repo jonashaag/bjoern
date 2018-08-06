@@ -182,7 +182,7 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
       /* HTTP parse error */
       read_state = done;
       DBG_REQ(request, "Parse error");
-      request->current_chunk = _Bytes_FromString(
+      request->current_chunk = _PEP3333_Bytes_FromString(
         http_error_messages[request->state.error_code]);
       assert(request->iterator == NULL);
     } else if(request->state.parse_finished) {
@@ -196,7 +196,7 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
         PyErr_Print();
         assert(!request->state.chunked_response);
         Py_XCLEAR(request->iterator);
-        request->current_chunk = _Bytes_FromString(
+        request->current_chunk = _PEP3333_Bytes_FromString(
           http_error_messages[HTTP_SERVER_ERROR]);
       }
     } else {
@@ -356,7 +356,7 @@ on_write_chunk(struct ev_loop* mainloop, Request* request)
 send_terminator_chunk:
   if(request->state.chunked_response) {
     /* We have to send a terminating empty chunk + \r\n */
-    request->current_chunk = _Bytes_FromString("0\r\n\r\n");
+    request->current_chunk = _PEP3333_Bytes_FromString("0\r\n\r\n");
     assert(request->current_chunk_p == 0);
     // Next time we get here, don't send the terminating empty chunk again.
     // XXX This is kind of a hack and should be refactored for easier understanding.
@@ -374,20 +374,20 @@ do_send_chunk(Request* request)
   Py_ssize_t bytes_sent;
 
   assert(request->current_chunk != NULL);
-  assert(!(request->current_chunk_p == _Bytes_GET_SIZE(request->current_chunk)
-           && _Bytes_GET_SIZE(request->current_chunk) != 0));
+  assert(!(request->current_chunk_p == _PEP3333_Bytes_GET_SIZE(request->current_chunk)
+           && _PEP3333_Bytes_GET_SIZE(request->current_chunk) != 0));
 
   bytes_sent = write(
     request->client_fd,
-    _Bytes_AS_DATA(request->current_chunk) + request->current_chunk_p,
-    _Bytes_GET_SIZE(request->current_chunk) - request->current_chunk_p
+    _PEP3333_Bytes_AS_DATA(request->current_chunk) + request->current_chunk_p,
+    _PEP3333_Bytes_GET_SIZE(request->current_chunk) - request->current_chunk_p
   );
 
   if(bytes_sent == -1)
     return handle_nonzero_errno(request);
 
   request->current_chunk_p += bytes_sent;
-  if(request->current_chunk_p == _Bytes_GET_SIZE(request->current_chunk)) {
+  if(request->current_chunk_p == _PEP3333_Bytes_GET_SIZE(request->current_chunk)) {
     Py_CLEAR(request->current_chunk);
     request->current_chunk_p = 0;
     return false;
