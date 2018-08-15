@@ -57,28 +57,32 @@ wsgi_call_application(Request* request)
    *
    * Look into the returned iterator in any case. This allows us to do other
    * optimizations, for example if the returned value is a list with exactly
-   * one string in it, we can pick the string and throw away the list so bjoern
-   * does not have to come back again and look into the iterator a second time.
+   * one bytestring in it, we can pick the bytestring and throw away the list
+   * so bjoern does not have to come back again and look into the iterator a
+   * second time.
    */
   PyObject* first_chunk;
 
   if(PyList_Check(retval) && PyList_GET_SIZE(retval) == 1 &&
      _PEP3333_Bytes_Check(PyList_GET_ITEM(retval, 0)))
   {
-    /* Optimize the most common case, a single string in a list: */
+    /* Optimize the most common case, a single bytestring in a list: */
     PyObject* tmp = PyList_GET_ITEM(retval, 0);
     Py_INCREF(tmp);
     Py_DECREF(retval);
     retval = tmp;
-    goto string; /* eeevil */
+    goto bytestring; /* eeevil */
   } else if(_PEP3333_Bytes_Check(retval)) {
     /* According to PEP 333 strings should be handled like any other iterable,
      * i.e. sending the response item for item. "item for item" means
-     * "char for char" if you have a string. -- I'm not that stupid. */
-    string:
+     * "char for char" if you have a bytestring. -- I'm not that stupid. */
+    bytestring:
+    request->iterable = NULL;
+    request->iterator = NULL;
     if(_PEP3333_Bytes_GET_SIZE(retval)) {
       first_chunk = retval;
     } else {
+      // empty response
       Py_DECREF(retval);
       first_chunk = NULL;
     }
@@ -108,6 +112,12 @@ wsgi_call_application(Request* request)
     );
     Py_XDECREF(first_chunk);
     return false;
+  }
+
+  /* Special-case HTTP 204 and 304 */
+  if (!strncmp(_PEP3333_Bytes_AS_DATA(request->status), "204", 3) ||
+      !strncmp(_PEP3333_Bytes_AS_DATA(request->status), "304", 3)) {
+    request->state.response_length_unknown = false;
   }
   
   /* keep-alive cruft */
@@ -348,6 +358,10 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
   request->status = _PEP3333_BytesLatin1_FromUnicode(status_unicode);
   if (request->status == NULL) {
     return NULL;
+  } else if (_PEP3333_Bytes_GET_SIZE(request->status) < 3) {
+    PyErr_SetString(PyExc_ValueError, "'status' must be 3-digit");
+    Py_CLEAR(request->status);
+    return NULL;
   }
 
   if(!inspect_headers(request)) {
@@ -355,7 +369,6 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
     return NULL;
   }
 
-  Py_INCREF(request->status);
   Py_INCREF(request->headers);
 
   request->state.start_response_called = true;
