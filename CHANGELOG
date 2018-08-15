@@ -1,3 +1,7 @@
+2.2.2 (Aug 15, 2018)
+    - Fix #138: Use Latin1 encoding for unicode strings
+    - Fix #139: Never use chunked responses for HTTP 204 and 304
+
 2.2.1 (June 4, 2018)
     - Fix #133: Segmentation fault with very long HTTP headers (@szabolcsbalogh)
 
