@@ -13,8 +13,12 @@
 
   Py_ssize_t portable_sendfile(int out_fd, int in_fd, off_t offset) {
     off_t len = SENDFILE_CHUNK_SIZE;
-    if(sendfile(in_fd, out_fd, offset, &len, NULL, 0) == -1)
+    if(sendfile(in_fd, out_fd, offset, &len, NULL, 0) == -1) {
+      if((errno == EAGAIN || errno == EINTR) && len > 0) {
+        return len;
+      }
       return -1;
+    }
     return len;
   }
 
@@ -26,6 +30,9 @@
   Py_ssize_t portable_sendfile(int out_fd, int in_fd, off_t offset) {
     off_t len;
     if(sendfile(in_fd, out_fd, offset, SENDFILE_CHUNK_SIZE, NULL, &len, 0) == -1) {
+      if((errno == EAGAIN || errno == EINTR) && len > 0) {
+        return len;
+      }
       return -1;
     }
     return len;
