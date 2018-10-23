@@ -52,6 +52,12 @@ typedef void ev_signal_callback(struct ev_loop*, ev_signal*, const int);
 static ev_signal_callback ev_signal_on_sigint;
 #endif
 
+#if WANT_SIGINT_HANDLING
+typedef void ev_timer_callback(struct ev_loop*, ev_timer*, const int);
+static ev_timer_callback ev_timer_ontick;
+ev_timer timeout_watcher;
+#endif
+
 static ev_io_callback ev_io_on_request;
 static ev_io_callback ev_io_on_read;
 static ev_io_callback ev_io_on_write;
@@ -75,9 +81,15 @@ void server_run(ServerInfo* server_info)
   ev_io_start(mainloop, &thread_info.accept_watcher);
 
 #if WANT_SIGINT_HANDLING
-  ev_signal signal_watcher;
-  ev_signal_init(&signal_watcher, ev_signal_on_sigint, SIGINT);
-  ev_signal_start(mainloop, &signal_watcher);
+  ev_signal sigint_watcher;
+  ev_signal_init(&sigint_watcher, ev_signal_on_sigint, SIGINT);
+  ev_signal_start(mainloop, &sigint_watcher);
+#endif
+
+#ifdef WANT_SIGNAL_HANDLING
+  ev_timer_init(&timeout_watcher, ev_timer_ontick, 0., SIGNAL_CHECK_INTERVAL);
+  ev_timer_start(mainloop, &timeout_watcher);
+  ev_set_priority(&timeout_watcher, EV_MINPRI);
 #endif
 
   /* This is the program main loop */
@@ -106,6 +118,19 @@ ev_signal_on_sigint(struct ev_loop* mainloop, ev_signal* watcher, const int even
 
   ev_io_stop(mainloop, &((ThreadInfo*)ev_userdata(mainloop))->accept_watcher);
   ev_signal_stop(mainloop, watcher);
+#ifdef WANT_SIGNAL_HANDLING
+  ev_timer_stop(mainloop, &timeout_watcher);
+#endif
+}
+#endif
+
+#if WANT_SIGNAL_HANDLING
+static void
+ev_timer_ontick(struct ev_loop* mainloop, ev_timer* watcher, const int events)
+{
+  GIL_LOCK(0);
+  PyErr_CheckSignals();
+  GIL_UNLOCK(0);
 }
 #endif
 

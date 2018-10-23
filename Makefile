@@ -25,6 +25,14 @@ ifneq ($(WANT_SIGINT_HANDLING), no)
 FEATURES	+= -D WANT_SIGINT_HANDLING
 endif
 
+ifneq ($(WANT_SIGNAL_HANDLING), no)
+FEATURES	+= -D WANT_SIGNAL_HANDLING
+endif
+
+ifndef SIGNAL_CHECK_INTERVAL
+FEATURES	+= -D SIGNAL_CHECK_INTERVAL=0.1
+endif
+
 all: prepare-build $(objects) _bjoernmodule
 
 print-env:
