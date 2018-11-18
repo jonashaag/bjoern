@@ -1,4 +1,4 @@
-2.2.2 (Aug 15, 2018)
+2.2.3 (Oct 22, 2018)
     - Fix #144: Proper handling of EAGAIN/EINTR (Adam Bouhenguel)
 
 2.2.2 (Aug 15, 2018)
