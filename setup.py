@@ -9,7 +9,7 @@ bjoern_extension = Extension(
     '_bjoern',
     sources       = SOURCE_FILES,
     libraries     = ['ev'],
-    include_dirs  = ['http-parser', '/usr/include/libev'],
+    include_dirs  = ['http-parser', '/usr/include/libev', '/opt/local/include'],
     define_macros = [('WANT_SENDFILE', '1'),
                      ('WANT_SIGINT_HANDLING', '1')],
     extra_compile_args = ['-std=c99', '-fno-strict-aliasing', '-fcommon',
