@@ -1,3 +1,4 @@
+import atexit
 import os
 import socket
 import _bjoern
@@ -38,6 +39,18 @@ def server_run(sock, wsgi_app):
     _bjoern.server_run(sock, wsgi_app)
 
 
+def _close_server_socket():
+    # Handler for cleaning up the server socket when the process terminates
+    global _default_instance
+    
+    if sock.family == socket.AF_UNIX:
+        filename = sock.getsockname()
+        if filename[0] != '\0':
+            os.unlink(sock.getsockname())
+    sock.close()
+    _default_instance = None
+
+
 # Backwards compatibility API
 def listen(wsgi_app, host, port=None, reuse_port=False):
     """
@@ -73,12 +86,6 @@ def run(*args, **kwargs):
                                "before calling bjoern.run() without arguments.")
 
     sock, wsgi_app = _default_instance
-    try:
-        server_run(sock, wsgi_app)
-    finally:
-        if sock.family == socket.AF_UNIX:
-            filename = sock.getsockname()
-            if filename[0] != '\0':
-                os.unlink(sock.getsockname())
-        sock.close()
-        _default_instance = None
+    atexit.register(_close_server_socket)
+
+    server_run(sock, wsgi_app)
