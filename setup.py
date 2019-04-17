@@ -32,5 +32,9 @@ setup(
                     'Programming Language :: Python :: 3',
                     'Topic :: Internet :: WWW/HTTP :: WSGI :: Server'],
     py_modules   = ['bjoern'],
-    ext_modules  = [bjoern_extension]
+    ext_modules  = [bjoern_extension],
+    entry_points = """
+    [paste.server_runner]
+    main = bjoern:serve_paste
+    """,
 )
