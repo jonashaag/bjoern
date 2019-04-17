@@ -35,6 +35,6 @@ setup(
     ext_modules  = [bjoern_extension],
     entry_points = """
     [paste.server_runner]
-    main = bjoern:serve_paste
+    main = contrib:serve_paste
     """,
 )

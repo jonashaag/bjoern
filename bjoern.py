@@ -82,8 +82,3 @@ def run(*args, **kwargs):
                 os.unlink(sock.getsockname())
         sock.close()
         _default_instance = None
-
-def serve_paste(app, global_conf, **kw):
-    kw['port'] = int(kw.get('port', '0')) or False
-    run(app, **kw)
-    return 0
