@@ -4,10 +4,11 @@ import _bjoern
 
 
 _default_instance = None
-LISTEN_BACKLOG = 1024
+DEFAULT_LISTEN_BACKLOG = 1024
 
 
-def bind_and_listen(host, port=None, reuse_port=False):
+def bind_and_listen(host, port=None, reuse_port=False,
+                    listen_backlog=DEFAULT_LISTEN_BACKLOG):
     if host.startswith("unix:@"):
         # Abstract UNIX socket: "unix:@foobar"
         sock = socket.socket(socket.AF_UNIX)
@@ -23,13 +24,13 @@ def bind_and_listen(host, port=None, reuse_port=False):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         if reuse_port:
             # Enable "receive steering" on FreeBSD and Linux >=3.9. This allows
-            # multiple independent bjoerns to bind to the same port (and ideally
-            # also set their CPU affinity), resulting in more efficient load
-            # distribution.  https://lwn.net/Articles/542629/
+            # multiple independent bjoerns to bind to the same port (and
+            # ideally also set their CPU affinity), resulting in more efficient
+            # load distribution.  https://lwn.net/Articles/542629/
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         sock.bind((host, port))
 
-    sock.listen(LISTEN_BACKLOG)
+    sock.listen(listen_backlog)
 
     return sock
 
@@ -39,18 +40,22 @@ def server_run(sock, wsgi_app):
 
 
 # Backwards compatibility API
-def listen(wsgi_app, host, port=None, reuse_port=False):
+def listen(wsgi_app, host, port=None, reuse_port=False,
+           listen_backlog=DEFAULT_LISTEN_BACKLOG):
     """
     Makes bjoern listen to 'host:port' and use 'wsgi_app' as WSGI application.
     (This does not run the server mainloop.)
 
     'reuse_port' -- whether to set SO_REUSEPORT (if available on platform)
+    'listen_backlog' -- listen backlog value (default: 1024)
     """
     global _default_instance
     if _default_instance:
         raise RuntimeError("Only one global server instance possible")
-    sock = bind_and_listen(host, port, reuse_port)
+    sock = bind_and_listen(host, port, reuse_port,
+                           listen_backlog=listen_backlog)
     _default_instance = (sock, wsgi_app)
+
 
 def run(*args, **kwargs):
     """
@@ -70,7 +75,8 @@ def run(*args, **kwargs):
         # Called as `bjoern.run()`
         if not _default_instance:
             raise RuntimeError("Must call bjoern.listen(wsgi_app, host, ...) "
-                               "before calling bjoern.run() without arguments.")
+                               "before calling bjoern.run() without "
+                               "arguments.")
 
     sock, wsgi_app = _default_instance
     try:
