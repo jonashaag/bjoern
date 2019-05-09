@@ -23,9 +23,9 @@ def bind_and_listen(host, port=None, reuse_port=False):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         if reuse_port:
             # Enable "receive steering" on FreeBSD and Linux >=3.9. This allows
-            # multiple independent bjoerns to bind to the same port (and ideally
-            # also set their CPU affinity), resulting in more efficient load
-            # distribution.  https://lwn.net/Articles/542629/
+            # multiple independent bjoerns to bind to the same port (and
+            # ideally also set their CPU affinity), resulting in more efficient
+            # load distribution.  https://lwn.net/Articles/542629/
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         sock.bind((host, port))
 
@@ -52,6 +52,7 @@ def listen(wsgi_app, host, port=None, reuse_port=False):
     sock = bind_and_listen(host, port, reuse_port)
     _default_instance = (sock, wsgi_app)
 
+
 def run(*args, **kwargs):
     """
     run(*args, **kwargs):
@@ -70,7 +71,8 @@ def run(*args, **kwargs):
         # Called as `bjoern.run()`
         if not _default_instance:
             raise RuntimeError("Must call bjoern.listen(wsgi_app, host, ...) "
-                               "before calling bjoern.run() without arguments.")
+                               "before calling bjoern.run() without "
+                               "arguments.")
 
     sock, wsgi_app = _default_instance
     try:
