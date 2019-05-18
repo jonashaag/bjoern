@@ -39,16 +39,21 @@ def server_run(sock, wsgi_app):
     _bjoern.server_run(sock, wsgi_app)
 
 
-def _close_server_socket():
-    # Handler for cleaning up the server socket when the process terminates
+def _close_server_socket(sock):
+    # Clean up the given socket
     global _default_instance
-    
-    sock = _default_instance[0]
+
+    # This fix is only needed on *NIX-like systems
     if sock.family == socket.AF_UNIX:
         filename = sock.getsockname()
         if filename[0] != '\0':
             os.unlink(sock.getsockname())
+
+    # Close the socket, but wait for current connections to close first.
+    # Calling sock.shutdown({reason}) would force it to close, but that may not
+    # be wiae in al circumstances.
     sock.close()
+
     _default_instance = None
 
 
@@ -65,6 +70,7 @@ def listen(wsgi_app, host, port=None, reuse_port=False):
         raise RuntimeError("Only one global server instance possible")
     sock = bind_and_listen(host, port, reuse_port)
     _default_instance = (sock, wsgi_app)
+
 
 def run(*args, **kwargs):
     """
@@ -87,6 +93,10 @@ def run(*args, **kwargs):
                                "before calling bjoern.run() without arguments.")
 
     sock, wsgi_app = _default_instance
-    atexit.register(_close_server_socket)
+    atexit.register(_close_server_socket, sock)
 
-    server_run(sock, wsgi_app)
+    try:
+        server_run(sock, wsgi_app)
+    finally:
+        _close_server_socket(sock)
+        atexit.unregister(sock)  # Make sure we don't try to close the aocket twice
