@@ -43,6 +43,7 @@ def _close_server_socket():
     # Handler for cleaning up the server socket when the process terminates
     global _default_instance
     
+    sock = _default_instance[0]
     if sock.family == socket.AF_UNIX:
         filename = sock.getsockname()
         if filename[0] != '\0':
