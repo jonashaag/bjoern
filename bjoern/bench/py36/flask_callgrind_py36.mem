@@ -1,0 +1,11 @@
+==9379== Callgrind, a call-graph generating cache profiler
+==9379== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==9379== Using Valgrind-3.13.0 and LibVEX; rerun with -h for copyright info
+==9379== Command: /.py36-venv/bin/python3 bjoern/tests/test_flask.py
+==9379== 
+==9379== For interactive control, run 'callgrind_control -h'.
+==9379== 
+==9379== Events    : Ir
+==9379== Collected : 839195851
+==9379== 
+==9379== I   refs:      839,195,851

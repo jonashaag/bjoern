@@ -1,3 +1,9 @@
-include http-parser/http_parser.[ch]
-include bjoern/*
+include vendors/http-parser/http_parser.c
+include vendors/http-parser/contrib/*.c
+include vendors/http-parser/http_parser.h
+include vendors/http-parser/LICENSE-MIT
+include vendors/log.c/*.c
+include vendors/log.c/*.h
+include vendors/log.c/LICENSE
+include src/*
 include LICENSE

@@ -1,0 +1,41 @@
+#!/bin/bash
+# It requires python command as parameter
+set -euo
+pip="$1"
+
+"${pip}" install        \
+    appdirs             \
+    atomicwrites        \
+    attrs               \
+    bleach              \
+    bottle              \
+    certifi             \
+    chardet             \
+    cffi                \
+    Click               \
+    docutils            \
+    Flask               \
+    idna                \
+    itsdangerous        \
+    Jinja2              \
+    MarkupSafe          \
+    more-itertools      \
+    pkginfo             \
+    pluggy              \
+    py                  \
+    Pygments            \
+    pytest              \
+    readme-renderer     \
+    requests            \
+    requests-toolbelt   \
+    six                 \
+    toml                \
+    tqdm                \
+    twine               \
+    urllib3             \
+    wcwidth             \
+    webencodings        \
+    Werkzeug            \
+    gunicorn
+
+"${pip}" install --no-binary :all: falcon

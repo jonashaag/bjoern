@@ -1,0 +1,11 @@
+==9403== Callgrind, a call-graph generating cache profiler
+==9403== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==9403== Using Valgrind-3.13.0 and LibVEX; rerun with -h for copyright info
+==9403== Command: /.py37-venv/bin/python3 bjoern/tests/test_flask.py
+==9403== 
+==9403== For interactive control, run 'callgrind_control -h'.
+==9403== 
+==9403== Events    : Ir
+==9403== Collected : 667980079
+==9403== 
+==9403== I   refs:      667,980,079

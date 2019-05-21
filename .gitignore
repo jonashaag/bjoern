@@ -5,3 +5,7 @@ build/
 dist/
 MANIFEST
 bjoern.egg-info/
+.idea
+*.so
+tmp/
+callgrind.out.*

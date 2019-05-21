@@ -1,0 +1,105 @@
+
+====== Flask-Gunicorn(Python3.6) ======
+
+
+====== GET ======
+
+This is ApacheBench, Version 2.3 <$Revision: 1807734 $>
+Copyright 1996 Adam Twiss, Zeus Technology Ltd, http://www.zeustech.net/
+Licensed to The Apache Software Foundation, http://www.apache.org/
+
+Benchmarking 127.0.0.1 (be patient)
+
+
+Server Software:        gunicorn/19.9.0
+Server Hostname:        127.0.0.1
+Server Port:            8080
+
+Document Path:          /a/b/c?k=v&k2=v2
+Document Length:        20 bytes
+
+Concurrency Level:      100
+Time taken for tests:   5.620 seconds
+Complete requests:      10000
+Failed requests:        0
+Total transferred:      1720000 bytes
+HTML transferred:       200000 bytes
+Requests per second:    1779.48 [#/sec] (mean)
+Time per request:       56.196 [ms] (mean)
+Time per request:       0.562 [ms] (mean, across all concurrent requests)
+Transfer rate:          298.90 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    0   0.2      0       3
+Processing:     1   56   3.5     56      63
+Waiting:        1   56   3.5     56      63
+Total:          4   56   3.4     56      63
+
+Percentage of the requests served within a certain time (ms)
+  50%     56
+  66%     57
+  75%     57
+  80%     57
+  90%     58
+  95%     59
+  98%     61
+  99%     62
+ 100%     63 (longest request)
+
+~~~~~ Keep Alive ~~~~~
+
+This is ApacheBench, Version 2.3 <$Revision: 1807734 $>
+Copyright 1996 Adam Twiss, Zeus Technology Ltd, http://www.zeustech.net/
+Licensed to The Apache Software Foundation, http://www.apache.org/
+
+Benchmarking 127.0.0.1 (be patient)
+
+
+Server Software:        gunicorn/19.9.0
+Server Hostname:        127.0.0.1
+Server Port:            8080
+
+Document Path:          /a/b/c?k=v&k2=v2
+Document Length:        20 bytes
+
+Concurrency Level:      100
+Time taken for tests:   5.735 seconds
+Complete requests:      10000
+Failed requests:        0
+Keep-Alive requests:    0
+Total transferred:      1720000 bytes
+HTML transferred:       200000 bytes
+Requests per second:    1743.72 [#/sec] (mean)
+Time per request:       57.349 [ms] (mean)
+Time per request:       0.573 [ms] (mean, across all concurrent requests)
+Transfer rate:          292.89 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    0   0.2      0       2
+Processing:     1   57   4.1     57      69
+Waiting:        1   57   4.1     57      68
+Total:          3   57   4.0     57      69
+
+Percentage of the requests served within a certain time (ms)
+  50%     57
+  66%     57
+  75%     57
+  80%     58
+  90%     60
+  95%     63
+  98%     65
+  99%     66
+ 100%     69 (longest request)
+
+====== POST ======
+
+
+~~~~~ Keep Alive ~~~~~
+
+This is ApacheBench, Version 2.3 <$Revision: 1807734 $>
+Copyright 1996 Adam Twiss, Zeus Technology Ltd, http://www.zeustech.net/
+Licensed to The Apache Software Foundation, http://www.apache.org/
+
+Benchmarking 127.0.0.1 (be patient)

@@ -1,0 +1,13 @@
+#!/bin/bash
+set -euo pipefail
+
+docker build -t bjoern .
+docker run -it --rm \
+    --cap-add=SYS_PTRACE \
+    --security-opt seccomp=unconfined \
+    -v $(pwd):/bjoern -v ~/.pypirc:/root/.pypirc \
+    -w /bjoern \
+    -p 8080:8080 \
+    --tmpfs /tmp:rw,size=102400k,mode=1777 \
+    bjoern bash
+
