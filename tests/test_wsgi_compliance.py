@@ -40,6 +40,6 @@ if __name__ == "__main__":
     try:
         test_compliance()
     except AssertionError:
-        print("Test failed")
+        raise SystemExit("Test failed")
     else:
         print("Test successful")
