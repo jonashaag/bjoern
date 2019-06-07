@@ -348,14 +348,14 @@ void _initialize_request_module(ServerInfo* server_info)
       PyDict_SetItemString(wsgi_base_dict, "SERVER_NAME", server_info->host);
 
       if (server_info->port == Py_None) {
-      PyDict_SetItemString(wsgi_base_dict, "SERVER_PORT", PyString_FromFormat(""));
+      PyDict_SetItemString(wsgi_base_dict, "SERVER_PORT", _PEP3333_String_FromFormat(""));
       } else {
-        PyDict_SetItemString(wsgi_base_dict, "SERVER_PORT", PyString_FromFormat("%i", server_info->port));
+        PyDict_SetItemString(wsgi_base_dict, "SERVER_PORT", _PEP3333_String_FromFormat("%i", server_info->port));
       }
      } else {
       /* SERVER_NAME is required, but not usefull with UNIX type sockets */
-      PyDict_SetItemString(wsgi_base_dict, "SERVER_NAME", PyString_FromFormat(""));
-      PyDict_SetItemString(wsgi_base_dict, "SERVER_PORT", PyString_FromFormat(""));
+      PyDict_SetItemString(wsgi_base_dict, "SERVER_NAME", _PEP3333_String_FromFormat(""));
+      PyDict_SetItemString(wsgi_base_dict, "SERVER_PORT", _PEP3333_String_FromFormat(""));
     }
   }
 }
