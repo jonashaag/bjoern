@@ -24,7 +24,7 @@ featuring
 * Can bind to TCP `host:port` addresses and Unix sockets (thanks @k3d3!)
 * Full persistent connection ("*keep-alive*") support in both HTTP/1.0 and 1.1,
   including support for HTTP/1.1 chunked responses
-* Gunicorn Worker support (4.0+ only)
+* [Gunicorn](https://gunicorn.org/) Worker support (4.0+ only)
 * Easy development with docker
 * Full suite of tests and benchmarks
 
@@ -113,7 +113,7 @@ Use as `kwargs`:
 - **keepalive**: default `True` (4.x+ only)
 - **tcp_nodelay**: default `True` (4.x+ only)
 
-## Gunicorn worker
+## [Gunicorn](https://gunicorn.org/) worker
 
 Use `--worker-class bjoern.gworker.BjoernWorker`:
 
@@ -128,6 +128,19 @@ gunicorn your:app \
     --keep-alive 3600 \
     --worker-class bjoern.gworker.BjoernWorker
 ```
+
+# Deployment
+
+Bjoern is strictly single threaded (as it is **libev**, see https://gist.github.com/andreybolonin/2413da76f088e2c5ab04df53f07659ea),
+and as a result of that it does not take advantage of multi-core/multi-cpu. For these cases use [Gunicorn](https://gunicorn.org/) worker.
+The worker is `sync` so enabling threads won't make it multithreaded, although if the app uses threads `--threads=1` is convenient.
+
+As for the nature of Bjoern, deploy exactly the number of desired CPU as processes, and you are good to go (no mambo jambo on (2*n)+1 in that).
+
+## SSL
+
+Bjoern does not support SSL, please use Gunicorn or a proxy like Nginx.
+
 
 # Development
 
