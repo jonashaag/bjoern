@@ -5,8 +5,6 @@ MAINTAINER <danius danigosa@gmail.com>
 ENV LC_ALL=C.UTF-8
 ENV LC_CTYPE=C.UTF-8
 
-ENV PYPY_VERSION="7.1.1-beta"
-
 # base packages
 RUN \
   apt-get -qq update && \
