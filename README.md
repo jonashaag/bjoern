@@ -1,7 +1,7 @@
-# bjoern: Fast And Ultra-Lightweight HTTP/1.1 WSGI Server (http://www.python.org/dev/peps/pep-0333/)
+# bjoern: Fast And Ultra-Lightweight HTTP/1.1 WSGI Server [ [PEP-0333] ](http://www.python.org/dev/peps/pep-0333/)
 
-[![Join the chat at https://gitter.im/jonashaag/bjoern](https://gitter.im/jonashaag/bjoern?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-[![Build Status](https://travis-ci.com/danigosa/bjoern.svg?branch=4.0)](https://travis-ci.com/danigosa/bjoern)
+![Join the chat at https://gitter.im/jonashaag/bjoern](https://gitter.im/jonashaag/bjoern?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+![Build Status](https://travis-ci.com/danigosa/bjoern.svg?branch=4.0)](https://travis-ci.com/danigosa/bjoern)
 
 A screamingly fast, ultra-lightweight WSGI_ server for CPython,
 written in C using Marc Lehmann's high performance [libev](http://software.schmorp.de/pkg/libev.html) event loop and
@@ -104,6 +104,15 @@ for initializing and cleaning up the socket in that case.
    bjoern.server_run(filedescriptor_as_integer, wsgi_application)
 ```
 
+### Parameters
+
+Use as `kwargs`:
+
+- **reuse_port**: default `False`,
+- **listen_backlog**: default 3.x `1024`, 4.x `2048`,
+- **keepalive**: default `True` (4.x+ only)
+- **tcp_nodelay**: default `True` (4.x+ only)
+
 ## Gunicorn worker
 
 Use `--worker-class bjoern.gworker.BjoernWorker`:
@@ -126,25 +135,27 @@ Requirements:
 
 - docker
 
-Run:
+Enter development environment:
 
 ```bash
-run-dev
+$ ./run-dev
+root@92310a2053bc:/bjoern#
 ```
 
-Pass tests:
+Run tests:
 
 ```bash
-# make all-36
-# make all-37
+$ ./run-dev
+root@92310a2053bc:/bjoern# make all-36
+root@92310a2053bc:/bjoern# make all-37
 ```
 
 # Benchmarks
 
 ```bash
-run-dev
-# make bjoern-bench-36
-# make bjoern-bench-37
+$ ./run-dev
+root@92310a2053bc:/bjoern# make bjoern-bench-36
+root@92310a2053bc:/bjoern# make bjoern-bench-37
 ```
 
 
