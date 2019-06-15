@@ -1,24 +1,14 @@
 CHANGELOG
 =========
 
-4.0.11 (June 2019)
-    - cleanup pypy intents, it's not easily compatible
+4.0.0rc1 (June 2019)
     - added legacy benchmarks
     - removed server level logs to improve performance
-
-4.0.10 (June 2019)
     - Backport 3.0.1 commits where applicable
-
-4.0.9 (May 2019)
     - Added tcp_nodelay, max_body_len, max_header_fields, max_header_field_len, max_uri_len, max_query_len to make
     DoS attacks less feasible
     - Refactor python code
     - Better HTTP compliant error codes
-
-4.0.8 (May 2019)
-    - Undo EPOLL as preference for the main loop, let the lib choose with EVFLAG_AUTO
-
-4.0.7 (May 2019)
     - Added 505 HTTP Version Not Supported on HTTP2
     - Improvements in C logging
     - Better call EPOLL
@@ -26,33 +16,11 @@ CHANGELOG
     - Improvements on sock configuration, like TCP NODELAY and KEEPALIVE
     - Fix several issues calling the gworker.BjoernWorker with gunicorn
     - Added benchmarks for gunicorn worker
-    - Initial support for Pypy, not working:
-        2019-05-30 06:40:31,113 - bjoern.console - INFO - Booting Bjoern with params:
-        - host: 0.0.0.0
-        - port: 8080
-        - LogConsoleLevel: 20
-        - LogFileLevel: 20
-        - LogToFile: -
-        - reuse_port: False
-        - listen_backlog: 64
-        - pid: 10189
-        - uid: 0
-        - gid: 0
-        - keepalive: 3600
-        - fd: None
-        - executable: /.pypy36-venv/bin/pypy3
-
-        [2019-05-30 06:40:31 UTC] [10189] [INFO] [src/_bjoernmodule.c:64] ConsoleLogging level set to: 20
-        Segmentation fault
-
-4.0.6 (May 2019)
     - Fix bad import when building from source externally with setup.py
     - configurable listen backlog, defaulted to the half of /proc/sys/net/core/somaxconn, if listen_backlog para is 0, to
       the max of the underlying hardware/runtime
     - Fixed benchmarks
     - Fixed file logging
-
-4.0.5 (May 2019)
     - use http_parser.h methods for BAD_REQUEST, REQUIRED_LENGTH and SERVER_ERROR
     - Fix when to raise HTTP_STATUS_REQUIRED_LENGTH(411)
     - Use ev_loop_new(EVFLAG_AUTO) backend instead of ev_loop_new(0), as compatibility to pre-3.9 is not required
@@ -62,25 +30,12 @@ CHANGELOG
     - added gunicorn worker
     - gross refactor of tests and main module
     - increased default backlog
-
-4.0.4 (May 2019)
-    - Added more tests
+    - Added tests
     - Tests passing on Py37
-
-4.0.3 (May 2019)
     - Added benchmarks with image input
     - Refactored Makefile
-    - Added tests
     - Initial config for Py37
-
-4.0.2 (May 2019)
     - Fixed problems uploading big POST bodies
-    - Refactored and added tests
-
-4.0.1 (May 2019)
-    - Refactored and added tests
-
-4.0.0-a1 (May 2019)
     - Fork from master@9884381ffdbc279fbf1ef640003fcce0a6f0996a
     - Drop support for Python2, supporting only Python3.6+
     - Updated to `http-parser` latest stable version 2.9.2
@@ -94,6 +49,9 @@ CHANGELOG
     - Added wheel building support
     - Added Flask, Bottle and Falcon ab benchmarks
     - Added Black & iSort formatting for python files
+
+3.0.1 (June 6, 2019)
+    - Fix #158, #160: Correct string type for WSGI environ
 
 3.0.0 (May 7, 2019)
     - Fix #91: Support for SIGTERM/SIGINT handling
