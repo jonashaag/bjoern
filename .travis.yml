@@ -4,8 +4,8 @@ services:
   - docker
 
 before_install:
-  - docker build --no-cache -t bjoern .
+  - docker build --no-cache -t bjoern36-37 .
 
 script:
-  - docker run -t -w /bjoern bjoern make all-36
-  - docker run -t -w /bjoern bjoern make all-37
+  - docker run -t -w /bjoern -v $(pwd):/bjoern bjoern36-37 make all-36
+  - docker run -t -w /bjoern -v $(pwd):/bjoern bjoern36-37 make all-37
