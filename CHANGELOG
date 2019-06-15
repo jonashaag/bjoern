@@ -2,6 +2,7 @@ CHANGELOG
 =========
 
 4.0.0rc1 (June 2019)
+    - added Travis CI support
     - added legacy benchmarks
     - removed server level logs to improve performance
     - Backport 3.0.1 commits where applicable
@@ -11,7 +12,6 @@ CHANGELOG
     - Better HTTP compliant error codes
     - Added 505 HTTP Version Not Supported on HTTP2
     - Improvements in C logging
-    - Better call EPOLL
     - Refactor runner so args and kwrags are well known
     - Improvements on sock configuration, like TCP NODELAY and KEEPALIVE
     - Fix several issues calling the gworker.BjoernWorker with gunicorn
@@ -23,9 +23,6 @@ CHANGELOG
     - Fixed file logging
     - use http_parser.h methods for BAD_REQUEST, REQUIRED_LENGTH and SERVER_ERROR
     - Fix when to raise HTTP_STATUS_REQUIRED_LENGTH(411)
-    - Use ev_loop_new(EVFLAG_AUTO) backend instead of ev_loop_new(0), as compatibility to pre-3.9 is not required
-    - refactored vendors
-    - included log.c improvements
     - allow separated file logger from console logger
     - added gunicorn worker
     - gross refactor of tests and main module
@@ -43,7 +40,6 @@ CHANGELOG
     - Added unit testing support with Pytest
     - Added tests for Flask, Falcon and Bottle
     - Replace in hand url parser by `http-parser.http_parser_url`
-    - Added logging support (stdout/stderr)
     - Added a Dockerfile and `run-dev` script to run development easily
     - Added modern `core-avx2` compilation options
     - Added wheel building support

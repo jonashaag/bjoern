@@ -12,9 +12,6 @@ typedef struct {
     PyObject *wsgi_app;
     PyObject *host;
     PyObject *port;
-    PyObject *log_console_level;
-    PyObject *log_file_level;
-    PyObject *log_file;
 } ServerInfo;
 
 typedef struct {
