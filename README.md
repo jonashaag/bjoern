@@ -1,6 +1,5 @@
 # bjoern: Fast And Ultra-Lightweight HTTP/1.1 WSGI Server
-
-[<img src="https://gitter.im/jonashaag/bjoern?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge">](https://gitter.im/jonashaag/bjoern)
+[<img src="https://badges.gitter.im/Join%20Chat.svg">](https://gitter.im/jonashaag/bjoern?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Build Status](https://travis-ci.com/danigosa/bjoern.svg?branch=4.0)](https://travis-ci.com/danigosa/bjoern)
 
 A screamingly fast, ultra-lightweight WSGI_ server for CPython,
