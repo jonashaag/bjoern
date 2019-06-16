@@ -41,10 +41,6 @@ RUN \
 	python3-wheel && \
   rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install \
-    black \
-    isort[requirements]
-
 RUN python3 -m venv --system-site-packages /.py35-venv && \
     /.py36-venv/bin/python -m pip install --upgrade \
         pip \
