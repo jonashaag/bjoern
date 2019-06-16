@@ -180,7 +180,7 @@ on_header_field(http_parser *parser, const char *field, size_t len) {
     }
 
     /* Header field size limit */
-    if (len > _Size_t_FromLong(SERVER_INFO->max_header_field_len)) {
+    if (len > _FromLong(SERVER_INFO->max_header_field_len)) {
         REQUEST->state.error_code = HTTP_STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE;
         return 1;
     }
@@ -204,7 +204,7 @@ on_header_field(http_parser *parser, const char *field, size_t len) {
     }
 
     /* Check if too many fields */
-    size_t _max_fields = _Size_t_FromLong(SERVER_INFO->max_header_fields);
+    size_t _max_fields = _FromLong(SERVER_INFO->max_header_fields);
     if (REQUEST->thread_info->header_fields == _max_fields) {
         REQUEST->state.error_code = HTTP_STATUS_PAYLOAD_TOO_LARGE;
         return 1;
@@ -229,7 +229,7 @@ on_header_value(http_parser *parser, const char *value, size_t len) {
      * For example in Apache default limit is 8KB, in IIS it's 16K.
      * Server will return 413 Entity Too Large error if headers size exceeds that limit.
      * */
-    size_t max_header_len = _Size_t_FromLong(SERVER_INFO->max_header_field_len);
+    size_t max_header_len = _FromLong(SERVER_INFO->max_header_field_len);
     if (len > max_header_len) {
         REQUEST->state.error_code = HTTP_STATUS_PAYLOAD_TOO_LARGE;
         return 1;
@@ -252,7 +252,7 @@ on_body(http_parser *parser, const char *data, const size_t len) {
         return 0;
     }
 
-    size_t _max_body_len = _Size_t_FromLong(SERVER_INFO->max_body_len);
+    size_t _max_body_len = _FromLong(SERVER_INFO->max_body_len);
     if (REQUEST->thread_info->payload_size + len > _max_body_len) {
         REQUEST->state.error_code = HTTP_STATUS_PAYLOAD_TOO_LARGE;
         return 1;

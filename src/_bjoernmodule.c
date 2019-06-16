@@ -6,55 +6,20 @@
 #include "py3.h"
 
 
-char *slice_str(const char *str, size_t size, size_t start, size_t end) {
-    char *buffer = malloc(sizeof(char[size]));
-    size_t j = 0;
-    for (size_t i = start; i <= end; ++i) {
-        buffer[j++] = str[i];
-    }
-    buffer[j] = 0;
-    return buffer;
-}
-
 static PyObject *
 run(PyObject *self, PyObject *args) {
     ServerInfo info;
 
-    PyObject *socket;
-    if (!PyArg_ParseTuple(args, "OOOOO:server_run",
-                          &socket,
+    if (!PyArg_ParseTuple(args, "isiOiii:server_run",
+                          &info.sockfd,
+                          &info.host,
+                          &info.port,
                           &info.wsgi_app,
                           &info.max_body_len,
                           &info.max_header_fields,
                           &info.max_header_field_len)) {
         return NULL;
     }
-
-    // Check socket
-    info.sockfd = PyObject_AsFileDescriptor(socket);
-    if (info.sockfd < 0) {
-        return NULL;
-    }
-
-    info.host = NULL;
-    if (PyObject_HasAttrString(socket, "getsockname")) {
-        PyObject *sockname = PyObject_CallMethod(socket, "getsockname", NULL);
-        if (sockname == NULL) {
-            return NULL;
-        }
-        if (PyTuple_CheckExact(sockname) && PyTuple_GET_SIZE(sockname) == 2) {
-            /* Standard (ipaddress, port) case */
-            info.host = PyTuple_GET_ITEM(sockname, 0);
-            info.port = PyTuple_GET_ITEM(sockname, 1);
-        }
-    }
-    PyObject *objectsRepresentation = PyObject_Repr(info.host);
-    PyObject *str = PyUnicode_AsEncodedString(objectsRepresentation, "utf-8", "~E~");
-    char *host = PyBytes_AS_STRING(str);
-    char *fmt_host = slice_str(host, strlen(host), 1, strlen(host) - 2);
-    Py_DECREF(objectsRepresentation);
-    Py_DECREF(str);
-    free(fmt_host);
 
     // Action starts
     set_server_info(&info);

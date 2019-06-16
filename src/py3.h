@@ -6,7 +6,6 @@
 #define PyFile_DecUseCount(file) NOP
 
 #define _FromLong(n) PyLong_FromLong(n)
-#define _Size_t_FromLong(n) PyLong_AsSize_t(n)
 
 #define _PEP3333_Bytes_AS_DATA(bytes) PyBytes_AS_STRING(bytes)
 #define _PEP3333_Bytes_FromString(bytes) PyBytes_FromString(bytes)
