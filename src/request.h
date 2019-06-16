@@ -6,7 +6,7 @@
 #include "common.h"
 #include "server.h"
 
-void _initialize_request_module(ServerInfo* server_info);
+void _initialize_request_module();
 
 typedef struct http_parser_url http_parser_url;
 
@@ -28,6 +28,12 @@ typedef struct {
   int last_call_was_header_value;
   int invalid_header;
 } bj_parser;
+
+typedef struct {
+    ev_io accept_watcher;
+    size_t payload_size;
+    size_t header_fields;
+} ThreadInfo;
 
 typedef struct {
 #ifdef DEBUG

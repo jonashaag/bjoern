@@ -1,6 +1,10 @@
 CHANGELOG
 =========
 
+4.0.0rc2 (June 2019)
+    - refactor server info (so it has not to be in every request)
+    -
+
 4.0.0rc1 (June 2019)
     - added Travis CI support
     - added legacy benchmarks

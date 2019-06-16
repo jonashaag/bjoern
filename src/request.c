@@ -3,6 +3,7 @@
 #include "request.h"
 #include "filewrapper.h"
 #include "py3.h"
+#include "server.h"
 
 static inline void PyDict_ReplaceKey(PyObject *dict, PyObject *k1, PyObject *k2);
 
@@ -179,7 +180,7 @@ on_header_field(http_parser *parser, const char *field, size_t len) {
     }
 
     /* Header field size limit */
-    if (len > _Size_t_FromLong(REQUEST->thread_info->server_info->max_header_field_len)) {
+    if (len > _Size_t_FromLong(SERVER_INFO->max_header_field_len)) {
         REQUEST->state.error_code = HTTP_STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE;
         return 1;
     }
@@ -203,7 +204,7 @@ on_header_field(http_parser *parser, const char *field, size_t len) {
     }
 
     /* Check if too many fields */
-    size_t _max_fields = _Size_t_FromLong(REQUEST->thread_info->server_info->max_header_fields);
+    size_t _max_fields = _Size_t_FromLong(SERVER_INFO->max_header_fields);
     if (REQUEST->thread_info->header_fields == _max_fields) {
         REQUEST->state.error_code = HTTP_STATUS_PAYLOAD_TOO_LARGE;
         return 1;
@@ -228,7 +229,7 @@ on_header_value(http_parser *parser, const char *value, size_t len) {
      * For example in Apache default limit is 8KB, in IIS it's 16K.
      * Server will return 413 Entity Too Large error if headers size exceeds that limit.
      * */
-    size_t max_header_len = _Size_t_FromLong(REQUEST->thread_info->server_info->max_header_field_len);
+    size_t max_header_len = _Size_t_FromLong(SERVER_INFO->max_header_field_len);
     if (len > max_header_len) {
         REQUEST->state.error_code = HTTP_STATUS_PAYLOAD_TOO_LARGE;
         return 1;
@@ -251,7 +252,7 @@ on_body(http_parser *parser, const char *data, const size_t len) {
         return 0;
     }
 
-    size_t _max_body_len = _Size_t_FromLong(REQUEST->thread_info->server_info->max_body_len);
+    size_t _max_body_len = _Size_t_FromLong(SERVER_INFO->max_body_len);
     if (REQUEST->thread_info->payload_size + len > _max_body_len) {
         REQUEST->state.error_code = HTTP_STATUS_PAYLOAD_TOO_LARGE;
         return 1;
@@ -341,7 +342,7 @@ static http_parser_settings
         on_header_value, NULL, on_body, on_message_complete, NULL, NULL
 };
 
-void _initialize_request_module(ServerInfo *server_info) {
+void _initialize_request_module() {
     IO_module = PyImport_ImportModule("io");
     if (IO_module == NULL) {
         /* PyImport_ImportModule should have exception set already */
@@ -417,13 +418,13 @@ void _initialize_request_module(ServerInfo *server_info) {
         /* dct['SERVER_NAME'] = '...'
          * dct['SERVER_PORT'] = '...'
          * Both are required by WSGI specs. */
-        if (server_info->host) {
-            PyDict_SetItemString(wsgi_base_dict, "SERVER_NAME", server_info->host);
+        if (SERVER_INFO->host) {
+            PyDict_SetItemString(wsgi_base_dict, "SERVER_NAME", SERVER_INFO->host);
 
-            if (server_info->port == Py_None) {
+            if (SERVER_INFO->port == Py_None) {
                 PyDict_SetItemString(wsgi_base_dict, "SERVER_PORT", _PEP3333_StringFromFormat(""));
             } else {
-                PyDict_SetItemString(wsgi_base_dict, "SERVER_PORT", _PEP3333_StringFromFormat("%i", server_info->port));
+                PyDict_SetItemString(wsgi_base_dict, "SERVER_PORT", _PEP3333_StringFromFormat("%i", SERVER_INFO->port));
             }
         } else {
             /* SERVER_NAME is required, but not usefull with UNIX type sockets */

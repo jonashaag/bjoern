@@ -66,17 +66,26 @@ static bool handle_nonzero_errno(Request *);
 
 static void close_connection(struct ev_loop *, Request *);
 
+static ServerInfo *server_info;
+
+ServerInfo *get_server_info(void) {
+    return server_info;
+};
+
+void set_server_info(ServerInfo *info) {
+    server_info = info;
+};
+
 static PyObject *http_error_message(unsigned short int minor, int code) {
     char message[128];
     sprintf(message, "HTTP/1.%hu %d %s\r\n\r\n", minor, code, http_status_str(code));
     return _PEP3333_Bytes_FromString(message);
 };
 
-void server_run(ServerInfo *server_info) {
+void server_run() {
     struct ev_loop *mainloop = ev_loop_new(ev_recommended_backends() | EVBACKEND_EPOLL);
 
     ThreadInfo thread_info;
-    thread_info.server_info = server_info;
     thread_info.payload_size = 0;
     thread_info.header_fields = 0;
     ev_set_userdata(mainloop, &thread_info);

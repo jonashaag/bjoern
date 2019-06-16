@@ -57,9 +57,9 @@ run(PyObject *self, PyObject *args) {
     free(fmt_host);
 
     // Action starts
-    _initialize_request_module(&info);
-    server_run(&info);
-
+    set_server_info(&info);
+    _initialize_request_module();
+    server_run();
 
     Py_RETURN_NONE;
 }

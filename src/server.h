@@ -14,13 +14,10 @@ typedef struct {
     PyObject *port;
 } ServerInfo;
 
-typedef struct {
-    ServerInfo *server_info;
-    ev_io accept_watcher;
-    size_t payload_size;
-    size_t header_fields;
-} ThreadInfo;
+ServerInfo *get_server_info();
+void set_server_info(ServerInfo *info);
+void server_run();
 
-void server_run(ServerInfo *);
+#define SERVER_INFO get_server_info()
 
 #endif
