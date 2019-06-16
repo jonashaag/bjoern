@@ -5,7 +5,9 @@ services:
 
 before_install:
   - docker build --no-cache -t bjoern36-37 .
+  - docker build --no-cache -t bjoern35 -f Dockerfile.py35 .
 
 script:
+  - docker run -t -w /bjoern -v $(pwd):/bjoern bjoern35 make all-35
   - docker run -t -w /bjoern -v $(pwd):/bjoern bjoern36-37 make all-36
   - docker run -t -w /bjoern -v $(pwd):/bjoern bjoern36-37 make all-37

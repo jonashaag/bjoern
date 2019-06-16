@@ -5,6 +5,8 @@ default: test
 
 SOURCE_DIR	:= src
 BUILD_DIR	:= build
+PYTHON35	:= /.py35-venv/bin/python3
+PIP35		:= /.py35-venv/bin/pip3
 PYTHON36	:= /.py36-venv/bin/python3
 PIP36		:= /.py36-venv/bin/pip3
 GUNICORN36	:= /.py36-venv/bin/gunicorn
@@ -13,6 +15,8 @@ PYTHON37	:= /.py37-venv/bin/python3
 PIP37		:= /.py37-venv/bin/pip3
 DEBUG 		:= DEBUG=True
 
+PYTHON35_INCLUDE	:= $(shell python3-config --includes | sed s/-I/-isystem\ /g)
+PYTHON35_LDFLAGS	:= $(shell python3-config --ldflags)
 PYTHON36_INCLUDE	:= $(shell python3-config --includes | sed s/-I/-isystem\ /g)
 PYTHON36_LDFLAGS	:= $(shell python3-config --ldflags)
 PYTHON37_INCLUDE	:= $(shell python3.7-config --includes | sed s/-I/-isystem\ /g)
@@ -46,9 +50,11 @@ ifndef SIGNAL_CHECK_INTERVAL
 FEATURES	+= -D SIGNAL_CHECK_INTERVAL=0.1
 endif
 CC 				:= gcc
+CPPFLAGS_35		+= $(PYTHON35_INCLUDE) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR)
 CPPFLAGS_36		+= $(PYTHON36_INCLUDE) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR)
 CPPFLAGS_37		+= $(PYTHON37_INCLUDE) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR)
 CFLAGS			+= $(FEATURES) -std=c99 -fno-strict-aliasing -fcommon -fPIC -Wall -D DEBUG
+LDFLAGS_35		+= $(PYTHON35_LDFLAGS) -shared -fcommon
 LDFLAGS_36		+= $(PYTHON36_LDFLAGS) -shared -fcommon
 LDFLAGS_37		+= $(PYTHON37_LDFLAGS) -shared -fcommon
 
@@ -78,9 +84,11 @@ flask_callgrind_37			 	:= bjoern/bench/flask_callgrind_py37.mem
 ab_post 						:= /tmp/bjoern.post
 
 # Targets
+setup-35: clean prepare-build reqs-35
 setup-36: clean prepare-build reqs-36
 setup-37: clean prepare-build reqs-37
 
+all-35: setup-35 $(objects) _bjoernmodule_35 test-35
 all-36: setup-36 $(objects) _bjoernmodule_36 test-36
 all-37: setup-36 $(objects) _bjoernmodule_37 test-37
 
@@ -92,6 +100,10 @@ print-env:
 	@echo LDFLAGS_37=$(LDFLAGS_37)
 	@echo args=$(HTTP_PARSER_SRC) $(wildcard $(SOURCE_DIR)/*.c)
 	@echo FEATURES=$(FEATURES)
+
+_bjoernmodule_35:
+	@$(CC) $(CPPFLAGS_35) $(CFLAGS) $(LDFLAGS_35) $(objects) -o $(BUILD_DIR)/_bjoern.so -lev
+	@PYTHONPATH=$$PYTHONPATH:$(BUILD_DIR) $(PYTHON35) -c 'import bjoern;print(f"Bjoern version: {bjoern.__version__}");'
 
 _bjoernmodule_36:
 	@$(CC) $(CPPFLAGS_36) $(CFLAGS) $(LDFLAGS_36) $(objects) -o $(BUILD_DIR)/_bjoern.so -lev
@@ -110,6 +122,9 @@ $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.c
 
 # foo.o: shortcut to $(BUILD_DIR)/foo.o
 %.o: $(BUILD_DIR)/%.o
+
+reqs-35:
+	@bash install-requirements $(PIP35)
 
 reqs-36:
 	@bash install-requirements $(PIP36)
@@ -130,6 +145,10 @@ clean:
 	@rm -rf *.egg-info
 	@rm -rf dist/*
 	@rm -f /tmp/*.tmp
+
+# Test
+test-35: fmt clean reqs-36 install-debug-35
+	@$(PYTHON35) -m pytest
 
 # Test
 test-36: fmt clean reqs-36 install-debug-36
@@ -387,6 +406,9 @@ extension-36:
 
 extension-37:
 	@PYTHONPATH=$$PYTHONPATH:$(BUILD_DIR) $(PYTHON37) setup.py build_ext
+
+install-debug-35:
+	@DEBUG=True PYTHONPATH=$$PYTHONPATH:$(BUILD_DIR) $(PYTHON35) -m pip install --editable .
 
 install-debug-36:
 	@DEBUG=True PYTHONPATH=$$PYTHONPATH:$(BUILD_DIR) $(PYTHON36) -m pip install --editable .
