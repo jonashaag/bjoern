@@ -18,7 +18,6 @@
 #define _PEP3333_StringFromFormat(...) PyUnicode_FromFormat(__VA_ARGS__)
 #define _PEP3333_String_FromUTF8String(data) PyUnicode_FromString(data)
 #define _PEP3333_String_FromLatin1StringAndSize(data, len) PyUnicode_DecodeLatin1(data, len, "replace")
-#define _PEP3333_String_GET_SIZE(u) PyUnicode_GET_LENGTH(u)
 #define _PEP3333_String_Concat(u1, u2) PyUnicode_Concat(u1, u2)
 
 

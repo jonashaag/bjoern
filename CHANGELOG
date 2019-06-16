@@ -4,6 +4,7 @@ CHANGELOG
 4.0.0rc2 (June 2019)
     - refactor server info (so it has not to be in every request)
     - make it Python4/5 friendly
+    - refactor run_server: make it more C than Python C-API
 
 4.0.0rc1 (June 2019)
     - added Travis CI support

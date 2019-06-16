@@ -78,41 +78,18 @@ def bind_and_listen(
     return sock
 
 
-def server_run(sock, wsgi_app, max_body_len, max_header_fields, max_header_field_len):
+def server_run(
+    sockfd, host, port, wsgi_app, max_body_len, max_header_fields, max_header_field_len
+):
     _bjoern.server_run(
-        sock, wsgi_app, max_body_len, max_header_fields, max_header_field_len
+        sockfd,
+        host,
+        port,
+        wsgi_app,
+        max_body_len,
+        max_header_fields,
+        max_header_field_len,
     )
-
-
-def setup_console_logging(log_level_):
-    console_log = logging.getLogger(f("bjoern.console"))
-    console_log.setLevel(log_level_)
-
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setLevel(log_level_)
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    handler.setFormatter(formatter)
-    console_log.addHandler(handler)
-    return console_log
-
-
-def setup_file_logging(log_level_, log_file_):
-    file_log = logging.getLogger(f("bjoern.file"))
-    file_log.setLevel(log_level_)
-
-    if log_file_ == "-" or log_file_ is None:
-        return
-    else:
-        handler = logging.FileHandler(log_file_)
-    handler.setLevel(log_level_)
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    handler.setFormatter(formatter)
-    file_log.addHandler(handler)
-    return file_log
 
 
 def listen(
@@ -221,7 +198,13 @@ def run(
     try:
         trace_on_abort()
         server_run(
-            sock, wsgi_app, max_body_len, max_header_fields, max_header_field_len
+            sock.fileno(),
+            sock.getsockname()[0] if sock.getsockname()[0] is not None else "",
+            sock.getsockname()[1] if sock.getsockname()[1] is not None else -1,
+            wsgi_app,
+            max_body_len,
+            max_header_fields,
+            max_header_field_len,
         )
     except Exception as e:
         print("Something wrong in the worker: {}".format(e))

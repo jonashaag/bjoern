@@ -10,7 +10,7 @@ static PyObject *
 run(PyObject *self, PyObject *args) {
     ServerInfo info;
 
-    if (!PyArg_ParseTuple(args, "isiOiii:server_run",
+    if (!PyArg_ParseTuple(args, "isiOnnn:server_run",
                           &info.sockfd,
                           &info.host,
                           &info.port,
@@ -21,7 +21,7 @@ run(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    // Action starts
+    // Initialize requests and run the server
     set_server_info(&info);
     _initialize_request_module();
     server_run();
