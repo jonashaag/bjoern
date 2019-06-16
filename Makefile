@@ -136,7 +136,7 @@ fmt:
 	@$(PYTHON36) -m isort --settings-path=/.isort.cfg **/*.py
 	@$(PYTHON36) -m black .
 
-prepare-build: fmt
+prepare-build:
 	@mkdir -p $(BUILD_DIR)
 
 clean:
