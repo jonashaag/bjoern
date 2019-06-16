@@ -103,7 +103,7 @@ print-env:
 
 _bjoernmodule_35:
 	@$(CC) $(CPPFLAGS_35) $(CFLAGS) $(LDFLAGS_35) $(objects) -o $(BUILD_DIR)/_bjoern.so -lev
-	@PYTHONPATH=$$PYTHONPATH:$(BUILD_DIR) $(PYTHON35) -c 'import bjoern;print("Bjoern version: {}".format(bjoern.__version__);'
+	@PYTHONPATH=$$PYTHONPATH:$(BUILD_DIR) $(PYTHON35) -c 'import bjoern;print("Bjoern version: {}".format(bjoern.__version__));'
 
 _bjoernmodule_36:
 	@$(CC) $(CPPFLAGS_36) $(CFLAGS) $(LDFLAGS_36) $(objects) -o $(BUILD_DIR)/_bjoern.so -lev
