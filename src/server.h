@@ -6,12 +6,12 @@
 
 typedef struct {
     int sockfd;
-    PyObject *max_body_len;
-    PyObject *max_header_fields;
-    PyObject *max_header_field_len;
+    size_t max_body_len;
+    size_t max_header_fields;
+    size_t max_header_field_len;
     PyObject *wsgi_app;
-    PyObject *host;
-    PyObject *port;
+    const char *host;
+    int port;
 } ServerInfo;
 
 ServerInfo *get_server_info();
