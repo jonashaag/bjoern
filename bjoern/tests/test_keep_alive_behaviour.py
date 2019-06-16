@@ -112,12 +112,8 @@ def test_keep_alive_behaviour_app(keep_alive_behaviour_app):
     def _is_chunked(r, d):
         headers = r.getheaders()
         if not any(f == "Transfer-Encoding" and v == "chunked" for f, v in headers):
-            print(f"Missing transfer-encoding header: {headers}")
             suffix = b"0\r\n\r\n"
             if not d.endswith(suffix):
-                print(
-                    f"Missing transfer-encoding header and not finalizing with: {suffix}"
-                )
                 return False
 
         return True

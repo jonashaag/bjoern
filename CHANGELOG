@@ -3,8 +3,9 @@ CHANGELOG
 
 4.0.0rc2 (June 2019)
     - refactor server info (so it has not to be in every request)
-    - make it Python4/5 friendly
+    - make it Python3.5 friendly, and added tests to Travis for Debian Stretch stock python
     - refactor run_server: make it more C than Python C-API
+    - Minor Travis docker improvements
 
 4.0.0rc1 (June 2019)
     - added Travis CI support

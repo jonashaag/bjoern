@@ -6,7 +6,7 @@ from io import BytesIO
 import pytest
 from bjoern.tests.conftest import _run_app
 
-FILES: dict = {"big": None, "small": None}
+FILES = {"big": None, "small": None}
 
 with open("/dev/urandom", "rb") as source:
     FILES["big"] = (BytesIO(source.read(512 * 1024 * 1024)), 512 * 1024 * 1024)

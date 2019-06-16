@@ -9,7 +9,7 @@ import pytest
 
 
 class TestClient:
-    base_url: str = "http://127.0.0.1:8080"
+    base_url = "http://127.0.0.1:8080"
 
     def get(self, path="/", params=None, headers=None, **kwargs):
         _headers = {}
@@ -19,9 +19,11 @@ class TestClient:
 
         if params and len(params):
             uri_params = "&".join([k + "=" + str(v) for k, v in params.items()])
-            path = f"{path}?{uri_params}"
+            path = "{}?{}".format(path, uri_params)
 
-        return requests.get(f"{self.base_url}{path}", headers=_headers, **kwargs)
+        return requests.get(
+            "{}{}".format(self.base_url, path), headers=_headers, **kwargs
+        )
 
     def post(self, path="/", json=None, data=None, headers=None):
         headers_ = {"Content-Type": "application/x-www-form-urlencoded"}
@@ -33,7 +35,9 @@ class TestClient:
         if headers is not None:
             headers_.update(headers)
 
-        return requests.post(f"{self.base_url}{path}", data=data, headers=headers_)
+        return requests.post(
+            "{}{}".format(self.base_url, path), data=data, headers=headers_
+        )
 
 
 @pytest.fixture

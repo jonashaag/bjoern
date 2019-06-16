@@ -13,7 +13,7 @@ def env_app():
         start_response("200 yo", [("Content-Type", "application/json")])
         env_ = {}
         # Avoid variable and non json serializable
-        env_["wsgi.input"] = f"{env['wsgi.input'].read()}"
+        env_["wsgi.input"] = "{}".format(env["wsgi.input"].read())
         env_["wsgi.errors"] = "wsgi.errors" in env
         env_["wsgi.file_wrapper"] = "wsgi.file_wrapper" in env
         env_["wsgi.version"] = list(env["wsgi.version"])

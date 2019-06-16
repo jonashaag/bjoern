@@ -147,14 +147,14 @@ clean:
 	@rm -f /tmp/*.tmp
 
 # Test
-test-35: fmt clean reqs-36 install-debug-35
+test-35: clean reqs-35 install-debug-35
 	@$(PYTHON35) -m pytest
 
 # Test
-test-36: fmt clean reqs-36 install-debug-36
+test-36: clean reqs-36 install-debug-36
 	@$(PYTHON36) -m pytest
 
-test-37: fmt clean reqs-37 install-debug-37
+test-37: clean reqs-37 install-debug-37
 	@$(PYTHON37) -m pytest
 
 test: test-37 test-36

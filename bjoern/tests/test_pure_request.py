@@ -47,7 +47,6 @@ def test_pure_request(pure_app):
     counter = 1
     for msg in msgs:
         time.sleep(0.1)
-        print(f"Sending msg({counter}): {msg}")
         try:
             conn.send(msg.encode())
         except (ConnectionResetError, BrokenPipeError):
@@ -60,7 +59,6 @@ def test_pure_request(pure_app):
                 assert counter in (5, 6)
                 break
             else:
-                print(f"Received data({counter}): {data}")
                 if not data:
                     break
                 if data.endswith(b"0\r\n\r\n"):

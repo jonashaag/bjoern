@@ -8,7 +8,7 @@ from flask import Flask, jsonify, request
 from bjoern.tests.conftest import _run_app
 
 with open("bjoern/tests/charlie.jpg", "rb") as f:
-    raw_data: bytes = f.read()
+    raw_data = f.read()
     data = base64.b64encode(raw_data).decode()
 
 
