@@ -65,7 +65,7 @@ yum install libev-devel
 pip install bjoern
 ```
 
-For CPython2.7 or CPython<3.6
+For CPython2.7 or CPython<3.5
 
 ```bash
 pip install bjoern<4.0
