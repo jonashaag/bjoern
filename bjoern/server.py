@@ -5,6 +5,7 @@ import socket
 import sys
 
 import _bjoern
+
 from bjoern import (
     DEFAULT_LISTEN_BACKLOG,
     DEFAULT_MAX_BODY_LEN,
@@ -84,7 +85,7 @@ def server_run(sock, wsgi_app, max_body_len, max_header_fields, max_header_field
 
 
 def setup_console_logging(log_level_):
-    console_log = logging.getLogger(f"bjoern.console")
+    console_log = logging.getLogger(f("bjoern.console"))
     console_log.setLevel(log_level_)
 
     handler = logging.StreamHandler(sys.stdout)
@@ -98,7 +99,7 @@ def setup_console_logging(log_level_):
 
 
 def setup_file_logging(log_level_, log_file_):
-    file_log = logging.getLogger(f"bjoern.file")
+    file_log = logging.getLogger(f("bjoern.file"))
     file_log.setLevel(log_level_)
 
     if log_file_ == "-" or log_file_ is None:
@@ -168,22 +169,38 @@ def run(
     gid = os.getgid()
 
     info = (
-        f"Booting Bjoern with params:\n"
-        f"- WSGI: {type(wsgi_app)} \n"
-        f"- host: {host} \n"
-        f"- port: {port} \n"
-        f"- reuse_port: {reuse_port} \n"
-        f"- listen_backlog: {listen_backlog} \n"
-        f"- pid: {pid} \n"
-        f"- uid: {uid} \n"
-        f"- gid: {gid} \n"
-        f"- tcp_keepalive: {tcp_keepalive} \n"
-        f"- tcp_nodelay: {tcp_nodelay} \n"
-        f"- max_body_len: {max_body_len} \n"
-        f"- max_header_fields: {max_header_fields} \n"
-        f"- max_header_field_len: {max_header_field_len} \n"
-        f"- fd: {fileno} \n"
-        f"- executable: {sys.executable} \n"
+        "Booting Bjoern with params:\n"
+        "- WSGI: {} \n"
+        "- host: {} \n"
+        "- port: {} \n"
+        "- reuse_port: {} \n"
+        "- listen_backlog: {} \n"
+        "- pid: {} \n"
+        "- uid: {} \n"
+        "- gid: {} \n"
+        "- tcp_keepalive: {} \n"
+        "- tcp_nodelay: {} \n"
+        "- max_body_len: {} \n"
+        "- max_header_fields: {} \n"
+        "- max_header_field_len: {} \n"
+        "- fd: {} \n"
+        "- executable: {} \n"
+    ).format(
+        type(wsgi_app),
+        host,
+        port,
+        reuse_port,
+        listen_backlog,
+        pid,
+        uid,
+        gid,
+        tcp_keepalive,
+        tcp_nodelay,
+        max_body_len,
+        max_header_fields,
+        max_header_field_len,
+        fileno,
+        sys.executable,
     )
     logging.info(info)
 
@@ -207,7 +224,7 @@ def run(
             sock, wsgi_app, max_body_len, max_header_fields, max_header_field_len
         )
     except Exception as e:
-        print(f"Something wrong in the worker: {e}")
+        print("Something wrong in the worker: {}".format(e))
     finally:
         if sock.family == socket.AF_UNIX:
             filename = sock.getsockname()
@@ -224,7 +241,7 @@ def trace_on_abort():
     def print_trace(sig, frame):
         trace = "".join(traceback.format_stack(frame))
         exec_info = sys.exc_info()
-        print(f"Trace ABORT: \n{trace} \n{exec_info}")
+        print("Trace ABORT: \n{} \n{}".format(trace, exec_info))
 
     signal.signal(signal.SIGABRT, print_trace)
 
