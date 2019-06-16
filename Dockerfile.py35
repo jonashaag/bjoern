@@ -42,7 +42,7 @@ RUN \
   rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m venv --system-site-packages /.py35-venv && \
-    /.py36-venv/bin/python -m pip install --upgrade \
+    /.py35-venv/bin/python -m pip install --upgrade \
         pip \
         setuptools\
         wheel \
