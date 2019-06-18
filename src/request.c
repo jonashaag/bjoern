@@ -36,9 +36,8 @@ void Request_reset(Request *request) {
     request->state.response_length_unknown = true;
     request->parser.last_call_was_header_value = true;
     request->parser.invalid_header = false;
-    request->parser.field = NULL;
-    request->parser.field = NULL;
     request->is_final = 0;
+    request->parser.field = NULL;
     request->thread_info->header_fields = 0;
     request->thread_info->payload_size = 0;
 }
@@ -68,14 +67,13 @@ void Request_clean(Request *request) {
     Py_XDECREF(request->iterator);
     Py_XDECREF(request->headers);
     Py_XDECREF(request->status);
-    Py_XDECREF(request->parser.field);
 }
 
 /* Parse stuff */
 void Request_parse(Request *request, const char *data, const size_t data_len) {
     assert(data_len);
     http_parser_execute((http_parser *) &request->parser,
-                                         &parser_settings, data, data_len);
+                        &parser_settings, data, data_len);
     if (request->parser.parser.http_major == 2) {
         request->state.error_code = HTTP_STATUS_HTTP_VERSION_NOT_SUPPORTED;
     }
@@ -166,9 +164,7 @@ static int
 on_header_field(http_parser *parser, const char *field, size_t len) {
     if (PARSER->last_call_was_header_value) {
         /* We are starting a new header */
-        Py_XDECREF(PARSER->field);
-        Py_INCREF(_HTTP_);
-        PARSER->field = _HTTP_;
+        PARSER->field = "";
         PARSER->last_call_was_header_value = false;
         PARSER->invalid_header = false;
     }
@@ -202,6 +198,7 @@ on_header_field(http_parser *parser, const char *field, size_t len) {
             field_processed[i] = c;
         }
     }
+    field_processed[len] = '\0';
 
     /* Check if too many fields */
     if (REQUEST->thread_info->header_fields == SERVER_INFO->max_header_fields) {
@@ -212,11 +209,10 @@ on_header_field(http_parser *parser, const char *field, size_t len) {
     }
 
     /* Append field name to the part we got from previous call */
-    PyObject *field_old = PARSER->field;
-    PyObject *field_new = _PEP3333_String_FromLatin1StringAndSize(field_processed, len);
-    PARSER->field = _PEP3333_String_Concat(field_old, field_new);
-    Py_DECREF(field_old);
-    Py_DECREF(field_new);
+    char *field_new;
+    if (asprintf(&field_new, "%s%s", PARSER->field, field_processed) == -1)
+        return 1;  // Memory likely to be exhausted
+    PARSER->field = field_new;
 
     return PARSER->field == NULL;
 }
@@ -233,9 +229,14 @@ on_header_value(http_parser *parser, const char *value, size_t len) {
         return 1;
     }
     PARSER->last_call_was_header_value = true;
+    char *http_new;
+    if (asprintf(&http_new, "HTTP_%s", PARSER->field) == -1)
+        return 1;  // Memory likely to be exhausted
     if (!PARSER->invalid_header) {
         /* Set header, or append data to header if this is not the first call */
-        _set_or_append_header(REQUEST->headers, PARSER->field, value, len);
+        _set_or_append_header(REQUEST->headers,
+                              _PEP3333_String_FromLatin1StringAndSize(http_new, strlen(http_new)), value,
+                              len);
     }
     /* If we are just keeping alive, make counter 0 */
     if (strncmp("Keep-Alive", value, 10) == 0) {

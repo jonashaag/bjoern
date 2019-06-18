@@ -36,6 +36,7 @@ def test_env_app(env_app, client):
     assert response.status_code == 200
     assert response.reason == "yo"
     j_response = response.json()
+    print(j_response)
     user_agent = j_response.pop("HTTP_USER_AGENT")
     assert "python-requests" in user_agent
     assert j_response == {
