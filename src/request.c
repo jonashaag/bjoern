@@ -13,9 +13,9 @@ static PyObject *wsgi_base_dict = NULL;
 
 static PyObject *IO_module;
 
-Request *Request_new(ThreadInfo *thread_info, int client_fd, const char *client_addr) {
+Request *Request_new(ThreadInfo *thread_info, int client_fd, char *client_addr) {
     Request *request = malloc(sizeof(Request));
-    if (result == NULL)
+    if (request == NULL)
         return NULL;  // No more memory?
 #ifdef DEBUG
     static unsigned long request_id = 0;
@@ -23,7 +23,7 @@ Request *Request_new(ThreadInfo *thread_info, int client_fd, const char *client_
 #endif
     request->thread_info = thread_info;
     request->client_fd = client_fd;
-    request->client_addr = _PEP3333_String_FromUTF8String(client_addr);
+    request->client_addr = client_addr;
     http_parser_init((http_parser *) &request->parser, HTTP_REQUEST);
     http_parser_url_init(&request->parser.url_parser);
     request->parser.parser.data = request;
@@ -47,7 +47,6 @@ void Request_reset(Request *request) {
 
 void Request_free(Request *request) {
     Request_clean(request);
-    Py_DECREF(request->client_addr);
     free(request);
 }
 
@@ -69,11 +68,10 @@ void Request_clean(Request *request) {
     }
     Py_XDECREF(request->iterator);
     Py_XDECREF(request->headers);
-    Py_XDECREF(request->status);
 }
 
 /* Parse stuff */
-void Request_parse(Request *request, const char *data, const size_t data_len) {
+void Request_parse(Request *request, char *data, size_t data_len) {
     assert(data_len);
     http_parser_execute((http_parser *) &request->parser,
                         &parser_settings, data, data_len);
@@ -304,13 +302,13 @@ on_message_complete(http_parser *parser) {
         /* I love useless micro-optimizations. */
         _set_header(_REQUEST_METHOD, _GET);
     } else {
-        _set_header_free_value(_REQUEST_METHOD,
-                               _PEP3333_String_FromUTF8String(http_method_str(parser->method))
+        _set_header(_REQUEST_METHOD,
+                    _PEP3333_String_FromUTF8String(http_method_str(parser->method))
         );
     }
 
     /* REMOTE_ADDR */
-    _set_header(_REMOTE_ADDR, REQUEST->client_addr);
+    _set_header(_REMOTE_ADDR, _PEP3333_String_FromUTF8String(REQUEST->client_addr));
 
     PyObject *body = PyDict_GetItem(REQUEST->headers, _wsgi_input);
     if (body) {

@@ -117,8 +117,7 @@ wsgi_call_application(Request *request) {
     }
 
     /* Special-case HTTP 204 and 304 */
-    if (!strncmp(_PEP3333_Bytes_AS_DATA(request->status), "204", 3) ||
-        !strncmp(_PEP3333_Bytes_AS_DATA(request->status), "304", 3)) {
+    if (strncmp(request->status, "204", 3) == 0 || strncmp(request->status, "304", 3) == 0) {
         request->state.response_length_unknown = false;
     }
 
@@ -225,7 +224,7 @@ inspect_headers(Request *request) {
 static void
 wsgi_getheaders(Request *request, PyObject **buf, Py_ssize_t *length) {
     Py_ssize_t length_upperbound =
-            strlen("HTTP/1.1 ") + _PEP3333_Bytes_GET_SIZE(request->status) + strlen("\r\nConnection: Keep-Alive") +
+            strlen("HTTP/1.1 ") + strlen(request->status) + strlen("\r\nConnection: Keep-Alive") +
             strlen("\r\nTransfer-Encoding: chunked") + strlen("\r\n\r\n");
     for (Py_ssize_t i = 0; i < PyList_GET_SIZE(request->headers); ++i) {
         PyObject *tuple = PyList_GET_ITEM(request->headers, i);
@@ -235,6 +234,7 @@ wsgi_getheaders(Request *request, PyObject **buf, Py_ssize_t *length) {
                 strlen("\r\n") + _PEP3333_Bytes_GET_SIZE(field) + strlen(": ") + _PEP3333_Bytes_GET_SIZE(value);
     }
 
+    // TODO this can be a simple char[length_upperbound]
     PyObject *bufobj = _PEP3333_Bytes_FromStringAndSize(NULL, length_upperbound);
     char *bufp = (char *) _PEP3333_Bytes_AS_DATA(bufobj);
 
@@ -248,8 +248,7 @@ wsgi_getheaders(Request *request, PyObject **buf, Py_ssize_t *length) {
 
     /* First line, e.g. "HTTP/1.1 200 Ok" */
     buf_write2("HTTP/1.1 ");
-    buf_write(_PEP3333_Bytes_AS_DATA(request->status),
-              _PEP3333_Bytes_GET_SIZE(request->status));
+    buf_write2(request->status);
 
     /* Headers, from the `request->headers` mapping.
      * [("Header1", "value1"), ("Header2", "value2")]
@@ -321,15 +320,15 @@ start_response(PyObject *self, PyObject *args, PyObject *kwargs) {
     if (request->state.start_response_called) {
         /* not the first call of start_response --
          * throw away any previous status and headers. */
-        Py_CLEAR(request->status);
         Py_CLEAR(request->headers);
         request->state.response_length_unknown = true;
     }
 
     PyObject *exc_info = NULL;
-    PyObject *status_unicode = NULL;
-    if (!PyArg_UnpackTuple(args, "start_response", 2, 3, &status_unicode, &request->headers, &exc_info))
+    if (!PyArg_ParseTuple(args, "sO|O", &request->status, &request->headers, &exc_info)) {
+        PyErr_SetString(PyExc_TypeError, "'start_response' bad arguments");
         return NULL;
+    }
 
     if (exc_info && exc_info != Py_None) {
         if (!PyTuple_Check(exc_info) || PyTuple_GET_SIZE(exc_info) != 3) {
@@ -351,20 +350,6 @@ start_response(PyObject *self, PyObject *args, PyObject *kwargs) {
     } else if (request->state.start_response_called) {
         PyErr_SetString(PyExc_TypeError, "'start_response' called twice without "
                                          "passing 'exc_info' the second time");
-        return NULL;
-    }
-
-    request->status = _PEP3333_BytesLatin1_FromUnicode(status_unicode);
-    if (request->status == NULL) {
-        return NULL;
-    } else if (_PEP3333_Bytes_GET_SIZE(request->status) < 3) {
-        PyErr_SetString(PyExc_ValueError, "'status' must be 3-digit");
-        Py_CLEAR(request->status);
-        return NULL;
-    }
-
-    if (!inspect_headers(request)) {
-        request->headers = NULL;
         return NULL;
     }
 
