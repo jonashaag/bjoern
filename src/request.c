@@ -15,6 +15,8 @@ static PyObject *IO_module;
 
 Request *Request_new(ThreadInfo *thread_info, int client_fd, const char *client_addr) {
     Request *request = malloc(sizeof(Request));
+    if (result == NULL)
+        return NULL;  // No more memory?
 #ifdef DEBUG
     static unsigned long request_id = 0;
     request->id = request_id++;

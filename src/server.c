@@ -126,6 +126,7 @@ ev_signal_on_sigint(struct ev_loop* mainloop, ev_signal* watcher, const int even
   /* Clean up and shut down this thread.
    * (Shuts down the Python interpreter if this is the main thread) */
   ev_cleanup* cleanup_watcher = malloc(sizeof(ev_cleanup));
+  assert(cleanup_watcher); // No more juicy memory?
   ev_cleanup_init(cleanup_watcher, pyerr_set_interrupt);
   ev_cleanup_start(mainloop, cleanup_watcher);
 
@@ -173,6 +174,10 @@ ev_io_on_request(struct ev_loop *mainloop, ev_io *watcher, const int events) {
             client_fd,
             inet_ntoa(sockaddr.sin_addr)
     );
+    if (request == NULL) {
+        DBG("Could not create a new request: errno %d", errno);
+        return;
+    }
 
     GIL_UNLOCK(0);
 

@@ -1,6 +1,9 @@
 CHANGELOG
 =========
 
+4.0.0rc3 (June 2019)
+    - refactor thread info
+
 4.0.0rc2 (June 2019)
     - refactor server info (so it has not to be in every request)
     - make it Python3.5 friendly, and added tests to Travis for Debian Stretch stock python
