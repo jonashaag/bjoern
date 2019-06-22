@@ -234,7 +234,6 @@ wsgi_getheaders(Request *request, PyObject **buf, Py_ssize_t *length) {
                 strlen("\r\n") + _PEP3333_Bytes_GET_SIZE(field) + strlen(": ") + _PEP3333_Bytes_GET_SIZE(value);
     }
 
-    // TODO this can be a simple char[length_upperbound]
     PyObject *bufobj = _PEP3333_Bytes_FromStringAndSize(NULL, length_upperbound);
     char *bufp = (char *) _PEP3333_Bytes_AS_DATA(bufobj);
 
