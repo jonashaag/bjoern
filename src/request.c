@@ -13,7 +13,7 @@ static PyObject *wsgi_base_dict = NULL;
 
 static PyObject *IO_module;
 
-Request *Request_new(ThreadInfo *thread_info, int client_fd, char *client_addr) {
+Request *Request_new(ThreadInfo *thread_info, int client_fd, const char *client_addr) {
     Request *request = malloc(sizeof(Request));
     if (request == NULL)
         return NULL;  // No more memory?
@@ -71,7 +71,7 @@ void Request_clean(Request *request) {
 }
 
 /* Parse stuff */
-void Request_parse(Request *request, char *data, size_t data_len) {
+void Request_parse(Request *request, const char *data, const size_t data_len) {
     assert(data_len);
     http_parser_execute((http_parser *) &request->parser,
                         &parser_settings, data, data_len);
@@ -211,7 +211,7 @@ on_header_field(http_parser *parser, const char *field, size_t len) {
 
     /* Append field name to the part we got from previous call */
     char *field_new = concat_str(PARSER->field, field_processed);
-    if (strcmp(PARSER->field, "") != 0)
+    if (strcmp(PARSER->field, ""))
         free(PARSER->field);
     if (field_new == NULL) {
         return 1;  // Memory likely to be exhausted
@@ -238,6 +238,7 @@ on_header_value(http_parser *parser, const char *value, size_t len) {
         return 1;  // Memory likely to be exhausted
     if (!PARSER->invalid_header) {
         /* Set header, or append data to header if this is not the first call */
+        fprintf(stderr, "SET HEADER: %s:%s", http_new, value);
         _set_or_append_header(REQUEST->headers,
                               _PEP3333_String_FromLatin1StringAndSize(http_new, strlen(http_new)), value,
                               len);
@@ -245,7 +246,7 @@ on_header_value(http_parser *parser, const char *value, size_t len) {
     free(http_new);
 
     /* If we are just keeping alive, make counter 0 */
-    if (strncmp("Keep-Alive", value, 10) == 0) {
+    if (!strncmp("Keep-Alive", value, 10)) {
         REQUEST->thread_info->header_fields = 0;
     }
     return 0;
@@ -298,14 +299,7 @@ on_message_complete(http_parser *parser) {
     _set_header(_SERVER_PROTOCOL, parser->http_minor == 1 ? _HTTP_1_1 : _HTTP_1_0);
 
     /* REQUEST_METHOD */
-    if (parser->method == HTTP_GET) {
-        /* I love useless micro-optimizations. */
-        _set_header(_REQUEST_METHOD, _GET);
-    } else {
-        _set_header(_REQUEST_METHOD,
-                    _PEP3333_String_FromUTF8String(http_method_str(parser->method))
-        );
-    }
+    _set_header(_REQUEST_METHOD, _PEP3333_String_FromUTF8String(http_method_str(parser->method)));
 
     /* REMOTE_ADDR */
     _set_header(_REMOTE_ADDR, _PEP3333_String_FromUTF8String(REQUEST->client_addr));

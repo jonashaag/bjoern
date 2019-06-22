@@ -117,7 +117,7 @@ wsgi_call_application(Request *request) {
     }
 
     /* Special-case HTTP 204 and 304 */
-    if (strncmp(request->status, "204", 3) == 0 || strncmp(request->status, "304", 3) == 0) {
+    if (!strncmp(request->status, "204", 3) || !strncmp(request->status, "304", 3)) {
         request->state.response_length_unknown = false;
     }
 
@@ -350,6 +350,11 @@ start_response(PyObject *self, PyObject *args, PyObject *kwargs) {
     } else if (request->state.start_response_called) {
         PyErr_SetString(PyExc_TypeError, "'start_response' called twice without "
                                          "passing 'exc_info' the second time");
+        return NULL;
+    }
+
+    if (!inspect_headers(request)) {
+        request->headers = NULL;
         return NULL;
     }
 

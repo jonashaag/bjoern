@@ -1,7 +1,7 @@
 import os
 import subprocess
 
-__version__ = "4.0.0rc3"
+__version__ = "4.0.0rc4"
 MAX_LISTEN_BACKLOG = int(
     subprocess.run(["cat", "/proc/sys/net/core/somaxconn"], stdout=subprocess.PIPE)
     .stdout.decode()

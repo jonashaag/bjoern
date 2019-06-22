@@ -41,8 +41,8 @@ typedef struct {
 #endif
     int client_fd;
     int is_final;
-    char *status;
-    char *client_addr;
+    const char *status;
+    const char *client_addr;
 
     bj_parser parser;
     ev_io ev_watcher;
@@ -60,9 +60,9 @@ typedef struct {
 #define REQUEST_FROM_WATCHER(watcher) \
   (Request*)((size_t)watcher - (size_t)(&(((Request*)NULL)->ev_watcher)));
 
-Request *Request_new(ThreadInfo *, int client_fd, char *client_addr);
+Request *Request_new(ThreadInfo *, int client_fd, const char *client_addr);
 
-void Request_parse(Request *, char *, size_t);
+void Request_parse(Request *, const char *, const size_t);
 
 void Request_reset(Request *);
 
