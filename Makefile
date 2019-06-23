@@ -53,7 +53,7 @@ CC 				:= gcc
 CPPFLAGS_35		+= $(PYTHON35_INCLUDE) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR)
 CPPFLAGS_36		+= $(PYTHON36_INCLUDE) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR)
 CPPFLAGS_37		+= $(PYTHON37_INCLUDE) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR)
-CFLAGS			+= $(FEATURES) -std=c99 -fno-strict-aliasing -fcommon -fPIC -Wall -D DEBUG
+CFLAGS			+= $(FEATURES) -std=c11 -fno-strict-aliasing -fcommon -fPIC -Wall -D DEBUG
 LDFLAGS_35		+= $(PYTHON35_LDFLAGS) -shared -fcommon
 LDFLAGS_36		+= $(PYTHON36_LDFLAGS) -shared -fcommon
 LDFLAGS_37		+= $(PYTHON37_LDFLAGS) -shared -fcommon
@@ -89,7 +89,7 @@ setup-36: clean prepare-build reqs-36
 setup-37: clean prepare-build reqs-37
 
 all-35: setup-35 $(objects) _bjoernmodule_35 test-35
-all-36: setup-36 $(objects) _bjoernmodule_36 test-36
+all-36: setup-36 $(objects) _bjoernmodule_36 #test-36
 all-37: setup-36 $(objects) _bjoernmodule_37 test-37
 
 print-env:

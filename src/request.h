@@ -43,6 +43,7 @@ typedef struct {
     int is_final;
     const char *status;
     const char *client_addr;
+    char *io_buffer;
 
     bj_parser parser;
     ev_io ev_watcher;

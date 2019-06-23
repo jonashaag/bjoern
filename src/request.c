@@ -24,6 +24,10 @@ Request *Request_new(ThreadInfo *thread_info, int client_fd, const char *client_
     request->thread_info = thread_info;
     request->client_fd = client_fd;
     request->client_addr = client_addr;
+    request->is_final = 0;
+    BUFFER_CREATE(request->io_buffer);
+    if (request->io_buffer == NULL)
+        return NULL; // memento
     http_parser_init((http_parser *) &request->parser, HTTP_REQUEST);
     http_parser_url_init(&request->parser.url_parser);
     request->parser.parser.data = request;
@@ -53,6 +57,8 @@ void Request_free(Request *request) {
 /* Close and DECREF all the Python objects in Request.
    Request_reset should be called after this if connection keep alive */
 void Request_clean(Request *request) {
+    if (request->io_buffer != NULL)
+        BUFFER_DESTROY(request->io_buffer);
     if (request->iterable) {
         /* Call 'iterable.close()' if available */
         PyObject *close_method = PyObject_GetAttr(request->iterable, _close);
@@ -238,7 +244,6 @@ on_header_value(http_parser *parser, const char *value, size_t len) {
         return 1;  // Memory likely to be exhausted
     if (!PARSER->invalid_header) {
         /* Set header, or append data to header if this is not the first call */
-        fprintf(stderr, "SET HEADER: %s:%s", http_new, value);
         _set_or_append_header(REQUEST->headers,
                               _PEP3333_String_FromLatin1StringAndSize(http_new, strlen(http_new)), value,
                               len);
@@ -257,36 +262,27 @@ on_body(http_parser *parser, const char *data, const size_t len) {
     if (REQUEST->is_final) {
         return 0;
     }
-
     if (REQUEST->thread_info->payload_size + len > SERVER_INFO->max_body_len) {
         REQUEST->state.error_code = HTTP_STATUS_PAYLOAD_TOO_LARGE;
         return 1;
     } else {
         REQUEST->thread_info->payload_size += len;
     }
-
-    PyObject *body;
-    body = PyDict_GetItem(REQUEST->headers, _wsgi_input);
-    if (body == NULL) {
-        if (!parser->content_length && !parser->http_minor && !(parser->flags & F_CHUNKED)) {
-            REQUEST->state.error_code = HTTP_STATUS_LENGTH_REQUIRED;
-            return 1;
-        }
-        body = PyObject_CallMethodObjArgs(IO_module, _BytesIO, NULL);
-        if (body == NULL) {
-            return 1;
-        }
-        _set_header_free_value(_wsgi_input, body);
+    if (!BUFFER_SIZE(REQUEST->io_buffer) && !parser->content_length && !parser->http_minor &&
+        !(parser->flags & F_CHUNKED)) {
+        REQUEST->state.error_code = HTTP_STATUS_LENGTH_REQUIRED;
+        return 1;
     }
 
-    PyObject *temp_data = _PEP3333_Bytes_FromStringAndSize(data, len);
-    PyObject *tmp = PyObject_CallMethodObjArgs(body, _write, temp_data, NULL);
-    if (PyErr_Occurred()) PyErr_Print();
+    /* Write data to request buffer */
+    BUFFER_PUSH(REQUEST->io_buffer, data);
+    if (REQUEST->io_buffer == NULL)
+        return 1; // out of capacity
 
-    Py_DECREF(tmp); /* Never throw away return objects from py-api */
-    Py_DECREF(temp_data);
     REQUEST->is_final = http_body_is_final(parser);
+
     return 0;
+
 }
 
 static int
@@ -304,17 +300,20 @@ on_message_complete(http_parser *parser) {
     /* REMOTE_ADDR */
     _set_header(_REMOTE_ADDR, _PEP3333_String_FromUTF8String(REQUEST->client_addr));
 
-    PyObject *body = PyDict_GetItem(REQUEST->headers, _wsgi_input);
-    if (body) {
-        /* first do a seek(0) and then read() returns all data */
+    PyObject *body = PyObject_CallMethodObjArgs(IO_module, _BytesIO, NULL);
+    if (BUFFER_SIZE(REQUEST->io_buffer)) {
+        /* Request has body */
+        PyObject *temp_data = _PEP3333_Bytes_FromStringAndSize(REQUEST->io_buffer, BUFFER_SIZE(REQUEST->io_buffer));
+        PyObject *tmp = PyObject_CallMethodObjArgs(body, _write, temp_data, NULL);
         PyObject *buf = PyObject_CallMethodObjArgs(body, _seek, _FromLong(0), NULL);
-        Py_DECREF(buf); /* Discard the return value */
-    } else {
-        /* Request has no body */
-        body = PyObject_CallMethodObjArgs(IO_module, _BytesIO, NULL);
-        _set_header_free_value(_wsgi_input, body);
-    }
 
+        Py_DECREF(buf); /* Discard the return value */
+        if (PyErr_Occurred()) PyErr_Print();
+
+        Py_DECREF(tmp); /* Never throw away return objects from py-api */
+        Py_DECREF(temp_data);
+    }
+    _set_header_free_value(_wsgi_input, body);
     PyDict_Update(REQUEST->headers, wsgi_base_dict);
 
     REQUEST->state.parse_finished = true;

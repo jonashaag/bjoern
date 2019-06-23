@@ -21,6 +21,8 @@ typedef struct {
 
 void _init_common(void);
 
+char *concat_str(const char *s1, const char *s2);
+
 PyObject *_REMOTE_ADDR, *_PATH_INFO, *_QUERY_STRING, *_REQUEST_METHOD, *_GET,
         *_HTTP_CONTENT_LENGTH, *_CONTENT_LENGTH, *_HTTP_CONTENT_TYPE,
         *_CONTENT_TYPE, *_SERVER_PROTOCOL, *_SERVER_NAME, *_SERVER_PORT,
@@ -51,6 +53,73 @@ PyObject *_REMOTE_ADDR, *_PATH_INFO, *_QUERY_STRING, *_REQUEST_METHOD, *_GET,
 #define assert(...) do{}while(0)
 #endif
 
-char *concat_str(const char *s1, const char *s2);
+// Expandable BUFFER for io input
+#define BUFFER_CHUNK_SIZE 16 * 1024
+#define BUFFER_CREATE(data) \
+    do { \
+        size_t *buf = malloc(3 * sizeof(size_t)); \
+        if (buf != NULL)  { \
+            buf[0] = 0; \
+            buf[1] = 0; \
+            buf[2] = 0; \
+            data = (char *) &buf[3]; \
+        } else { \
+            data = NULL; \
+        } \
+} while(0)
+
+#define BUFFER_DESTROY(data)    \
+    do { \
+        size_t *buf = ((size_t *) (data) - 3); \
+        free(buf); \
+        data = NULL; \
+    } while(0)
+
+#define BUFFER_LEN(BUFFER) (*((size_t *) BUFFER - 3))
+#define BUFFER_CAPACITY(BUFFER) (*((size_t *) BUFFER - 2)) * BUFFER_CHUNK_SIZE
+#define BUFFER_SIZE(BUFFER) (*((size_t *) BUFFER - 1))
+
+#define BUFFER_PUSH(data, value)\
+do { \
+    fprintf(stderr, "push: %zd:%zd \n\n", BUFFER_CAPACITY(data), strlen(value)); \
+    size_t *buf = ((size_t *) (data) - 3); \
+    fprintf(stderr, "push: %zd:%zd:%zd \n\n", buf[0], buf[1], buf[2]); \
+    buf[0] = buf[0] + 1; \
+    if(buf[1] == 0) { \
+         buf[1] = 1; \
+         buf[2] = strlen(value); \
+         fprintf(stderr, "realloc0: %zd\n", buf[2]); \
+         buf = realloc(buf, 3 * sizeof(size_t) + buf[1] * BUFFER_CHUNK_SIZE); \
+         if (buf != NULL)  { \
+            (data) = (char *) &buf[3]; \
+         } else { \
+             data = NULL; \
+         } \
+    } \
+    if(buf[0] > buf[1]) { \
+         buf[1] += 1; \
+         buf[2] += strlen(value); \
+         fprintf(stderr, "realloc1: %zd\n", buf[2]); \
+         buf = realloc(buf, 3 * sizeof(size_t) + buf[1] * BUFFER_CHUNK_SIZE); \
+         if (buf == NULL) { \
+            if (data != NULL) { \
+               fprintf(stderr, "destroy0:\n"); \
+               fprintf(stderr, "destroy0: %zd\n", BUFFER_CAPACITY(data)); \
+               BUFFER_DESTROY(data); \
+            } \
+            data = NULL; \
+         } else { \
+            (data) = (char *) &buf[3]; \
+         } \
+     } \
+    if (data != NULL && BUFFER_CAPACITY(data) < strlen(value)){ \
+        fprintf(stderr, "destroy1:\n"); \
+        fprintf(stderr, "destroy1: %zd\n", BUFFER_CAPACITY(data)); \
+        BUFFER_DESTROY(data); \
+        data = NULL; \
+    } \
+    if (data != NULL) \
+        data[buf[0] - 1] = (*((char *)(value))); \
+ } while(0)
 
 #endif
