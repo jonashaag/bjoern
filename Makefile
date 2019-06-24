@@ -89,7 +89,7 @@ setup-36: clean prepare-build reqs-36
 setup-37: clean prepare-build reqs-37
 
 all-35: setup-35 $(objects) _bjoernmodule_35 test-35
-all-36: setup-36 $(objects) _bjoernmodule_36 #test-36
+all-36: setup-36 $(objects) _bjoernmodule_36 test-36
 all-37: setup-36 $(objects) _bjoernmodule_37 test-37
 
 print-env:
