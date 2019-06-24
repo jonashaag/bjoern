@@ -2,7 +2,10 @@ CHANGELOG
 =========
 
 4.0.0rc4 (June 2019)
-    - refactor thread info
+    - Refactor GILs
+
+4.0.0rc4 (June 2019)
+    - add expandable buffer in C instead of hooking into IO_module for every chunk
 
 4.0.0rc3 (June 2019)
     - refactor thread info

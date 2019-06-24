@@ -98,4 +98,10 @@ typedef struct {
        } \
     } while(0)
 
+/* GIL */
+#define GIL_LOCK(n) PyGILState_STATE _gilstate_##n = PyGILState_Ensure()
+#define GIL_UNLOCK(n) PyGILState_Release(_gilstate_##n)
+
 #endif
+
+

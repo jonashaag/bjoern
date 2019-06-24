@@ -2,6 +2,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <ev.h>
+#include "common.h"
+#include "server.h"
 
 #if defined(__FreeBSD__) || defined(__DragonFly__)
 # include <netinet/in.h> /* for struct sockaddr_in */
@@ -26,8 +28,6 @@
 
 #define READ_BUFFER_SIZE 64*1024
 #define Py_XCLEAR(obj) do { if(obj) { Py_DECREF(obj); obj = NULL; } } while(0)
-#define GIL_LOCK(n) PyGILState_STATE _gilstate_##n = PyGILState_Ensure()
-#define GIL_UNLOCK(n) PyGILState_Release(_gilstate_##n)
 
 enum _rw_state {
     not_yet_done = 1,
@@ -202,8 +202,6 @@ ev_io_on_read(struct ev_loop *mainloop, ev_io *watcher, const int events) {
             READ_BUFFER_SIZE
     );
 
-    GIL_LOCK(0);
-
     if (read_bytes == 0) {
         /* Client disconnected */
         read_state = aborted;
@@ -229,6 +227,7 @@ ev_io_on_read(struct ev_loop *mainloop, ev_io *watcher, const int events) {
         } else if (request->state.parse_finished) {
             /* HTTP parse successful */
             read_state = done;
+            GIL_LOCK(0);
             bool wsgi_ok = wsgi_call_application(request);
             if (!wsgi_ok) {
                 /* Response is "HTTP 500 Internal Server Error" */
@@ -240,6 +239,7 @@ ev_io_on_read(struct ev_loop *mainloop, ev_io *watcher, const int events) {
                 request->current_chunk = http_error_message(request->parser.parser.http_minor,
                                                             HTTP_STATUS_INTERNAL_SERVER_ERROR);
             }
+            GIL_UNLOCK(0);
         } else {
             /* Wait for more data */
             read_state = not_yet_done;
@@ -260,8 +260,6 @@ ev_io_on_read(struct ev_loop *mainloop, ev_io *watcher, const int events) {
             close_connection(mainloop, request);
             break;
     }
-
-    GIL_UNLOCK(0);
 }
 
 static void

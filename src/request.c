@@ -90,18 +90,22 @@ void Request_parse(Request *request, const char *data, const size_t data_len) {
 #define PARSER  ((bj_parser*)parser)
 #define URL_PARSER  (((bj_parser*)parser)->url_parser)
 
-#define _set_header(k, v) PyDict_SetItem(REQUEST->headers, k, v);
+#define _set_header(k, v) \
+  do { \
+    PyDict_SetItem(REQUEST->headers, k, v); \
+} while(0)
 
 /* PyDict_SetItem() increases the ref-count for value */
 #define _set_header_free_value(k, v) \
   do { \
     PyObject* val = (v); \
-    _set_header(k, val); \
+    PyDict_SetItem(REQUEST->headers, k, v); \
     Py_DECREF(val); \
   } while(0)
 
 static void
 _set_or_append_header(PyObject *headers, PyObject *k, const char *val, size_t len) {
+    GIL_LOCK(0);
     PyObject *py_val = _PEP3333_String_FromLatin1StringAndSize(val, len);
     PyObject *py_val_old = PyDict_GetItem(headers, k);
 
@@ -113,6 +117,7 @@ _set_or_append_header(PyObject *headers, PyObject *k, const char *val, size_t le
         PyDict_SetItem(headers, k, py_val);
     }
     Py_DECREF(py_val);
+    GIL_UNLOCK(0);
 }
 
 static int
@@ -288,6 +293,7 @@ on_body(http_parser *parser, const char *data, const size_t len) {
 static int
 on_message_complete(http_parser *parser) {
     /* HTTP_CONTENT_{LENGTH,TYPE} -> CONTENT_{LENGTH,TYPE} */
+    GIL_LOCK(0);
     PyDict_ReplaceKey(REQUEST->headers, _HTTP_CONTENT_LENGTH, _CONTENT_LENGTH);
     PyDict_ReplaceKey(REQUEST->headers, _HTTP_CONTENT_TYPE, _CONTENT_TYPE);
 
@@ -300,6 +306,7 @@ on_message_complete(http_parser *parser) {
     /* REMOTE_ADDR */
     _set_header(_REMOTE_ADDR, _PEP3333_String_FromUTF8String(REQUEST->client_addr));
 
+    /* Write to IO_module */
     PyObject *body = PyObject_CallMethodObjArgs(IO_module, _BytesIO, NULL);
     if (REQUEST->io_buffer->size) {
         /* Request has body */
@@ -314,7 +321,10 @@ on_message_complete(http_parser *parser) {
         Py_DECREF(temp_data);
     }
     _set_header_free_value(_wsgi_input, body);
+
+    /* Update WSGI headers */
     PyDict_Update(REQUEST->headers, wsgi_base_dict);
+    GIL_UNLOCK(0);
 
     REQUEST->state.parse_finished = true;
 
