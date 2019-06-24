@@ -89,7 +89,7 @@ setup-36: clean prepare-build reqs-36
 setup-37: clean prepare-build reqs-37
 
 all-35: setup-35 $(objects) _bjoernmodule_35 test-35
-all-36: setup-36 $(objects) _bjoernmodule_36 #test-36
+all-36: setup-36 $(objects) _bjoernmodule_36 test-36
 all-37: setup-36 $(objects) _bjoernmodule_37 test-37
 
 print-env:
@@ -177,7 +177,7 @@ flask-ab-36: $(flask_bench_36) $(ab_post)
 	@echo -e "\n====== POST ======\n" | tee -a $(flask_bench_36)
 	@echo -e "\n~~~~~ Keep Alive ~~~~~\n" | tee -a $(flask_bench_36)
 	$(AB) -T 'application/x-www-form-urlencoded' -T 'Expect: 100-continue' -k -p $(ab_post) $(TEST_URL) | tee -a $(flask_bench_36)
-	@killall -9 $(PYTHON36)
+	@killall -9 $(PYTHON36) && sleep 2
 
 $(flask_gworker_bench_multi_36):
 	@$(GUNICORN36) bjoern.bench.flask_bench:app --bind localhost:8080 --log-level info -w 4 --backlog 2048 --timeout 1800 --worker-class bjoern.gworker.BjoernWorker &
@@ -192,7 +192,7 @@ flask-ab-gworker-multi-36: $(flask_gworker_bench_multi_36) $(ab_post)
 	@echo -e "\n====== POST ======\n" | tee -a $(flask_gworker_bench_multi_36)
 	@echo -e "\n~~~~~ Keep Alive ~~~~~\n" | tee -a $(flask_gworker_bench_multi_36)
 	$(AB) -T 'application/x-www-form-urlencoded' -T 'Expect: 100-continue' -k -p $(ab_post) $(TEST_URL) | tee -a $(flask_gworker_bench_multi_36)
-	@killall -9 gunicorn
+	@killall -9 gunicorn && sleep 2
 
 $(flask_gworker_bench_36):
 	@$(GUNICORN36) bjoern.bench.flask_bench:app --bind localhost:8080 --log-level info --backlog 2048 --timeout 1800 --worker-class bjoern.gworker.BjoernWorker &
@@ -207,7 +207,7 @@ flask-ab-gworker-36: $(flask_gworker_bench_36) $(ab_post)
 	@echo -e "\n====== POST ======\n" | tee -a $(flask_gworker_bench_36)
 	@echo -e "\n~~~~~ Keep Alive ~~~~~\n" | tee -a $(flask_gworker_bench_36)
 	$(AB) -T 'application/x-www-form-urlencoded' -T 'Expect: 100-continue' -k -p $(ab_post) $(TEST_URL) | tee -a $(flask_gworker_bench_36)
-	@killall -9 gunicorn
+	@killall -9 gunicorn && sleep 2
 
 $(flask_gunicorn_bench_36):
 	@$(GUNICORN36) bjoern.bench.flask_bench:app --bind localhost:8080 --log-level info --backlog 2048 --timeout 1800 &
@@ -222,7 +222,7 @@ flask-ab-gunicorn-36: $(flask_gunicorn_bench_36) $(ab_post)
 	@echo -e "\n====== POST ======\n" | tee -a $(flask_gunicorn_bench_36)
 	@echo -e "\n~~~~~ Keep Alive ~~~~~\n" | tee -a $(flask_gunicorn_bench_36)
 	$(AB) -T 'application/x-www-form-urlencoded' -T 'Expect: 100-continue' -k -p $(ab_post) $(TEST_URL) | tee -a $(flask_gunicorn_bench_36)
-	@killall -9 gunicorn
+	@killall -9 gunicorn && sleep 2
 
 $(bottle_bench_36):
 	@$(PYTHON36) bjoern/bench/bottle_bench.py &
@@ -237,7 +237,7 @@ bottle-ab-36: $(bottle_bench_36) $(ab_post)
 	@echo -e "\n====== POST ======\n" | tee -a $(bottle_bench_36)
 	@echo -e "\n~~~~~ Keep Alive ~~~~~\n" | tee -a $(bottle_bench_36)
 	$(AB) -T 'application/x-www-form-urlencoded' -T 'Expect: 100-continue' -k -p $(ab_post) $(TEST_URL) | tee -a $(bottle_bench_36)
-	@killall -9 $(PYTHON36)
+	@killall -9 $(PYTHON36) && sleep 2
 
 $(falcon_bench_36):
 	@$(PYTHON36) bjoern/bench/falcon_bench.py &
@@ -252,7 +252,7 @@ falcon-ab-36: $(falcon_bench_36) $(ab_post)
 	@echo -e "\n====== POST ======\n" | tee -a $(falcon_bench_36)
 	@echo -e "\n~~~~~ Keep Alive ~~~~~\n" | tee -a $(falcon_bench_36)
 	$(AB) -T 'application/x-www-form-urlencoded' -T 'Expect: 100-continue' -k -p $(ab_post) $(TEST_URL) | tee -a $(falcon_bench_36)
-	@killall -9 $(PYTHON36)
+	@killall -9 $(PYTHON36) && sleep 2
 
 _clean_bench_36:
 	@rm -rf bjoern/bench/*36.txt
@@ -274,7 +274,7 @@ flask-ab-37: $(flask_bench_37) $(ab_post)
 	@echo -e "\n====== POST ======\n" | tee -a $(flask_bench_37)
 	@echo -e "\n~~~~~ Keep Alive ~~~~~\n" | tee -a $(flask_bench_37)
 	$(AB) -T 'application/x-www-form-urlencoded' -T 'Expect: 100-continue' -k -p $(ab_post) $(TEST_URL) | tee -a $(flask_bench_37)
-	@killall -9 $(PYTHON37)
+	@killall -9 $(PYTHON37) && sleep 2
 
 $(flask_gworker_bench_multi_37):
 	@$(GUNICORN37) bjoern.bench.flask_bench:app --bind localhost:8080 --log-level info -w 4 --backlog 2048 --timeout 1800 --worker-class bjoern.gworker.BjoernWorker &
@@ -289,7 +289,7 @@ flask-ab-gworker-multi-37: $(flask_gworker_bench_multi_37) $(ab_post)
 	@echo -e "\n====== POST ======\n" | tee -a $(flask_gworker_bench_multi_37)
 	@echo -e "\n~~~~~ Keep Alive ~~~~~\n" | tee -a $(flask_gworker_bench_multi_37)
 	$(AB) -T 'application/x-www-form-urlencoded' -T 'Expect: 100-continue' -k -p $(ab_post) $(TEST_URL) | tee -a $(flask_gworker_bench_multi_37)
-	@killall -9 gunicorn
+	@killall -9 gunicorn && sleep 2
 
 $(flask_gworker_bench_37):
 	@$(GUNICORN37) bjoern.bench.flask_bench:app --backlog 2048 --timeout 1800 --worker-class bjoern.gworker.BjoernWorker &
@@ -304,7 +304,7 @@ flask-ab-gworker-37: $(flask_gworker_bench_37) $(ab_post)
 	@echo -e "\n====== POST ======\n" | tee -a $(flask_gworker_bench_37)
 	@echo -e "\n~~~~~ Keep Alive ~~~~~\n" | tee -a $(flask_gworker_bench_37)
 	$(AB) -T 'application/x-www-form-urlencoded' -T 'Expect: 100-continue' -k -p $(ab_post) $(TEST_URL) | tee -a $(flask_gworker_bench_37)
-	@killall -9 gunicorn
+	@killall -9 gunicorn && sleep 2
 
 $(flask_gunicorn_bench_37):
 	@$(GUNICORN37) bjoern.bench.flask_bench:app --backlog 2048 --timeout 1800 &
@@ -319,7 +319,7 @@ flask-ab-gunicorn-37: $(flask_gunicorn_bench_37) $(ab_post)
 	@echo -e "\n====== POST ======\n" | tee -a $(flask_gunicorn_bench_37)
 	@echo -e "\n~~~~~ Keep Alive ~~~~~\n" | tee -a $(flask_gunicorn_bench_37)
 	$(AB) -T 'application/x-www-form-urlencoded' -T 'Expect: 100-continue' -k -p $(ab_post) $(TEST_URL) | tee -a $(flask_gunicorn_bench_37)
-	@killall -9 gunicorn
+	@killall -9 gunicorn && sleep 2
 
 $(bottle_bench_37):
 	@$(PYTHON37) bjoern/bench/bottle_bench.py & jobs -p >/var/run/bottle_bjoern.bench.pid
@@ -334,7 +334,7 @@ bottle-ab-37: $(bottle_bench_37) $(ab_post)
 	@echo -e "\n====== POST ======\n" | tee -a $(bottle_bench_37)
 	@echo -e "\n~~~~~ Keep Alive ~~~~~\n" | tee -a $(bottle_bench_37)
 	$(AB) -T 'application/x-www-form-urlencoded' -T 'Expect: 100-continue' -k -p $(ab_post) $(TEST_URL) | tee -a $(bottle_bench_37)
-	@killall -9 $(PYTHON37)
+	@killall -9 $(PYTHON37) && sleep 2
 
 $(falcon_bench_37):
 	@$(PYTHON37) bjoern/bench/falcon_bench.py & jobs -p >/var/run/falcon_bjoern.bench.pid
@@ -349,7 +349,7 @@ falcon-ab-37: $(falcon_bench_37) $(ab_post)
 	@echo -e "\n====== POST ======\n" | tee -a $(falcon_bench_37)
 	@echo -e "\n~~~~~ Keep Alive ~~~~~\n" | tee -a $(falcon_bench_37)
 	$(AB) -T 'application/x-www-form-urlencoded' -T 'Expect: 100-continue' -k -p $(ab_post) $(TEST_URL) | tee -a $(falcon_bench_37)
-	@killall -9 $(PYTHON37)
+	@killall -9 $(PYTHON37) && sleep 2
 
 _clean_bench_37:
 	@rm -rf bjoern/bench/*37.txt

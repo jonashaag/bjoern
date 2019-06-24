@@ -25,7 +25,7 @@ Request *Request_new(ThreadInfo *thread_info, int client_fd, const char *client_
     request->client_fd = client_fd;
     request->client_addr = client_addr;
     request->is_final = 0;
-    BUFFER_CREATE(request->io_buffer);
+    BUFFER_INIT(request->io_buffer);
     if (request->io_buffer == NULL)
         return NULL; // memento
     http_parser_init((http_parser *) &request->parser, HTTP_REQUEST);
@@ -51,14 +51,13 @@ void Request_reset(Request *request) {
 
 void Request_free(Request *request) {
     Request_clean(request);
+    BUFFER_FREE(request->io_buffer);
     free(request);
 }
 
 /* Close and DECREF all the Python objects in Request.
    Request_reset should be called after this if connection keep alive */
 void Request_clean(Request *request) {
-    if (request->io_buffer != NULL)
-        BUFFER_DESTROY(request->io_buffer);
     if (request->iterable) {
         /* Call 'iterable.close()' if available */
         PyObject *close_method = PyObject_GetAttr(request->iterable, _close);
@@ -176,12 +175,6 @@ on_header_field(http_parser *parser, const char *field, size_t len) {
         PARSER->invalid_header = false;
     }
 
-    /* Ignore invalid header or headers field names longer than 64*/
-    if (PARSER->invalid_header) {
-        REQUEST->state.error_code = HTTP_STATUS_BAD_REQUEST;
-        return 1;
-    }
-
     /* Header field size limit */
     if (len > SERVER_INFO->max_header_field_len) {
         REQUEST->state.error_code = HTTP_STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE;
@@ -195,8 +188,6 @@ on_header_field(http_parser *parser, const char *field, size_t len) {
         if (c == '_') {
             // CVE-2015-0219
             PARSER->invalid_header = true;
-            REQUEST->state.error_code = HTTP_STATUS_BAD_REQUEST;
-            return 1;
         } else if (c == '-') {
             field_processed[i] = '_';
         } else if (c >= 'a' && c <= 'z') {
@@ -205,6 +196,13 @@ on_header_field(http_parser *parser, const char *field, size_t len) {
             field_processed[i] = c;
         }
     }
+
+    /* Ignore invalid header */
+    if (PARSER->invalid_header) {
+        REQUEST->state.error_code = HTTP_STATUS_BAD_REQUEST;
+        return 1;
+    }
+
     field_processed[len] = '\0';
 
     /* Check if too many fields */
@@ -268,16 +266,18 @@ on_body(http_parser *parser, const char *data, const size_t len) {
     } else {
         REQUEST->thread_info->payload_size += len;
     }
-    if (!BUFFER_SIZE(REQUEST->io_buffer) && !parser->content_length && !parser->http_minor &&
+    if (!REQUEST->io_buffer->size && !parser->content_length && !parser->http_minor &&
         !(parser->flags & F_CHUNKED)) {
         REQUEST->state.error_code = HTTP_STATUS_LENGTH_REQUIRED;
         return 1;
     }
 
     /* Write data to request buffer */
-    BUFFER_PUSH(REQUEST->io_buffer, data);
-    if (REQUEST->io_buffer == NULL)
+    BUFFER_PUSH(REQUEST->io_buffer, data, len);
+    if (REQUEST->io_buffer == NULL) {
+        fprintf(stderr, "Could not PUSH data into buffer (%zd)", len);
         return 1; // out of capacity
+    }
 
     REQUEST->is_final = http_body_is_final(parser);
 
@@ -301,9 +301,9 @@ on_message_complete(http_parser *parser) {
     _set_header(_REMOTE_ADDR, _PEP3333_String_FromUTF8String(REQUEST->client_addr));
 
     PyObject *body = PyObject_CallMethodObjArgs(IO_module, _BytesIO, NULL);
-    if (BUFFER_SIZE(REQUEST->io_buffer)) {
+    if (REQUEST->io_buffer->size) {
         /* Request has body */
-        PyObject *temp_data = _PEP3333_Bytes_FromStringAndSize(REQUEST->io_buffer, BUFFER_SIZE(REQUEST->io_buffer));
+        PyObject *temp_data = _PEP3333_Bytes_FromStringAndSize(REQUEST->io_buffer->buffer, REQUEST->io_buffer->size);
         PyObject *tmp = PyObject_CallMethodObjArgs(body, _write, temp_data, NULL);
         PyObject *buf = PyObject_CallMethodObjArgs(body, _seek, _FromLong(0), NULL);
 

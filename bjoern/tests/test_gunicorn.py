@@ -13,7 +13,11 @@ def flask_app():
     @app.route("/a/b/c", methods=("GET", "POST"))
     def hello_world():
         return "Hello, World! Args:" " {}".format(
-            (request.args.get("k"), request.args.get("k2"), sorted(request.form.items()))
+            (
+                request.args.get("k"),
+                request.args.get("k2"),
+                sorted(request.form.items()),
+            )
         )
 
     return app
@@ -53,7 +57,7 @@ def test_flask_gunicorn_app(run_app_gunicorn, client):
     response = client.get("/a/b/c?k=v&k2=v2")
     assert response.status_code == 200
     assert response.reason == "OK"
-    assert response.content ==  b"Hello, World! Args: ('v', 'v2', [])"
+    assert response.content == b"Hello, World! Args: ('v', 'v2', [])"
     response = client.post("/a/b/c?k=v&k2=v2", data={"k3": "v3", "k4": b"v4"})
     assert response.status_code == 200
     assert response.reason == "OK"
