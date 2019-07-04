@@ -1,3 +1,4 @@
+import atexit
 import os
 import socket
 import _bjoern
@@ -37,6 +38,24 @@ def bind_and_listen(host, port=None, reuse_port=False,
 
 def server_run(sock, wsgi_app):
     _bjoern.server_run(sock, wsgi_app)
+
+
+def _close_server_socket(sock):
+    # Clean up the given socket
+    global _default_instance
+
+    # This fix is only needed on *NIX-like systems
+    if sock.family == socket.AF_UNIX:
+        filename = sock.getsockname()
+        if filename[0] != '\0':
+            os.unlink(sock.getsockname())
+
+    # Close the socket, but wait for current connections to close first.
+    # Calling sock.shutdown({reason}) would force it to close, but that may not
+    # be wiae in al circumstances.
+    sock.close()
+
+    _default_instance = None
 
 
 # Backwards compatibility API
@@ -79,12 +98,10 @@ def run(*args, **kwargs):
                                "arguments.")
 
     sock, wsgi_app = _default_instance
+    atexit.register(_close_server_socket, sock)
+
     try:
         server_run(sock, wsgi_app)
     finally:
-        if sock.family == socket.AF_UNIX:
-            filename = sock.getsockname()
-            if filename[0] != '\0':
-                os.unlink(sock.getsockname())
-        sock.close()
-        _default_instance = None
+        _close_server_socket(sock)
+        atexit.unregister(sock)  # Make sure we don't try to close the aocket twice
