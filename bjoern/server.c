@@ -224,6 +224,11 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
         request->current_chunk = _PEP3333_Bytes_FromString(
           http_error_messages[HTTP_SERVER_ERROR]);
       }
+    } else if (request->state.expect_continue) {
+      read_state = done;
+      request->current_chunk = _PEP3333_Bytes_FromString(
+        CONTINUE_RESPONSE);
+      request->state.keep_alive = true;
     } else {
       /* Wait for more data */
       read_state = not_yet_done;
@@ -285,8 +290,16 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
     if(request->state.keep_alive) {
       DBG_REQ(request, "done, keep-alive");
       ev_io_stop(mainloop, &request->ev_watcher);
-      Request_clean(request);
-      Request_reset(request);
+
+      if (!request->state.expect_continue) {
+        /* There will be more to receive/send after sending 100-Continue, so
+         * don't clobber the request until after the "real" response. */
+        Request_clean(request);
+        Request_reset(request);
+      }
+
+      request->state.expect_continue = false;
+
       ev_io_init(&request->ev_watcher, &ev_io_on_read,
                  request->client_fd, EV_READ);
       ev_io_start(mainloop, &request->ev_watcher);

@@ -147,6 +147,14 @@ on_header_field(http_parser* parser, const char* field, size_t len)
     return 0;
   }
 
+  /* If `Expect` is encountered, set request->state to notify that the client
+   * expects an "HTTP/1.1 100 Continue" response before it will send the body */
+  if (!strncmp(field, HTTP_EXPECT, len)) {
+    if (parser->http_major > 0 && parser->http_minor > 0) {
+      REQUEST->state.expect_continue = true;
+    }
+  }
+
   char field_processed[len];
   for(size_t i=0; i<len; i++) {
     char c = field[i];

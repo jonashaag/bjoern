@@ -56,6 +56,8 @@ def listen(wsgi_app, host, port=None, reuse_port=False,
                            listen_backlog=listen_backlog)
     _default_instance = (sock, wsgi_app)
 
+    return sock
+
 
 def run(*args, **kwargs):
     """
