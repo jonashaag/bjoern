@@ -18,6 +18,7 @@
 #define _PEP3333_String_FromFormat(...) PyUnicode_FromFormat(__VA_ARGS__)
 #define _PEP3333_String_GET_SIZE(u) PyUnicode_GET_LENGTH(u)
 #define _PEP3333_String_Concat(u1, u2) PyUnicode_Concat(u1, u2)
+#define _PEP3333_String_CompareWithASCIIString(o, c_str) PyUnicode_CompareWithASCIIString(o, c_str)
 
 #else
 
@@ -52,6 +53,11 @@ static PyObject *_PEP3333_String_Concat(PyObject *l, PyObject *r)
   PyString_Concat(&ret, r);
 
   return ret;
+}
+
+static int _PEP3333_String_CompareWithASCIIString(PyObject *o, const char *c_str)
+{
+  return memcmp(_PEP3333_Bytes_AS_DATA(o), c_str, _PEP3333_Bytes_GET_SIZE(o));
 }
 #endif
 

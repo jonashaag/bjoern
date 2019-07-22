@@ -147,14 +147,6 @@ on_header_field(http_parser* parser, const char* field, size_t len)
     return 0;
   }
 
-  /* If `Expect` is encountered, set request->state to notify that the client
-   * expects an "HTTP/1.1 100 Continue" response before it will send the body */
-  if (!strncmp(field, HTTP_EXPECT, len)) {
-    if (parser->http_major > 0 && parser->http_minor > 0) {
-      REQUEST->state.expect_continue = true;
-    }
-  }
-
   char field_processed[len];
   for(size_t i=0; i<len; i++) {
     char c = field[i];
@@ -188,7 +180,49 @@ on_header_value(http_parser* parser, const char* value, size_t len)
   if(!PARSER->invalid_header) {
     /* Set header, or append data to header if this is not the first call */
     _set_or_append_header(REQUEST->headers, PARSER->field, value, len);
+
+    /*
+    ** HTTP/1.1 describes the header `Expect: 100-continue`, which provides
+    ** a mechanism for a client to request permission from a server to send
+    ** the rest of the request (i.e., the body). This restriction is entirely
+    ** client-side in that, regardless of this header existing, the client
+    ** can opt to send the body immediately (i.e., contradicting the header).
+    ** In that case, the header MAY be ignored (according to the RFC). It's
+    ** important to note that this mechanism is not intended to mitigate DoS
+    ** attacks, etc. It's an optional client-side courtesy only.
+    **
+    ** Some popular clients (e.g., cURL) do in fact wait for an indefinite
+    ** time period before sending the rest of the request, and so it is
+    ** appropriate to respond with `HTTP/1.1 100 Continue` in that case.
+    **
+    ** In the future, it may be a reasonable improvement to provide a callback
+    ** API to provide a mechanism for calling code (i.e., Python) to determine
+    ** whether continuation is appropriate based on the existing headers, but
+    ** currently the behavior implemented here is to respond with 100-continue
+    ** automatically as soon as the Expect header is detected, or
+    ** `417 Expectation Failed` if the header contains anything other than
+    ** "100-continue".
+    **
+    ** see https://tools.ietf.org/html/rfc2616#page-48 for specifics.
+    */
+    if (REQUEST->state.expect_continue || REQUEST->state.error_code)
+        return 0;
+
+    if (parser->http_major > 0 && parser->http_minor > 0) {
+      bool field_is_http_expect = !_PEP3333_String_CompareWithASCIIString(
+        PARSER->field, "HTTP_EXPECT"
+      );
+
+      if (field_is_http_expect) {
+        if (!strncmp(value, "100-continue", len)) {
+          REQUEST->state.expect_continue = true;
+        } else {
+          REQUEST->state.error_code = HTTP_EXPECTATION_FAILED;
+        }
+      }
+    }
   }
+
   return 0;
 }
 
@@ -196,6 +230,14 @@ static int
 on_body(http_parser* parser, const char* data, const size_t len)
 {
   PyObject *body;
+
+  /*
+  ** If you're reading the body, you're not waiting for it, so
+  ** no need to respond 100-continue.
+  ** See RFC 2616 https://tools.ietf.org/html/rfc2616#page-49 for details.
+  ** See also comment above in `on_header_value`.
+  */
+  REQUEST->state.expect_continue = false;
 
   body = PyDict_GetItem(REQUEST->headers, _wsgi_input);
   if (body == NULL) {

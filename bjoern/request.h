@@ -50,9 +50,6 @@ typedef struct {
 #define REQUEST_FROM_WATCHER(watcher) \
   (Request*)((size_t)watcher - (size_t)(&(((Request*)NULL)->ev_watcher)));
 
-#define HTTP_EXPECT "Expect"
-#define CONTINUE_RESPONSE "HTTP/1.1 100 Continue\r\n\r\n"
-
 Request* Request_new(ServerInfo*, int client_fd, const char* client_addr);
 void Request_parse(Request*, const char*, const size_t);
 void Request_reset(Request*);
