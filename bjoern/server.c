@@ -25,7 +25,7 @@
 #define GIL_LOCK(n) PyGILState_STATE _gilstate_##n = PyGILState_Ensure()
 #define GIL_UNLOCK(n) PyGILState_Release(_gilstate_##n)
 
-static const char* http_error_messages[4] = {
+static const char* http_error_messages[5] = {
   NULL, /* Error codes start at 1 because 0 means "no error" */
   "HTTP/1.1 400 Bad Request\r\n\r\n",
   "HTTP/1.1 406 Length Required\r\n\r\n",
