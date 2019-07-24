@@ -29,13 +29,17 @@ static const char* http_error_messages[4] = {
   NULL, /* Error codes start at 1 because 0 means "no error" */
   "HTTP/1.1 400 Bad Request\r\n\r\n",
   "HTTP/1.1 406 Length Required\r\n\r\n",
+  "HTTP/1.1 417 Expectation Failed\r\n\r\n",
   "HTTP/1.1 500 Internal Server Error\r\n\r\n"
 };
+
+static const char *CONTINUE = "HTTP/1.1 100 Continue\r\n\r\n";
 
 enum _rw_state {
   not_yet_done = 1,
   done,
   aborted,
+  expect_continue,
 };
 typedef enum _rw_state read_state;
 typedef enum _rw_state write_state;
@@ -172,6 +176,23 @@ ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
   ev_io_start(mainloop, &request->ev_watcher);
 }
 
+
+static void
+start_reading(struct ev_loop *mainloop, Request *request)
+{
+  ev_io_init(&request->ev_watcher, &ev_io_on_read,
+             request->client_fd, EV_READ);
+  ev_io_start(mainloop, &request->ev_watcher);
+}
+
+static void
+start_writing(struct ev_loop *mainloop, Request *request)
+{
+  ev_io_init(&request->ev_watcher, &ev_io_on_write,
+             request->client_fd, EV_WRITE);
+  ev_io_start(mainloop, &request->ev_watcher);
+}
+
 static void
 ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
 {
@@ -211,10 +232,11 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
         http_error_messages[request->state.error_code]);
       assert(request->iterator == NULL);
     } else if(request->state.parse_finished) {
-      /* HTTP parse successful */
+      /* HTTP parse successful, meaning we have the entire
+       * request (the header _and_ the body). */
       read_state = done;
-      bool wsgi_ok = wsgi_call_application(request);
-      if (!wsgi_ok) {
+
+      if (!wsgi_call_application(request)) {
         /* Response is "HTTP 500 Internal Server Error" */
         DBG_REQ(request, "WSGI app error");
         assert(PyErr_Occurred());
@@ -224,6 +246,13 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
         request->current_chunk = _PEP3333_Bytes_FromString(
           http_error_messages[HTTP_SERVER_ERROR]);
       }
+    } else if (request->state.expect_continue) {
+      /*
+      ** Handle "Expect: 100-continue" header.
+      ** See https://tools.ietf.org/html/rfc2616#page-48 and `on_header_value`
+      ** in request.c for more details.
+      */
+      read_state = expect_continue;
     } else {
       /* Wait for more data */
       read_state = not_yet_done;
@@ -233,12 +262,16 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
   switch (read_state) {
   case not_yet_done:
     break;
+  case expect_continue:
+    DBG_REQ(request, "pause read, write 100-continue");
+    ev_io_stop(mainloop, &request->ev_watcher);
+    request->current_chunk = _PEP3333_Bytes_FromString(CONTINUE);
+    start_writing(mainloop, request);
+    break;
   case done:
     DBG_REQ(request, "Stop read watcher, start write watcher");
     ev_io_stop(mainloop, &request->ev_watcher);
-    ev_io_init(&request->ev_watcher, &ev_io_on_write,
-               request->client_fd, EV_WRITE);
-    ev_io_start(mainloop, &request->ev_watcher);
+    start_writing(mainloop, request);
     break;
   case aborted:
     close_connection(mainloop, request);
@@ -278,6 +311,10 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
     write_state = on_write_chunk(mainloop, request);
   }
 
+  write_state = request->state.expect_continue
+    ? expect_continue
+    : write_state;
+
   switch(write_state) {
   case not_yet_done:
     break;
@@ -285,15 +322,22 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
     if(request->state.keep_alive) {
       DBG_REQ(request, "done, keep-alive");
       ev_io_stop(mainloop, &request->ev_watcher);
+
       Request_clean(request);
       Request_reset(request);
-      ev_io_init(&request->ev_watcher, &ev_io_on_read,
-                 request->client_fd, EV_READ);
-      ev_io_start(mainloop, &request->ev_watcher);
+
+      start_reading(mainloop, request);
     } else {
       DBG_REQ(request, "done, close");
       close_connection(mainloop, request);
     }
+    break;
+  case expect_continue:
+    DBG_REQ(request, "expect continue");
+    ev_io_stop(mainloop, &request->ev_watcher);
+
+    request->state.expect_continue = false;
+    start_reading(mainloop, request);
     break;
   case aborted:
     /* Response was aborted due to an error. We can't do anything graceful here
