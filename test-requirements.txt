@@ -1,0 +1,4 @@
+requests-unixsocket
+pytest
+six
+tblib
