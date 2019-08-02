@@ -16,7 +16,7 @@ import requests
 import bjoern
 
 
-@pytest.mark.parametrize('header_x_auth', ('X-Auth_User', 'X_Auth_User', 'X_Auth-User'))
+@pytest.mark.parametrize('header_x_auth', ['X-Auth_User', 'X_Auth_User', 'X_Auth-User'])
 def test_CVE_2015_0219(client, header_x_auth):
     """
     https://www.djangoproject.com/weblog/2015/jan/13/security/
@@ -25,7 +25,7 @@ def test_CVE_2015_0219(client, header_x_auth):
 
     def app(env, start_response):
         assert header_x_auth not in env.keys()
-        assert 'X-Auth-User' not in env.keys()
+        assert 'HTTP_X_AUTH_USER' not in env.keys()
         start_response('200 ok', [])
         return b''
 
@@ -46,13 +46,7 @@ def test_listen(client):
 
 
 @pytest.mark.parametrize(
-    'content,status_code',
-    (
-        ('200 ok', 200),
-        ('201 created', 201),
-        ('202 accepted', 202),
-        ('204 no content', 204),
-    ),
+    'content,status_code', [('200 ok', 200), ('201 created', 201), ('202 accepted', 202), ('204 no content', 204)]
 )
 def test_status_codes(client, content, status_code):
     """tests/204.py"""
@@ -78,7 +72,7 @@ def test_empty_content(client):
     assert response.content == b''
 
 
-@pytest.mark.parametrize('method', ('DELETE', 'GET', 'OPTIONS', 'POST', 'PATCH', 'PUT'))
+@pytest.mark.parametrize('method', ['DELETE', 'GET', 'OPTIONS', 'POST', 'PATCH', 'PUT'])
 def test_env_request_method(client, method):
     """tests/env.py"""
 
@@ -101,22 +95,15 @@ def wrap(text, width=20, placeholder='...'):
 
 @pytest.mark.parametrize(
     'header_key,header_value',
-    (
+    [
         ('Content-Type', 'text/plain'),
         ('a' * 1000, 'b' * 1000),
-        pytest.param(
-            'Ü',
-            'ä',
-            marks=pytest.mark.skip(
-                reason='requests hangs, see https://github.com/urllib3/urllib3/issues/1433'
-            ),
-        ),
         ('Foo', 'Bar'),
         ('Blah', 'Blubb'),
         ('Spam', 'Eggs'),
         ('Blurg', 'asdasjdaskdasdjj asdk jaks / /a jaksdjkas jkasd jkasdj '),
         ('asd2easdasdjaksdjdkskjkasdjka', 'oasdjkadk kasdk k k k k k '),
-    ),
+    ],
     ids=wrap,
 )
 def test_headers(client, header_key, header_value):
@@ -144,7 +131,7 @@ def test_invalid_header_type(client):
         client.get()
 
 
-@pytest.mark.parametrize('headers', ((), ('a', 'b', 'c'), ('a',)), ids=str)
+@pytest.mark.parametrize('headers', [(), ('a', 'b', 'c'), ('a',)], ids=str)
 def test_invalid_header_tuple(client, headers):
     """tests/all-kinds-of-errors.py"""
 
@@ -216,19 +203,17 @@ def filewrapper_factory(wrapper, file, pseudo=False):
     return app
 
 
-@pytest.mark.parametrize('file', ('README.rst',), ids=('README.rst',))
-@pytest.mark.parametrize(
-    'pseudo', (False, True), ids=lambda x: 'pseudofile' if x else 'file'
-)
+@pytest.mark.parametrize('file', ['README.rst'], ids=['README.rst'])
+@pytest.mark.parametrize('pseudo', [False, True], ids=lambda x: 'pseudofile' if x else 'file')
 @pytest.mark.parametrize(
     'wrapper',
-    (
+    [
         lambda f, _: iter(lambda: f.read(64 * 1024), b''),
         lambda f, _: f,
         lambda f, env: env['wsgi.file_wrapper'](f),
         lambda f, env: env['wsgi.file_wrapper'](f, 1),
-    ),
-    ids=('callable-iterator', 'xreadlines', 'filewrapper', 'filewrapper2'),
+    ],
+    ids=['callable-iterator', 'xreadlines', 'filewrapper', 'filewrapper2'],
 )
 def test_file_wrapper(client, wrapper, file, pseudo):
     """tests/filewrapper.py"""
@@ -298,16 +283,14 @@ def test_huge_response(client):
 
 
 def app1(env, sr):
-    sr(
-        '200 ok',
-        [
-            ('Foo', 'Bar'),
-            ('Blah', 'Blubb'),
-            ('Spam', 'Eggs'),
-            ('Blurg', 'asdasjdaskdasdjj asdk jaks / /a jaksdjkas jkasd jkasdj '),
-            ('asd2easdasdjaksdjdkskjkasdjka', 'oasdjkadk kasdk k k k k k '),
-        ],
-    )
+    headers = [
+        ('Foo', 'Bar'),
+        ('Blah', 'Blubb'),
+        ('Spam', 'Eggs'),
+        ('Blurg', 'asdasjdaskdasdjj asdk jaks / /a jaksdjkas jkasd jkasdj '),
+        ('asd2easdasdjaksdjdkskjkasdjka', 'oasdjkadk kasdk k k k k k '),
+    ]
+    sr('200 ok', headers)
     return [b'hello', b'world']
 
 
@@ -330,12 +313,12 @@ def app4(e, sr):
 
 @pytest.mark.parametrize(
     'app,status_code,body',
-    (
+    [
         (app1, 200, b'helloworld'),
         (app2, 200, b'hello'),
         (app3, 200, b'Hello World\n'),
         (app4, 200, b'hello there ... \n'),
-    ),
+    ],
 )
 def test_unix_socket(unixclient, app, status_code, body):
     """tests/hello_unix.py"""
@@ -405,28 +388,16 @@ def test_wsgi_compliance(client):
 
 @pytest.mark.parametrize(
     'expect_header_value,content_length,body,response',
-    (
+    [
         ('100-continue', 300, '', b'HTTP/1.1 100 Continue\r\n\r\n'),
-        (
-            '100-continue',
-            0,
-            '',
-            b'HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: Keep-Alive\r\n\r\n',
-        ),
-        (
-            '100-continue',
-            4,
-            'test',
-            b'HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: Keep-Alive\r\n\r\n',
-        ),
+        ('100-continue', 0, '', b'HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: Keep-Alive\r\n\r\n'),
+        ('100-continue', 4, 'test', b'HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: Keep-Alive\r\n\r\n'),
         ('badness', 0, '', b'HTTP/1.1 417 Expectation Failed\r\n\r\n'),
         ('badness', 300, '', b'HTTP/1.1 417 Expectation Failed\r\n\r\n'),
         ('badness', 4, 'test', b'HTTP/1.1 417 Expectation Failed\r\n\r\n'),
-    ),
+    ],
 )
-def test_expect_100_continue(
-    httpclient, expect_header_value, content_length, body, response
-):
+def test_expect_100_continue(httpclient, expect_header_value, content_length, body, response):
     """tests/expect100.py"""
 
     def app(e, s):
@@ -443,9 +414,7 @@ def test_expect_100_continue(
     httpclient.start(app)
     # requests doesn't support expect100, see https://github.com/psf/requests/issues/3614
     # use the raw connection instead of httpclient
-    with contextlib.closing(
-        socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    ) as raw_client:
+    with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as raw_client:
         raw_client.connect((httpclient.host, httpclient.port))
         request = 'GET /fizz HTTP/1.1\r\nExpect: {}\r\nContent-Length: {}\r\n\r\n{}'.format(
             expect_header_value, content_length, body
@@ -457,8 +426,5 @@ def test_expect_100_continue(
         if resp == b'HTTP/1.1 100 Continue\r\n\r\n':
             body = ''.join('x' for x in range(0, content_length))
             raw_client.send(body.encode('utf-8'))
-            resp = raw_client.recv(1 << 10)
-            assert (
-                resp
-                == b'HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: Keep-Alive\r\n\r\n'
-            )
+            resp = raw_client.recv(bjoern.DEFAULT_LISTEN_BACKLOG)
+            assert resp == b'HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: Keep-Alive\r\n\r\n'

@@ -24,7 +24,10 @@ import bjoern
 def free_port():
     with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
         s.bind(('', 0))
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        except AttributeError:
+            pass
         port = s.getsockname()[1]
     return port
 
@@ -39,10 +42,7 @@ class ErrorHandleMiddleware:
             return self.app(*args, **kwargs)
         except Exception as e:
             if self.pipe is not None:
-                exc_info = sys.exc_info()
-                exc_type = exc_info[0]
-                tb = exc_info[2]
-                self.pipe.send((exc_type, e, tb))
+                self.pipe.send(sys.exc_info())
             raise e
 
 
@@ -57,9 +57,8 @@ def pytest_runtest_call(item):
 
 def reraise(f):
     @functools.wraps(f)
-    def wrapper(*args, **kwargs):
-        result = f(*args, **kwargs)
-        testclient = args[0]
+    def wrapper(testclient, *args, **kwargs):
+        result = f(testclient, *args, **kwargs)
         testclient._reraise_app_errors()
         return result
 
@@ -80,6 +79,13 @@ class Client(object):
         self.reuse_port = False
         self.listen_backlog = bjoern.DEFAULT_LISTEN_BACKLOG
         self._children = []
+        self.delete = functools.partial(self._request, 'delete')
+        self.get = functools.partial(self._request, 'get')
+        self.head = functools.partial(self._request, 'head')
+        self.patch = functools.partial(self._request, 'patch')
+        self.post = functools.partial(self._request, 'post')
+        self.put = functools.partial(self._request, 'put')
+        self.options = functools.partial(self._request, 'options')
 
     @property
     def session(self):
@@ -97,9 +103,7 @@ class Client(object):
         (self._error_receiver, self._error_publisher) = mp.Pipe(False)
         for _ in range(num_workers):
             errorhandler = ErrorHandleMiddleware(wsgi_app, self._error_publisher)
-            child = mp.Process(
-                target=bjoern.server_run, args=(self._sock, errorhandler)
-            )
+            child = mp.Process(target=bjoern.server_run, args=(self._sock, errorhandler))
             child.start()
             self._children.append(child)
 
@@ -129,45 +133,9 @@ class Client(object):
             raise_(*exc_info)  # python2 compat
 
     @reraise
-    def get(self, path=None, **kwargs):
-        """Adapter for :py:meth:`requests.Session.get`"""
-        return self.session.get(self._join(self.root, (path or '')), **kwargs)
-
-    @reraise
-    def options(self, path=None, **kwargs):
-        """Adapter for :py:meth:`requests.Session.options`"""
-        return self.session.options(self._join(self.root, (path or '')), **kwargs)
-
-    @reraise
-    def head(self, path=None, **kwargs):
-        """Adapter for :py:meth:`requests.Session.head`"""
-        return self.session.head(self._join(self.root, (path or '')), **kwargs)
-
-    @reraise
-    def post(self, path=None, data=None, json=None, **kwargs):
-        """Adapter for :py:meth:`requests.Session.post`"""
-        return self.session.post(
-            self._join(self.root, (path or '')), data=data, json=json, **kwargs
-        )
-
-    @reraise
-    def put(self, path=None, data=None, **kwargs):
-        """Adapter for :py:meth:`requests.Session.put`"""
-        return self.session.put(
-            self._join(self.root, (path or '')), data=data, **kwargs
-        )
-
-    @reraise
-    def patch(self, path=None, data=None, **kwargs):
-        """Adapter for :py:meth:`requests.Session.patch`"""
-        return self.session.patch(
-            self._join(self.root, (path or '')), data=data, **kwargs
-        )
-
-    @reraise
-    def delete(self, path=None, **kwargs):
-        """Adapter for :py:meth:`requests.Session.delete`"""
-        return self.session.delete(self._join(self.root, (path or '')), **kwargs)
+    def _request(self, method, path=None, **kwargs):
+        m = getattr(self.session, method)
+        return m(self._join(self.root, (path or '')), **kwargs)
 
 
 class HttpClient(Client):
@@ -182,10 +150,7 @@ class HttpClient(Client):
         self._session = requests.Session()
         self.port = self.port or free_port()
         self._sock = bjoern.bind_and_listen(
-            self.host,
-            port=self.port,
-            reuse_port=self.reuse_port,
-            listen_backlog=self.listen_backlog,
+            self.host, port=self.port, reuse_port=self.reuse_port, listen_backlog=self.listen_backlog
         )
         super(HttpClient, self).start(wsgi_app, num_workers)
 
@@ -197,12 +162,14 @@ class HttpClient(Client):
 class UnixClient(Client):
     _join = functools.partial(posixpath.join)
 
+    @property
+    def _unix_host(self):
+        return 'unix:{}'.format(self.host)
+
     def start(self, wsgi_app, num_workers=1):
         self._session = requests_unixsocket.Session()
         self._sock = bjoern.bind_and_listen(
-            'unix:{}'.format(self.host),
-            port=self.port,
-            listen_backlog=self.listen_backlog,
+            self._unix_host, port=self.port, listen_backlog=self.listen_backlog
         )
         super(UnixClient, self).start(wsgi_app, num_workers)
 
@@ -211,7 +178,7 @@ class UnixClient(Client):
         return urlunsplit(('http+unix', quote(self.host, safe=''), '', '', ''))
 
 
-@pytest.fixture(params=('HttpClient', 'UnixClient'))
+@pytest.fixture(params=['HttpClient', 'UnixClient'])
 def client(request):
     return request.getfixturevalue(request.param.lower())
 
@@ -235,9 +202,7 @@ def unixclient():
         tmpdir = '/tmp'  # yikes! but should be short enough
     else:
         tmpdir = tempfile.gettempdir()
-    with tempfile.NamedTemporaryFile(
-        prefix='bjoern', suffix='.sock', dir=tmpdir, delete=True
-    ) as temp:
+    with tempfile.NamedTemporaryFile(prefix='bjoern', suffix='.sock', dir=tmpdir, delete=True) as temp:
         file = temp.name
     with UnixClient() as client:
         client.host = file
