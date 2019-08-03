@@ -19,8 +19,9 @@ import bjoern
 @pytest.mark.parametrize('header_x_auth', ['X-Auth_User', 'X_Auth_User', 'X_Auth-User'])
 def test_CVE_2015_0219(client, header_x_auth):
     """
-    https://www.djangoproject.com/weblog/2015/jan/13/security/
-    https://snyk.io/vuln/SNYK-PYTHON-BJOERN-40507
+    Test against CVE-2015-0219 (WSGI header spoofing). For details, see:
+     * https://www.djangoproject.com/weblog/2015/jan/13/security/
+     * https://snyk.io/vuln/SNYK-PYTHON-BJOERN-40507
     """
 
     def app(env, start_response):
@@ -33,26 +34,78 @@ def test_CVE_2015_0219(client, header_x_auth):
     client.get(headers={header_x_auth: 'admin'})
 
 
-def test_listen(client):
-    """tests/listen.py"""
+def app1(e, s):
+    s('200 ok', [])
+    return b''
 
-    def app(environ, start_response):
-        start_response('200 OK', [])
-        yield b'Hello world'
-        yield b''
 
-    client.start(app)
-    assert client.get().content == b'Hello world'
+def app2(e, s):
+    s('200 ok', [])
+    return [b'']
+
+
+def app3(env, sr):
+    headers = [
+        ('Foo', 'Bar'),
+        ('Blah', 'Blubb'),
+        ('Spam', 'Eggs'),
+        ('Blurg', 'asdasjdaskdasdjj asdk jaks / /a jaksdjkas jkasd jkasdj '),
+        ('asd2easdasdjaksdjdkskjkasdjka', 'oasdjkadk kasdk k k k k k '),
+    ]
+    sr('200 ok', headers)
+    return [b'hello', b'world']
+
+
+def app4(env, sr):
+    sr('200 ok', [])
+    return b'hello'
+
+
+def app5(env, sr):
+    sr('200 abc', [('Content-Length', '12')])
+    yield b'Hello'
+    yield b' World'
+    yield b'\n'
+
+
+def app6(e, sr):
+    sr('200 ok', [])
+    return [b'hello there ... \n']
+
+
+def app7(environ, start_response):
+    start_response('200 OK', [('Content-Type', 'text/plain')])
+    return (b'Hello,', b" it's me, ", b'Bob!')
 
 
 @pytest.mark.parametrize(
-    'content,status_code', [('200 ok', 200), ('201 created', 201), ('202 accepted', 202), ('204 no content', 204)]
+    'app,status_code,body',
+    [
+        (app1, 200, b''),
+        (app2, 200, b''),
+        (app3, 200, b'helloworld'),
+        (app4, 200, b'hello'),
+        (app5, 200, b'Hello World\n'),
+        (app6, 200, b'hello there ... \n'),
+        (app7, 200, b"Hello, it's me, Bob!")
+    ],
 )
-def test_status_codes(client, content, status_code):
-    """tests/204.py"""
+def test_response_body(client, app, status_code, body):
+    """Test the server responds with the correct response body."""
+    client.start(app)
+    response = client.get()
+    assert response.status_code == status_code
+    assert response.content == body
+
+
+@pytest.mark.parametrize(
+    'status,status_code', [('200 ok', 200), ('201 created', 201), ('202 accepted', 202), ('204 no content', 204)]
+)
+def test_status_codes(client, status, status_code):
+    """Test the server responds with the correct HTTP status code."""
 
     def app(e, s):
-        s(content, [])
+        s(status, [])
         return b''
 
     client.start(app)
@@ -60,21 +113,13 @@ def test_status_codes(client, content, status_code):
     assert resp.status_code == status_code
 
 
-def test_empty_content(client):
-    """tests/empty.py"""
-
-    def app(e, s):
-        s('200 ok', [])
-        return b''
-
-    client.start(app)
-    response = client.get()
-    assert response.content == b''
-
-
 @pytest.mark.parametrize('method', ['DELETE', 'GET', 'OPTIONS', 'POST', 'PATCH', 'PUT'])
 def test_env_request_method(client, method):
-    """tests/env.py"""
+    """
+    Example test for validating the WSGI environment, see
+    https://www.python.org/dev/peps/pep-3333/#environ-variables.
+    This test validates the ``REQUEST_METHOD`` is set correctly.
+    """
 
     def app(env, start_response):
         start_response('200 yo', [])
@@ -107,7 +152,7 @@ def wrap(text, width=20, placeholder='...'):
     ids=wrap,
 )
 def test_headers(client, header_key, header_value):
-    """tests/headers.py"""
+    """Test the server responds with valid headers."""
 
     def app(env, start_response):
         start_response('200 yo', [(header_key, header_value)])
@@ -120,7 +165,12 @@ def test_headers(client, header_key, header_value):
 
 
 def test_invalid_header_type(client):
-    """tests/all-kinds-of-errors.py"""
+    """
+    Test the server raises a ``TypeError`` when the headers are ``None``.
+    According to WSGI specification, the headers should be a list of ``(header_name,
+    header_value)`` tuples describing the HTTP response header, see
+    https://www.python.org/dev/peps/pep-3333/#specification-details
+    """
 
     def app(environ, start_response):
         start_response('200 ok', None)
@@ -133,7 +183,13 @@ def test_invalid_header_type(client):
 
 @pytest.mark.parametrize('headers', [(), ('a', 'b', 'c'), ('a',)], ids=str)
 def test_invalid_header_tuple(client, headers):
-    """tests/all-kinds-of-errors.py"""
+    """
+    Test the server raises a ``TypeError`` when the headers are a tuple instead
+    of a list of tuples.
+    According to WSGI specification, the headers should be a list of ``(header_name,
+    header_value)`` tuples describing the HTTP response header, see
+    https://www.python.org/dev/peps/pep-3333/#specification-details
+    """
 
     def app(environ, start_response):
         start_response('200 ok', headers)
@@ -145,15 +201,21 @@ def test_invalid_header_tuple(client, headers):
         client.get()
 
 
-def test_invalid_header_tuple_item(client):
-    """tests/all-kinds-of-errors.py"""
-
+@pytest.mark.parametrize('header', [(object(), object()), (), ('a', 'b', 'c'), ('a',)])
+def test_invalid_header_tuple_item(client, header):
+    """
+    Test the server raises a ``TypeError`` when the headers list contain tuples
+    that are not of type ``("header_name", "header_value")``.
+    According to WSGI specification, the headers should be a list of ``(header_name,
+    header_value)`` tuples describing the HTTP response header, see
+    https://www.python.org/dev/peps/pep-3333/#specification-details
+    """
     def app(environ, start_response):
-        start_response('200 ok', (object(), object()))
+        start_response('200 ok', [header])
         return ['yo']
 
     client.start(app)
-    message = r"start response argument 2 must be a list of 2-tuples \(got 'tuple' object instead\)"
+    message = r"found invalid 'tuple' object at position 0"
     with pytest.raises(TypeError, match=message):
         client.get()
 
@@ -168,7 +230,7 @@ def temp_file(request, tmp_path):
 
 
 def test_send_file(client, temp_file):
-    """tests/file.py"""
+    """Test server file handling."""
 
     def app(env, start_response):
         start_response('200 ok', [])
@@ -216,7 +278,10 @@ def filewrapper_factory(wrapper, file, pseudo=False):
     ids=['callable-iterator', 'xreadlines', 'filewrapper', 'filewrapper2'],
 )
 def test_file_wrapper(client, wrapper, file, pseudo):
-    """tests/filewrapper.py"""
+    """
+    Test "file-like" object wrapper handling. See
+    https://www.python.org/dev/peps/pep-3333/#optional-platform-specific-file-handling
+    """
     client.start(filewrapper_factory(wrapper, file, pseudo))
     resp = client.get()
     resp.raise_for_status()
@@ -231,15 +296,22 @@ def test_file_wrapper(client, wrapper, file, pseudo):
     assert resp.content == expected
 
 
-def test_wsgi_app_not_callable(client):
-    """tests/not-callable.py"""
-    client.start(object())
-    with pytest.raises(TypeError):
+@pytest.mark.parametrize('app', [object(), None, ''])
+def test_wsgi_app_not_callable(client, app):
+    """
+    Test the server raises a ``TypeError`` when the WSGI application
+    object is not a callable object.
+    According to WSGI specification, the application object must be
+    a callable object that accepts two arguments, see
+    https://www.python.org/dev/peps/pep-3333/#the-application-framework-side
+    """
+    client.start(app)
+    with pytest.raises(TypeError, match="'.*' object is not callable"):
         response = client.get()
 
 
 def test_iter_response(client):
-    """tests/huge.py"""
+    """Test huge response body with an iterator."""
     N = 1024
     CHUNK = b'a' * 1024
     DATA_LEN = N * len(CHUNK)
@@ -258,20 +330,8 @@ def test_iter_response(client):
     assert response.content == b'a' * 1024 * 1024
 
 
-def test_tuple_response(client):
-    """tests/slow_server.py"""
-
-    def app(environ, start_response):
-        start_response('200 OK', [('Content-Type', 'text/plain')])
-        return (b'Hello,', b" it's me, ", b'Bob!')
-
-    client.start(app)
-    response = client.get()
-    assert response.content == b"Hello, it's me, Bob!"
-
-
 def test_huge_response(client):
-    """tests/slow_server.py"""
+    """Test huge response body with a list."""
 
     def app(environ, start_response):
         start_response('200 OK', [('Content-Type', 'text/plain')])
@@ -282,54 +342,8 @@ def test_huge_response(client):
     assert response.content == b'x' * 1024 * 1024
 
 
-def app1(env, sr):
-    headers = [
-        ('Foo', 'Bar'),
-        ('Blah', 'Blubb'),
-        ('Spam', 'Eggs'),
-        ('Blurg', 'asdasjdaskdasdjj asdk jaks / /a jaksdjkas jkasd jkasdj '),
-        ('asd2easdasdjaksdjdkskjkasdjka', 'oasdjkadk kasdk k k k k k '),
-    ]
-    sr('200 ok', headers)
-    return [b'hello', b'world']
-
-
-def app2(env, sr):
-    sr('200 ok', [])
-    return b'hello'
-
-
-def app3(env, sr):
-    sr('200 abc', [('Content-Length', '12')])
-    yield b'Hello'
-    yield b' World'
-    yield b'\n'
-
-
-def app4(e, sr):
-    sr('200 ok', [])
-    return [b'hello there ... \n']
-
-
-@pytest.mark.parametrize(
-    'app,status_code,body',
-    [
-        (app1, 200, b'helloworld'),
-        (app2, 200, b'hello'),
-        (app3, 200, b'Hello World\n'),
-        (app4, 200, b'hello there ... \n'),
-    ],
-)
-def test_unix_socket(unixclient, app, status_code, body):
-    """tests/hello_unix.py"""
-    unixclient.start(app)
-    response = unixclient.get()
-    assert response.status_code == status_code
-    assert response.content == body
-
-
 def test_interrupt_during_request(client):
-    """tests/interrupt-during-request.py"""
+    """Test request interrupt."""
 
     def application(environ, start_response):
         start_response('200 ok', [])
@@ -343,7 +357,10 @@ def test_interrupt_during_request(client):
 
 
 def test_exc_info_reference(client):
-    """tests/test_exc_info_reference.py"""
+    """
+    Test a handled exception is trapped and logged. See
+    https://www.python.org/dev/peps/pep-3333/#error-handling
+    """
 
     def app(env, start_response):
         start_response('200 alright', [])
@@ -363,7 +380,7 @@ def test_exc_info_reference(client):
 
 
 def test_fork(unixclient):
-    """tests/fork.py"""
+    """Test running multiple server workers."""
 
     def app(env, start_response):
         start_response('200 ok', [])
@@ -375,7 +392,10 @@ def test_fork(unixclient):
 
 
 def test_wsgi_compliance(client):
-    """test_wsgi_compliance.py"""
+    """
+    Check for conformance to the WSGI specification using
+    the :py:mod:`wsgiref.validate` validation tool.
+    """
 
     @validator
     def _app(environ, start_response):
@@ -398,7 +418,10 @@ def test_wsgi_compliance(client):
     ],
 )
 def test_expect_100_continue(httpclient, expect_header_value, content_length, body, response):
-    """tests/expect100.py"""
+    """
+    Test the HTTP 1.1 Expect/Continue implementation. See
+    https://www.python.org/dev/peps/pep-3333/#http-1-1-expect-continue
+    """
 
     def app(e, s):
         s('200 OK', [('Content-Length', '0')])
