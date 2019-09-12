@@ -88,7 +88,7 @@ wsgi_call_application(Request* request)
       Py_DECREF(retval);
       first_chunk = NULL;
     }
-  } else if(FileWrapper_CheckExact(retval) && FileWrapper_GetFd(retval) != -1) {
+  } else if(!request->state.response_length_unknown && FileWrapper_CheckExact(retval) && FileWrapper_GetFd(retval) != -1) {
     DBG_REQ(request, "WSGI iterable is wsgi.file_wrapper instance and Content-Length is known");
     request->iterable = retval;
     request->iterator = NULL;
