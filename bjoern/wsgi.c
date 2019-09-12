@@ -67,6 +67,7 @@ wsgi_call_application(Request* request)
      _PEP3333_Bytes_Check(PyList_GET_ITEM(retval, 0)))
   {
     /* Optimize the most common case, a single bytestring in a list: */
+    DBG_REQ(request, "WSGI iterable is list of size 1");
     PyObject* tmp = PyList_GET_ITEM(retval, 0);
     Py_INCREF(tmp);
     Py_DECREF(retval);
@@ -77,6 +78,7 @@ wsgi_call_application(Request* request)
      * i.e. sending the response item for item. "item for item" means
      * "char for char" if you have a bytestring. -- I'm not that stupid. */
     bytestring:
+    DBG_REQ(request, "WSGI iterable is byte string");
     request->iterable = NULL;
     request->iterator = NULL;
     if(_PEP3333_Bytes_GET_SIZE(retval)) {
@@ -87,11 +89,13 @@ wsgi_call_application(Request* request)
       first_chunk = NULL;
     }
   } else if(FileWrapper_CheckExact(retval) && FileWrapper_GetFd(retval) != -1) {
+    DBG_REQ(request, "WSGI iterable is wsgi.file_wrapper instance and Content-Length is known");
     request->iterable = retval;
     request->iterator = NULL;
     first_chunk = NULL;
   } else {
     /* Generic iterable (list of length != 1, generator, ...) */
+    DBG_REQ(request, "WSGI iterable is some other iterable");
     request->iterable = retval;
     request->iterator = PyObject_GetIter(retval);
     if(request->iterator == NULL)
@@ -125,18 +129,22 @@ wsgi_call_application(Request* request)
     if(request->state.response_length_unknown) {
       if(request->parser.parser.http_major > 0 && request->parser.parser.http_minor > 0) {
         /* On HTTP 1.1, we can use Transfer-Encoding: chunked. */
+        DBG_REQ(request, "Content-Length unknown, HTTP/1.1 -> Connection: will keep-alive with chunked response");
         request->state.chunked_response = true;
         request->state.keep_alive = true;
       } else {
         /* On HTTP 1.0, we can only resort to closing the connection.  */
+        DBG_REQ(request, "Content-Length unknown, HTTP/1.10 -> will close");
         request->state.keep_alive = false;
       }
     } else {
       /* We know the content-length. Can always keep-alive. */
+        DBG_REQ(request, "Content-Length known -> will keep alive");
       request->state.keep_alive = true;
     }
   } else {
     /* Explicit "Connection: close" (HTTP 1.1) or missing "Connection: keep-alive" (HTTP 1.0) */
+    DBG_REQ(request, "Connection: close request by client");
     request->state.keep_alive = false;
   }
 
