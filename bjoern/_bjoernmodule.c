@@ -2,6 +2,7 @@
 #include "server.h"
 #include "wsgi.h"
 #include "filewrapper.h"
+#include "statsd-client.h"
 
 static PyObject*
 run(PyObject* self, PyObject* args)
@@ -10,7 +11,11 @@ run(PyObject* self, PyObject* args)
 
   PyObject* socket;
 
-  if(!PyArg_ParseTuple(args, "OO:server_run", &socket, &info.wsgi_app)) {
+  StatsdInfo statsd_info;
+
+  if(!PyArg_ParseTuple(args, "OOiziz:server_run", &socket, &info.wsgi_app,
+                       &statsd_info.enabled, &statsd_info.host, &statsd_info.port,
+                       &statsd_info.namespace)) {
     return NULL;
   }
 
@@ -32,8 +37,22 @@ run(PyObject* self, PyObject* args)
     }
   }
 
+  statsd_link* statsd = NULL;
+  if (statsd_info.enabled) {
+      if (statsd_info.host == NULL || *statsd_info.host == '\0') {
+        statsd_info.host = "127.0.0.1";
+      }
+
+      if (statsd_info.namespace == NULL || statsd_info.namespace == '\0') {
+        statsd = statsd_init(statsd_info.host, statsd_info.port);
+      } else {
+        statsd = statsd_init_with_namespace(statsd_info.host, statsd_info.port, statsd_info.namespace);
+      }
+  }
+
   _initialize_request_module(&info);
-  server_run(&info);
+  server_run(&info, statsd);
+  statsd_finalize(statsd);
 
   Py_RETURN_NONE;
 }

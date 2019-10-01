@@ -1,6 +1,8 @@
 #ifndef __server_h__
 #define __server_h__
 
+#include "statsd-client.h"
+
 typedef struct {
   int sockfd;
   PyObject* wsgi_app;
@@ -8,6 +10,13 @@ typedef struct {
   PyObject* port;
 } ServerInfo;
 
-void server_run(ServerInfo*);
+typedef struct {
+  int enabled;
+  int port;
+  char* host;
+  char* namespace;
+} StatsdInfo;
+
+void server_run(ServerInfo*, statsd_link*);
 
 #endif

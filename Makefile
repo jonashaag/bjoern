@@ -9,11 +9,15 @@ HTTP_PARSER_DIR	= http-parser
 HTTP_PARSER_OBJ = $(HTTP_PARSER_DIR)/http_parser.o
 HTTP_PARSER_SRC = $(HTTP_PARSER_DIR)/http_parser.c
 
-objects		= $(HTTP_PARSER_OBJ) \
+STATSD_CLIENT_DIR = statsd-c-client
+STATSD_CLIENT_OBJ = $(STATSD_CLIENT_DIR)/statsd-client.o
+STATSD_CLIENT_SRC = $(STATSD_CLIENT_DIR)/statsd-client.c
+
+objects		= $(HTTP_PARSER_OBJ) $(STATSD_CLIENT_OBJ) \
 		  $(patsubst $(SOURCE_DIR)/%.c, $(BUILD_DIR)/%.o, \
 		             $(wildcard $(SOURCE_DIR)/*.c))
 
-CPPFLAGS	+= $(PYTHON_INCLUDE) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR)
+CPPFLAGS	+= $(PYTHON_INCLUDE) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR) -I $(STATSD_CLIENT_DIR)
 CFLAGS		+= $(FEATURES) -std=c99 -fno-strict-aliasing -fcommon -fPIC -Wall
 LDFLAGS		+= $(PYTHON_LDFLAGS) -l ev -shared -fcommon
 
@@ -107,3 +111,6 @@ upload:
 
 $(HTTP_PARSER_OBJ):
 	$(MAKE) -C $(HTTP_PARSER_DIR) http_parser.o CFLAGS_DEBUG_EXTRA=-fPIC CFLAGS_FAST_EXTRA=-fPIC
+
+$(STATSD_CLIENT_OBJ):
+	$(MAKE) -C $(STATSD_CLIENT_DIR) statsd-client.o CFLAGS_DEBUG_EXTRA=-fPIC CFLAGS_FAST_EXTRA=-fPIC

@@ -42,16 +42,24 @@ Usage
    # Bind to abstract Unix socket: (Linux only)
    bjoern.run(wsgi_application, 'unix:@socket_name')
 
+   # enable statsd metrics
+   bjoern.run(wsgi_application, host, port, reuse_port=True, enable_statsd=True)
+
 Alternatively, the mainloop can be run separately::
 
    bjoern.listen(wsgi_application, host, port)
    bjoern.run()
-   
+
+   # with metrics
+   bjoern.listen(wsgi_application, host, port)
+   bjoern.run(enable_statsd=True)
+
 You can also simply pass a Python socket(-like) object. Note that you are responsible
 for initializing and cleaning up the socket in that case. ::
 
    bjoern.server_run(socket_object, wsgi_application)
    bjoern.server_run(filedescriptor_as_integer, wsgi_application)
+   bjoern.server_run(socket_object, wsgi_application, enable_statsd=True)
 
 .. _WSGI:         http://www.python.org/dev/peps/pep-0333/
 .. _libev:        http://software.schmorp.de/pkg/libev.html

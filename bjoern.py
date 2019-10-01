@@ -35,8 +35,8 @@ def bind_and_listen(host, port=None, reuse_port=False,
     return sock
 
 
-def server_run(sock, wsgi_app):
-    _bjoern.server_run(sock, wsgi_app)
+def server_run(sock, wsgi_app, enable_statsd=False, statsd_host="127.0.0.1", statsd_port=8125, statsd_ns="bjoern"):
+    _bjoern.server_run(sock, wsgi_app, int(enable_statsd), statsd_host, statsd_port, statsd_ns)
 
 
 # Backwards compatibility API
@@ -59,6 +59,22 @@ def listen(wsgi_app, host, port=None, reuse_port=False,
     return sock
 
 
+def __separate_config(kwargs):
+    statsd_config = {
+        "enable_statsd": False,
+        "statsd_host": "127.0.0.1",
+        "statsd_port": 8125,
+        "statsd_ns": "bjoern",
+    }
+
+    for each in statsd_config.keys():
+        if each in kwargs:
+            statsd_config[each] = kwargs[each]
+            del kwargs[each]
+
+    return kwargs, statsd_config
+
+
 def run(*args, **kwargs):
     """
     run(*args, **kwargs):
@@ -69,6 +85,8 @@ def run(*args, **kwargs):
         run() without arguments."
     """
     global _default_instance
+
+    kwargs, statsd_config = __separate_config(kwargs)
 
     if args or kwargs:
         # Called as `bjoern.run(wsgi_app, host, ...)`
@@ -82,7 +100,7 @@ def run(*args, **kwargs):
 
     sock, wsgi_app = _default_instance
     try:
-        server_run(sock, wsgi_app)
+        server_run(sock, wsgi_app, **statsd_config)
     finally:
         if sock.family == socket.AF_UNIX:
             filename = sock.getsockname()
