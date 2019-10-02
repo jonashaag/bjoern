@@ -41,6 +41,10 @@ ifneq ($(WANT_STATSD), no)
 FEATURES	+= -D WANT_STATSD
 endif
 
+ifneq ($(WANT_STATSD_TAGS), no)
+FEATURES	+= -D WANT_STATSD_TAGS
+endif
+
 all: prepare-build $(objects) _bjoernmodule
 
 print-env:

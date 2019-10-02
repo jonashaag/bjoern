@@ -18,7 +18,11 @@ typedef struct {
   char* namespace;
 } StatsdInfo;
 
-void server_run(ServerInfo*, statsd_link*);
+  #ifdef WANT_STATSD_TAGS
+  void server_run(ServerInfo*, statsd_link*, const char*);
+  #else
+  void server_run(ServerInfo*, statsd_link*);
+  #endif
 
 #else
 void server_run(ServerInfo*);

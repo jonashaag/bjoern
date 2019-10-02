@@ -13,17 +13,19 @@ run(PyObject* self, PyObject* args)
 
 #ifdef WANT_STATSD
   StatsdInfo statsd_info;
+  char* statsd_tags = NULL;
 
-  if(!PyArg_ParseTuple(args, "OOiziz:server_run", &socket, &info.wsgi_app,
+  if(!PyArg_ParseTuple(args, "OOiziz|z:server_run", &socket, &info.wsgi_app,
                        &statsd_info.enabled, &statsd_info.host, &statsd_info.port,
-                       &statsd_info.namespace)) {
+                       &statsd_info.namespace, &statsd_tags)) {
     return NULL;
   }
 #else
   char* ignored_str;
   int ignored_int;
 
-  if(!PyArg_ParseTuple(args, "OO|iziz:server_run", &socket, &info.wsgi_app, &ignored_int, &ignored_str, &ignored_int, &ignored_str)) {
+  if(!PyArg_ParseTuple(args, "OO|izizz:server_run", &socket, &info.wsgi_app, &ignored_int,
+                       &ignored_str, &ignored_int, &ignored_str, &ignored_str)) {
     return NULL;
   }
 #endif
@@ -53,7 +55,7 @@ run(PyObject* self, PyObject* args)
         statsd_info.host = "127.0.0.1";
       }
 
-      if (statsd_info.namespace == NULL || statsd_info.namespace == '\0') {
+      if (statsd_info.namespace == NULL || *statsd_info.namespace == '\0') {
         statsd = statsd_init(statsd_info.host, statsd_info.port);
       } else {
         statsd = statsd_init_with_namespace(statsd_info.host, statsd_info.port, statsd_info.namespace);
@@ -64,7 +66,11 @@ run(PyObject* self, PyObject* args)
   _initialize_request_module(&info);
 
 #ifdef WANT_STATSD
+  #ifdef WANT_STATSD_TAGS
+  server_run(&info, statsd, statsd_tags);
+  #else
   server_run(&info, statsd);
+  #endif
   statsd_finalize(statsd);
 #else
   server_run(&info);

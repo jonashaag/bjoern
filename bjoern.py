@@ -35,8 +35,12 @@ def bind_and_listen(host, port=None, reuse_port=False,
     return sock
 
 
-def server_run(sock, wsgi_app, enable_statsd=False, statsd_host="127.0.0.1", statsd_port=8125, statsd_ns="bjoern"):
-    _bjoern.server_run(sock, wsgi_app, int(enable_statsd), statsd_host, statsd_port, statsd_ns)
+def server_run(sock, wsgi_app, enable_statsd=False, statsd_host="127.0.0.1", statsd_port=8125, statsd_ns="bjoern", statsd_tags=None):
+    tags = None
+    if statsd_tags:
+        tags = ",".join(statsd_tags)
+
+    _bjoern.server_run(sock, wsgi_app, int(enable_statsd), statsd_host, statsd_port, statsd_ns, tags)
 
 
 # Backwards compatibility API
@@ -65,6 +69,7 @@ def __separate_config(kwargs):
         "statsd_host": "127.0.0.1",
         "statsd_port": 8125,
         "statsd_ns": "bjoern",
+        "statsd_tags": [],
     }
 
     for each in statsd_config.keys():

@@ -20,9 +20,13 @@
 
 #ifdef WANT_STATSD
 # include "statsd-client.h"
-# define SERVER_RUN_ARGS ServerInfo* server_info, statsd_link* statsd
+  #ifdef WANT_STATSD_TAGS
+    #define SERVER_RUN_ARGS ServerInfo* server_info, statsd_link* statsd, const char* statsd_tags
+  #else
+    #define SERVER_RUN_ARGS ServerInfo* server_info, statsd_link* statsd
+  #endif
 #else
-# define SERVER_RUN_ARGS ServerInfo* server_info
+  #define SERVER_RUN_ARGS ServerInfo* server_info
 #endif
 
 #include "py2py3.h"
@@ -56,6 +60,9 @@ typedef struct {
   ev_io accept_watcher;
 #ifdef WANT_STATSD
   statsd_link* statsd;
+# ifdef WANT_STATSD_TAGS
+  char* statsd_tags
+# endif
 #endif
 } ThreadInfo;
 
@@ -92,6 +99,9 @@ void server_run(SERVER_RUN_ARGS)
 
 #ifdef WANT_STATSD
   thread_info.statsd = statsd;
+#ifdef WANT_STATSD_TAGS
+  thread_info.statsd_tags = statsd_tags;
+#endif
 #endif
 
   ev_set_userdata(mainloop, &thread_info);

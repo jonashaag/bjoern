@@ -59,7 +59,13 @@ PyObject *_REMOTE_ADDR, *_PATH_INFO, *_QUERY_STRING, *_REQUEST_METHOD, *_GET,
 
 #ifdef WANT_STATSD
   #include "statsd-client.h"
-  #define STATSD_INC(name) statsd_inc(((ThreadInfo*) ev_userdata(mainloop))->statsd, name, 1.0)
+
+  #ifdef WANT_STATSD_TAGS
+    #include "statsd_tags.h"
+    #define STATSD_INC(name) statsd_inc_with_tags(((ThreadInfo*) ev_userdata(mainloop))->statsd, name, ((ThreadInfo*) ev_userdata(mainloop))->statsd_tags)
+  #else
+    #define STATSD_INC(name) statsd_inc(((ThreadInfo*) ev_userdata(mainloop))->statsd, name, 1.0)
+  #endif
 #else
   #define STATSD_INC(name) DBG("statsd.inc: %s", name)
 #endif
