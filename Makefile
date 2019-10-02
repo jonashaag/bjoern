@@ -37,6 +37,10 @@ ifndef SIGNAL_CHECK_INTERVAL
 FEATURES	+= -D SIGNAL_CHECK_INTERVAL=0.1
 endif
 
+ifneq ($(WANT_STATSD), no)
+FEATURES	+= -D WANT_STATSD
+endif
+
 all: prepare-build $(objects) _bjoernmodule
 
 print-env:

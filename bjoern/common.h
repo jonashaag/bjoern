@@ -57,4 +57,11 @@ PyObject *_REMOTE_ADDR, *_PATH_INFO, *_QUERY_STRING, *_REQUEST_METHOD, *_GET,
   #define assert(...) do{}while(0)
 #endif
 
+#ifdef WANT_STATSD
+  #include "statsd-client.h"
+  #define STATSD_INC(name) statsd_inc(((ThreadInfo*) ev_userdata(mainloop))->statsd, name, 1.0)
+#else
+  #define STATSD_INC(name) DBG("statsd.inc: %s", name)
+#endif
+
 #endif

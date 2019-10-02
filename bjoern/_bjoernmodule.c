@@ -11,6 +11,7 @@ run(PyObject* self, PyObject* args)
 
   PyObject* socket;
 
+#ifdef WANT_STATSD
   StatsdInfo statsd_info;
 
   if(!PyArg_ParseTuple(args, "OOiziz:server_run", &socket, &info.wsgi_app,
@@ -18,6 +19,14 @@ run(PyObject* self, PyObject* args)
                        &statsd_info.namespace)) {
     return NULL;
   }
+#else
+  char* ignored_str;
+  int ignored_int;
+
+  if(!PyArg_ParseTuple(args, "OO|iziz:server_run", &socket, &info.wsgi_app, &ignored_int, &ignored_str, &ignored_int, &ignored_str)) {
+    return NULL;
+  }
+#endif
 
   info.sockfd = PyObject_AsFileDescriptor(socket);
   if (info.sockfd < 0) {
@@ -37,6 +46,7 @@ run(PyObject* self, PyObject* args)
     }
   }
 
+#ifdef WANT_STATSD
   statsd_link* statsd = NULL;
   if (statsd_info.enabled) {
       if (statsd_info.host == NULL || *statsd_info.host == '\0') {
@@ -49,10 +59,16 @@ run(PyObject* self, PyObject* args)
         statsd = statsd_init_with_namespace(statsd_info.host, statsd_info.port, statsd_info.namespace);
       }
   }
+#endif
 
   _initialize_request_module(&info);
+
+#ifdef WANT_STATSD
   server_run(&info, statsd);
   statsd_finalize(statsd);
+#else
+  server_run(&info);
+#endif
 
   Py_RETURN_NONE;
 }

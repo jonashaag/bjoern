@@ -14,6 +14,7 @@ bjoern_extension = Extension(
     define_macros = [('WANT_SENDFILE', '1'),
                      ('WANT_SIGINT_HANDLING', '1'),
                      ('WANT_SIGNAL_HANDLING', '1'),
+                     ('WANT_STATSD', '1'),
                      ('SIGNAL_CHECK_INTERVAL', '0.1')],
     extra_compile_args = ['-std=c99', '-fno-strict-aliasing', '-fcommon',
                           '-fPIC', '-Wall', '-Wextra', '-Wno-unused-parameter',
