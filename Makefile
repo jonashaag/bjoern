@@ -37,11 +37,11 @@ ifndef SIGNAL_CHECK_INTERVAL
 FEATURES	+= -D SIGNAL_CHECK_INTERVAL=0.1
 endif
 
-ifneq ($(WANT_STATSD), no)
+ifeq ($(WANT_STATSD), yes)
 FEATURES	+= -D WANT_STATSD
 endif
 
-ifneq ($(WANT_STATSD_TAGS), no)
+ifeq ($(WANT_STATSD_TAGS), yes)
 FEATURES	+= -D WANT_STATSD_TAGS
 endif
 

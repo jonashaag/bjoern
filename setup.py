@@ -2,20 +2,17 @@ import os
 import glob
 from setuptools import setup, Extension
 
-SOURCE_FILES = [os.path.join('http-parser', 'http_parser.c'),
-                os.path.join('statsd-c-client', 'statsd-client.c')] + \
+SOURCE_FILES = [os.path.join('http-parser', 'http_parser.c')] + \
                sorted(glob.glob(os.path.join('bjoern', '*.c')))
 
 bjoern_extension = Extension(
     '_bjoern',
     sources       = SOURCE_FILES,
     libraries     = ['ev'],
-    include_dirs  = ['http-parser', 'statsd-c-client', '/usr/include/libev', '/opt/local/include'],
+    include_dirs  = ['http-parser', '/usr/include/libev', '/opt/local/include'],
     define_macros = [('WANT_SENDFILE', '1'),
                      ('WANT_SIGINT_HANDLING', '1'),
                      ('WANT_SIGNAL_HANDLING', '1'),
-                     ('WANT_STATSD', '1'),
-                     ('WANT_STATSD_TAGS', '1'),
                      ('SIGNAL_CHECK_INTERVAL', '0.1')],
     extra_compile_args = ['-std=c99', '-fno-strict-aliasing', '-fcommon',
                           '-fPIC', '-Wall', '-Wextra', '-Wno-unused-parameter',

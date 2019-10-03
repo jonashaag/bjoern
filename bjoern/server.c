@@ -17,19 +17,11 @@
 #include "common.h"
 #include "wsgi.h"
 #include "server.h"
+#include "py2py3.h"
 
 #ifdef WANT_STATSD
-# include "statsd-client.h"
-  #ifdef WANT_STATSD_TAGS
-    #define SERVER_RUN_ARGS ServerInfo* server_info, statsd_link* statsd, const char* statsd_tags
-  #else
-    #define SERVER_RUN_ARGS ServerInfo* server_info, statsd_link* statsd
-  #endif
-#else
-  #define SERVER_RUN_ARGS ServerInfo* server_info
+#include "statsd-client.h"
 #endif
-
-#include "py2py3.h"
 
 #define READ_BUFFER_SIZE 64*1024
 #define Py_XCLEAR(obj) do { if(obj) { Py_DECREF(obj); obj = NULL; } } while(0)
@@ -58,12 +50,6 @@ typedef enum _rw_state write_state;
 typedef struct {
   ServerInfo* server_info;
   ev_io accept_watcher;
-#ifdef WANT_STATSD
-  statsd_link* statsd;
-# ifdef WANT_STATSD_TAGS
-  char* statsd_tags
-# endif
-#endif
 } ThreadInfo;
 
 typedef void ev_io_callback(struct ev_loop*, ev_io*, const int);
@@ -90,19 +76,12 @@ static bool handle_nonzero_errno(Request*);
 static void close_connection(struct ev_loop*, Request*);
 
 
-void server_run(SERVER_RUN_ARGS)
+void server_run(ServerInfo* server_info)
 {
   struct ev_loop* mainloop = ev_loop_new(0);
 
   ThreadInfo thread_info;
   thread_info.server_info = server_info;
-
-#ifdef WANT_STATSD
-  thread_info.statsd = statsd;
-#ifdef WANT_STATSD_TAGS
-  thread_info.statsd_tags = statsd_tags;
-#endif
-#endif
 
   ev_set_userdata(mainloop, &thread_info);
 
@@ -174,13 +153,13 @@ ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
   client_fd = accept(watcher->fd, (struct sockaddr*)&sockaddr, &addrlen);
   if(client_fd < 0) {
     DBG("Could not accept() client: errno %d", errno);
-    STATSD_INC("conn.accept.error");
+    STATSD_INCREMENT("conn.accept.error");
     return;
   }
 
   int flags = fcntl(client_fd, F_GETFL, 0);
   if(fcntl(client_fd, F_SETFL, (flags < 0 ? 0 : flags) | O_NONBLOCK) == -1) {
-    STATSD_INC("conn.accept.error");
+    STATSD_INCREMENT("conn.accept.error");
     DBG("Could not set_nonblocking() client %d: errno %d", client_fd, errno);
     return;
   }
@@ -195,7 +174,7 @@ ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
 
   GIL_UNLOCK(0);
 
-  STATSD_INC("conn.accept.success");
+  STATSD_INCREMENT("conn.accept.success");
 
   DBG_REQ(request, "Accepted client %s:%d on fd %d",
           inet_ntoa(sockaddr.sin_addr), ntohs(sockaddr.sin_port), client_fd);
@@ -242,7 +221,7 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
     /* Client disconnected */
     read_state = aborted;
     DBG_REQ(request, "Client disconnected");
-    STATSD_INC("req.error.client_disconnected");
+    STATSD_INCREMENT("req.error.client_disconnected");
   } else if (read_bytes < 0) {
     /* Would block or error */
     if(errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -250,7 +229,7 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
     } else {
       read_state = aborted;
       DBG_REQ(request, "Hit errno %d while read()ing", errno);
-      STATSD_INC("req.error.read");
+      STATSD_INCREMENT("req.error.read");
     }
   } else {
     /* OK, either expect more data or done reading */
@@ -259,7 +238,7 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
       /* HTTP parse error */
       read_state = done;
       DBG_REQ(request, "Parse error");
-      STATSD_INC("req.error.parse");
+      STATSD_INCREMENT("req.error.parse");
       request->current_chunk = _PEP3333_Bytes_FromString(
         http_error_messages[request->state.error_code]);
       assert(request->iterator == NULL);
@@ -268,7 +247,7 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
        * request (the header _and_ the body). */
       read_state = done;
 
-      STATSD_INC("req.success.read");
+      STATSD_INCREMENT("req.success.read");
 
       if (!wsgi_call_application(request)) {
         /* Response is "HTTP 500 Internal Server Error" */
@@ -279,7 +258,7 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
         Py_XCLEAR(request->iterator);
         request->current_chunk = _PEP3333_Bytes_FromString(
           http_error_messages[HTTP_SERVER_ERROR]);
-        STATSD_INC("req.error.internal");
+        STATSD_INCREMENT("req.error.internal");
       }
     } else if (request->state.expect_continue) {
       /*
@@ -296,7 +275,7 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
 
   switch (read_state) {
   case not_yet_done:
-    STATSD_INC("req.active");
+    STATSD_INCREMENT("req.active");
     break;
   case expect_continue:
     DBG_REQ(request, "pause read, write 100-continue");
@@ -308,11 +287,11 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
     DBG_REQ(request, "Stop read watcher, start write watcher");
     ev_io_stop(mainloop, &request->ev_watcher);
     start_writing(mainloop, request);
-    STATSD_INC("req.done");
+    STATSD_INCREMENT("req.done");
     break;
   case aborted:
     close_connection(mainloop, request);
-    STATSD_INC("req.aborted");
+    STATSD_INCREMENT("req.aborted");
     break;
   }
 
@@ -355,13 +334,13 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
 
   switch(write_state) {
   case not_yet_done:
-    STATSD_INC("resp.active");
+    STATSD_INCREMENT("resp.active");
     break;
   case done:
-    STATSD_INC("resp.done");
+    STATSD_INCREMENT("resp.done");
     if(request->state.keep_alive) {
       DBG_REQ(request, "done, keep-alive");
-      STATSD_INC("resp.done.keepalive");
+      STATSD_INCREMENT("resp.done.keepalive");
       ev_io_stop(mainloop, &request->ev_watcher);
 
       Request_clean(request);
@@ -370,7 +349,7 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
       start_reading(mainloop, request);
     } else {
       DBG_REQ(request, "done, close");
-      STATSD_INC("resp.conn.close");
+      STATSD_INCREMENT("resp.conn.close");
       close_connection(mainloop, request);
     }
     break;
@@ -385,7 +364,7 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
     /* Response was aborted due to an error. We can't do anything graceful here
      * because at least one chunk is already sent... just close the connection. */
     close_connection(mainloop, request);
-    STATSD_INC("resp.aborted");
+    STATSD_INCREMENT("resp.aborted");
     break;
   }
 

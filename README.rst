@@ -43,6 +43,7 @@ Usage
    bjoern.run(wsgi_application, 'unix:@socket_name')
 
    # enable statsd metrics
+   # This needs manual compilation with `WANT_STATSD=yes`
    bjoern.run(wsgi_application, host, port, reuse_port=True, enable_statsd=True)
 
 Alternatively, the mainloop can be run separately::
@@ -51,6 +52,7 @@ Alternatively, the mainloop can be run separately::
    bjoern.run()
 
    # with metrics
+   # This needs manual compilation with `WANT_STATSD=yes`
    bjoern.listen(wsgi_application, host, port)
    bjoern.run(enable_statsd=True)
 
@@ -59,6 +61,8 @@ for initializing and cleaning up the socket in that case. ::
 
    bjoern.server_run(socket_object, wsgi_application)
    bjoern.server_run(filedescriptor_as_integer, wsgi_application)
+
+   # This needs manual compilation with `WANT_STATSD=yes`
    bjoern.server_run(socket_object, wsgi_application, enable_statsd=True)
 
 .. _WSGI:         http://www.python.org/dev/peps/pep-0333/

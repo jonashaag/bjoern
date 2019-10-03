@@ -1,6 +1,27 @@
 ## Instrumentation
 
-Bjoern can export connection and request metrics to statsd. You can enable statsd metrics on server boot by setting `enable_statsd=True`.
+Bjoern can export connection and request metrics to statsd. If you want support for instrumentation you must compile
+bjoern manually with
+
+```bash
+WANT_STATSD=yes make all
+```
+
+you can also enable Dogstatsd tags support by compiling with
+
+```bash
+WANT_STATSD=yes WANT_STATSD_TAGS=yes make all
+```
+
+After building with statsd support you can enable statsd metrics on server boot by setting `enable_statsd=True`, e.g.
+
+```python
+bjoern.listen(wsgi_application, host, port)
+bjoern.run(enable_statsd=True)
+
+# With tags
+bjoern.run(enable_statsd=True, statsd_tags=['app:my-app-name', 'zone:central-europe'])
+```
 
 Following metrics are exposed:
 

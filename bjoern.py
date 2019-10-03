@@ -35,12 +35,12 @@ def bind_and_listen(host, port=None, reuse_port=False,
     return sock
 
 
-def server_run(sock, wsgi_app, enable_statsd=False, statsd_host="127.0.0.1", statsd_port=8125, statsd_ns="bjoern", statsd_tags=None):
+def server_run(sock, wsgi_app, statsd_enable=False, statsd_host="127.0.0.1", statsd_port=8125, statsd_ns="bjoern", statsd_tags=None):
     tags = None
     if statsd_tags:
         tags = ",".join(statsd_tags)
 
-    _bjoern.server_run(sock, wsgi_app, int(enable_statsd), statsd_host, statsd_port, statsd_ns, tags)
+    _bjoern.server_run(sock, wsgi_app, int(statsd_enable), statsd_host, statsd_port, statsd_ns, tags)
 
 
 # Backwards compatibility API
@@ -63,21 +63,12 @@ def listen(wsgi_app, host, port=None, reuse_port=False,
     return sock
 
 
-def __separate_config(kwargs):
-    statsd_config = {
-        "enable_statsd": False,
-        "statsd_host": "127.0.0.1",
-        "statsd_port": 8125,
-        "statsd_ns": "bjoern",
-        "statsd_tags": [],
-    }
-
-    for each in statsd_config.keys():
-        if each in kwargs:
-            statsd_config[each] = kwargs[each]
-            del kwargs[each]
-
-    return kwargs, statsd_config
+default_statsd_config = {
+    "host": "127.0.0.1",
+    "port": 8125,
+    "ns": "bjoern",
+    "tags": [],
+}
 
 
 def run(*args, **kwargs):
@@ -91,7 +82,13 @@ def run(*args, **kwargs):
     """
     global _default_instance
 
-    kwargs, statsd_config = __separate_config(kwargs)
+    statsd = kwargs.pop('statsd', None)
+    if statsd:
+        for k, v in default_statsd_config.iteritems():
+            if k not in statsd:
+                statsd[k] = v
+
+    statsd = {'statsd_{}'.format(k): v for k, v in statsd.iteritems()} if statsd else {}
 
     if args or kwargs:
         # Called as `bjoern.run(wsgi_app, host, ...)`
@@ -105,7 +102,7 @@ def run(*args, **kwargs):
 
     sock, wsgi_app = _default_instance
     try:
-        server_run(sock, wsgi_app, **statsd_config)
+        server_run(sock, wsgi_app, **statsd)
     finally:
         if sock.family == socket.AF_UNIX:
             filename = sock.getsockname()

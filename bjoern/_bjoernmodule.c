@@ -2,7 +2,10 @@
 #include "server.h"
 #include "wsgi.h"
 #include "filewrapper.h"
+
+#ifdef WANT_STATSD
 #include "statsd-client.h"
+#endif
 
 static PyObject*
 run(PyObject* self, PyObject* args)
@@ -12,12 +15,15 @@ run(PyObject* self, PyObject* args)
   PyObject* socket;
 
 #ifdef WANT_STATSD
-  StatsdInfo statsd_info;
+  info.statsd = NULL;
+  int statsd_enabled;
+  char* statsd_host = NULL;
+  int statsd_port;
+  char* statsd_ns = NULL;
   char* statsd_tags = NULL;
 
   if(!PyArg_ParseTuple(args, "OOiziz|z:server_run", &socket, &info.wsgi_app,
-                       &statsd_info.enabled, &statsd_info.host, &statsd_info.port,
-                       &statsd_info.namespace, &statsd_tags)) {
+                       &statsd_enabled, &statsd_host, &statsd_port, &statsd_ns, &statsd_tags)) {
     return NULL;
   }
 #else
@@ -49,31 +55,30 @@ run(PyObject* self, PyObject* args)
   }
 
 #ifdef WANT_STATSD
-  statsd_link* statsd = NULL;
-  if (statsd_info.enabled) {
-      if (statsd_info.host == NULL || *statsd_info.host == '\0') {
-        statsd_info.host = "127.0.0.1";
+  if (statsd_enabled) {
+      if (statsd_host == NULL || *statsd_host == '\0') {
+        statsd_host = "127.0.0.1";
       }
 
-      if (statsd_info.namespace == NULL || *statsd_info.namespace == '\0') {
-        statsd = statsd_init(statsd_info.host, statsd_info.port);
+      if (statsd_ns == NULL || *statsd_ns == '\0') {
+        info.statsd = statsd_init(statsd_host, statsd_port);
       } else {
-        statsd = statsd_init_with_namespace(statsd_info.host, statsd_info.port, statsd_info.namespace);
+        info.statsd = statsd_init_with_namespace(statsd_host, statsd_port, statsd_ns);
       }
   }
+
+#ifdef WANT_STATSD_TAGS
+  info.statsd_tags = statsd_tags;
+#endif
+
 #endif
 
   _initialize_request_module(&info);
 
-#ifdef WANT_STATSD
-  #ifdef WANT_STATSD_TAGS
-  server_run(&info, statsd, statsd_tags);
-  #else
-  server_run(&info, statsd);
-  #endif
-  statsd_finalize(statsd);
-#else
   server_run(&info);
+
+#ifdef WANT_STATSD
+  statsd_finalize(info.statsd);
 #endif
 
   Py_RETURN_NONE;
