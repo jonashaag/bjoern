@@ -123,16 +123,44 @@ PyMODINIT_FUNC INIT_BJOERN(void)
   Py_INCREF(&FileWrapper_Type);
   Py_INCREF(&StartResponse_Type);
 
+  PyObject* features = PyDict_New();
+
+#ifdef WANT_SIGNAL_HANDLING
+  PyDict_SetItemString(features, "has_signal_handling", Py_True);
+#else
+  PyDict_SetItemString(features, "has_signal_handling", Py_False);
+#endif
+
+#ifdef WANT_SIGINT_HANDLING
+  PyDict_SetItemString(features, "has_sigint_handling", Py_True);
+#else
+  PyDict_SetItemString(features, "has_sigint_handling", Py_False);
+#endif
+
+#ifdef WANT_STATSD
+  PyDict_SetItemString(features, "has_statsd", Py_True);
+#else
+  PyDict_SetItemString(features, "has_statsd", Py_False);
+#endif
+
+#ifdef WANT_STATSD_TAGS
+  PyDict_SetItemString(features, "has_statsd_tags", Py_True);
+#else
+  PyDict_SetItemString(features, "has_statsd_tags", Py_False);
+#endif
+
 #if PY_MAJOR_VERSION >= 3
   PyObject* bjoern_module = PyModule_Create(&module);
   if (bjoern_module == NULL) {
     return NULL;
   }
 
+  PyModule_AddObject(bjoern_module, "features", features);
   PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(iii)", 3, 0, 1));
   return bjoern_module;
 #else
   PyObject* bjoern_module = Py_InitModule("_bjoern", Bjoern_FunctionTable);
+  PyModule_AddObject(bjoern_module, "features", features);
   PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(iii)", 3, 0, 1));
 #endif
 

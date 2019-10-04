@@ -6,6 +6,7 @@ import _bjoern
 _default_instance = None
 DEFAULT_LISTEN_BACKLOG = 1024
 
+features = _bjoern.features
 
 def bind_and_listen(host, port=None, reuse_port=False,
                     listen_backlog=DEFAULT_LISTEN_BACKLOG):
@@ -36,10 +37,15 @@ def bind_and_listen(host, port=None, reuse_port=False,
 
 
 def server_run(sock, wsgi_app, statsd=None):
-    if statsd is None:
-        _bjoern.server_run(sock, wsgi_app)
-    else:
-        _bjoern.server_run(sock, wsgi_app, int(statsd['enable']), statsd['host'], statsd['port'], statsd['ns'], statsd.get('tags'))
+    args = [sock, wsgi_app]
+
+    if statsd and features.get('has_statsd'):
+        args.extend([int(statsd['enable']), statsd['host'], statsd['port'], statsd['ns'], statsd.get('tags')])
+
+    if not statsd and features.get('has_statsd'):
+        args.extend([0, None, 0, None, None])
+
+    _bjoern.server_run(*args)
 
 
 def listen(wsgi_app, host, port=None, reuse_port=False,

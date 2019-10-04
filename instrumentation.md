@@ -24,6 +24,7 @@ bjoern.listen(wsgi_application, host, port)
 bjoern.run(statsd={'enable': True, 'host': '...', port: ..., ns: 'bjoern'})
 
 # With tags
+# Note that the tags parameter takes a comma separated string of tags, not a list of strings.
 bjoern.run(statsd={'enable': True, 'host': '...', port: ..., ns: 'bjoern', 'tags': 'app:my-app-name,zone:central-europe'})
 ```
 
