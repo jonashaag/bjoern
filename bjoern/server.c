@@ -54,12 +54,12 @@ typedef struct {
 
 typedef void ev_io_callback(struct ev_loop*, ev_io*, const int);
 
-#if WANT_SIGINT_HANDLING
+#ifdef WANT_SIGINT_HANDLING
 typedef void ev_signal_callback(struct ev_loop*, ev_signal*, const int);
 static ev_signal_callback ev_signal_on_sigint;
 #endif
 
-#if WANT_SIGINT_HANDLING
+#ifdef WANT_SIGNAL_HANDLING
 typedef void ev_timer_callback(struct ev_loop*, ev_timer*, const int);
 static ev_timer_callback ev_timer_ontick;
 ev_timer timeout_watcher;
@@ -88,7 +88,7 @@ void server_run(ServerInfo* server_info)
   ev_io_init(&thread_info.accept_watcher, ev_io_on_request, server_info->sockfd, EV_READ);
   ev_io_start(mainloop, &thread_info.accept_watcher);
 
-#if WANT_SIGINT_HANDLING
+#ifdef WANT_SIGINT_HANDLING
   ev_signal sigint_watcher;
   ev_signal_init(&sigint_watcher, ev_signal_on_sigint, SIGINT);
   ev_signal_start(mainloop, &sigint_watcher);
@@ -107,7 +107,7 @@ void server_run(ServerInfo* server_info)
   Py_END_ALLOW_THREADS
 }
 
-#if WANT_SIGINT_HANDLING
+#ifdef WANT_SIGINT_HANDLING
 static void
 pyerr_set_interrupt(struct ev_loop* mainloop, struct ev_cleanup* watcher, const int events)
 {
@@ -132,7 +132,7 @@ ev_signal_on_sigint(struct ev_loop* mainloop, ev_signal* watcher, const int even
 }
 #endif
 
-#if WANT_SIGNAL_HANDLING
+#ifdef WANT_SIGNAL_HANDLING
 static void
 ev_timer_ontick(struct ev_loop* mainloop, ev_timer* watcher, const int events)
 {

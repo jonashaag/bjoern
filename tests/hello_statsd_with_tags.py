@@ -29,4 +29,4 @@ def wsgi_app(env, start_response):
     return choice(apps)(env, start_response)
 
 if __name__ == '__main__':
-    bjoern.run(wsgi_app, '0.0.0.0', 8080, statsd={'enable': True, 'tags': ['tag1:val1', 'tag2:val2']})
+    bjoern.run(wsgi_app, '0.0.0.0', 8080, statsd={'enable': True, 'host': '127.0.0.1', 'port': 8888, 'ns': 'bjoern', 'tags': 'tag1:val1,tag2:val2'})

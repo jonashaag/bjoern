@@ -17,9 +17,9 @@ run(PyObject* self, PyObject* args)
 #ifdef WANT_STATSD
   info.statsd = NULL;
   int statsd_enabled;
-  char* statsd_host = NULL;
+  char* statsd_host;
   int statsd_port;
-  char* statsd_ns = NULL;
+  char* statsd_ns;
   char* statsd_tags = NULL;
 
   if(!PyArg_ParseTuple(args, "OOiziz|z:server_run", &socket, &info.wsgi_app,
@@ -27,11 +27,15 @@ run(PyObject* self, PyObject* args)
     return NULL;
   }
 #else
-  char* ignored_str;
-  int ignored_int;
+  char* ignored_str = NULL;
+  int ignored_int = 0;
 
   if(!PyArg_ParseTuple(args, "OO|izizz:server_run", &socket, &info.wsgi_app, &ignored_int,
                        &ignored_str, &ignored_int, &ignored_str, &ignored_str)) {
+    return NULL;
+  }
+  if (ignored_str != NULL || ignored_int != 0) {
+    PyErr_Format(PyExc_TypeError, "Unexpected statsd_* arguments (forgot to compile with statsd support?)");
     return NULL;
   }
 #endif

@@ -35,15 +35,13 @@ def bind_and_listen(host, port=None, reuse_port=False,
     return sock
 
 
-def server_run(sock, wsgi_app, statsd_enable=False, statsd_host="127.0.0.1", statsd_port=8125, statsd_ns="bjoern", statsd_tags=None):
-    tags = None
-    if statsd_tags:
-        tags = ",".join(statsd_tags)
+def server_run(sock, wsgi_app, statsd=None):
+    if statsd is None:
+        _bjoern.server_run(sock, wsgi_app)
+    else:
+        _bjoern.server_run(sock, wsgi_app, int(statsd['enable']), statsd['host'], statsd['port'], statsd['ns'], statsd.get('tags'))
 
-    _bjoern.server_run(sock, wsgi_app, int(statsd_enable), statsd_host, statsd_port, statsd_ns, tags)
 
-
-# Backwards compatibility API
 def listen(wsgi_app, host, port=None, reuse_port=False,
            listen_backlog=DEFAULT_LISTEN_BACKLOG):
     """
@@ -63,14 +61,6 @@ def listen(wsgi_app, host, port=None, reuse_port=False,
     return sock
 
 
-default_statsd_config = {
-    "host": "127.0.0.1",
-    "port": 8125,
-    "ns": "bjoern",
-    "tags": [],
-}
-
-
 def run(*args, **kwargs):
     """
     run(*args, **kwargs):
@@ -83,12 +73,6 @@ def run(*args, **kwargs):
     global _default_instance
 
     statsd = kwargs.pop('statsd', None)
-    if statsd:
-        for k, v in default_statsd_config.iteritems():
-            if k not in statsd:
-                statsd[k] = v
-
-    statsd = {'statsd_{}'.format(k): v for k, v in statsd.iteritems()} if statsd else {}
 
     if args or kwargs:
         # Called as `bjoern.run(wsgi_app, host, ...)`
@@ -102,7 +86,7 @@ def run(*args, **kwargs):
 
     sock, wsgi_app = _default_instance
     try:
-        server_run(sock, wsgi_app, **statsd)
+        server_run(sock, wsgi_app, statsd)
     finally:
         if sock.family == socket.AF_UNIX:
             filename = sock.getsockname()

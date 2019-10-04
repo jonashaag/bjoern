@@ -4,12 +4,16 @@ Bjoern can export connection and request metrics to statsd. If you want support 
 bjoern manually with
 
 ```bash
+BJOERN_WANT_STATSD=yes python setup.py install
+# or
 WANT_STATSD=yes make all
 ```
 
 you can also enable Dogstatsd tags support by compiling with
 
 ```bash
+BJOERN_WANT_STATSD=yes BJOERN_WANT_STATSD_TAGS=yes python setup.py install
+# or
 WANT_STATSD=yes WANT_STATSD_TAGS=yes make all
 ```
 
@@ -17,10 +21,10 @@ After building with statsd support you can enable statsd metrics on server boot 
 
 ```python
 bjoern.listen(wsgi_application, host, port)
-bjoern.run(enable_statsd=True)
+bjoern.run(statsd={'enable': True, 'host': '...', port: ..., ns: 'bjoern'})
 
 # With tags
-bjoern.run(enable_statsd=True, statsd_tags=['app:my-app-name', 'zone:central-europe'])
+bjoern.run(statsd={'enable': True, 'host': '...', port: ..., ns: 'bjoern', 'tags': 'app:my-app-name,zone:central-europe'})
 ```
 
 Following metrics are exposed:

@@ -21,10 +21,6 @@ CPPFLAGS	+= $(PYTHON_INCLUDE) -I . -I $(SOURCE_DIR) -I $(HTTP_PARSER_DIR) -I $(S
 CFLAGS		+= $(FEATURES) -std=c99 -fno-strict-aliasing -fcommon -fPIC -Wall
 LDFLAGS		+= $(PYTHON_LDFLAGS) -l ev -shared -fcommon
 
-ifneq ($(WANT_SENDFILE), no)
-FEATURES	+= -D WANT_SENDFILE
-endif
-
 ifneq ($(WANT_SIGINT_HANDLING), no)
 FEATURES	+= -D WANT_SIGINT_HANDLING
 endif

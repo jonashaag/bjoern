@@ -18,4 +18,6 @@ typedef struct {
 #endif
 } ServerInfo;
 
+void server_run(ServerInfo*);
+
 #endif
