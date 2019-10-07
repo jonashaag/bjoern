@@ -43,7 +43,7 @@ Usage
    bjoern.run(wsgi_application, 'unix:@socket_name')
 
    # Enable statsd metrics. See instrumentation.md for details.
-   bjoern.run(wsgi_application, host, port, reuse_port=True, statsd=...)
+   bjoern.run(wsgi_application, host, port, statsd=...)
 
 Alternatively, the mainloop can be run separately::
 
