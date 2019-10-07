@@ -62,11 +62,19 @@ PyObject *_REMOTE_ADDR, *_PATH_INFO, *_QUERY_STRING, *_REQUEST_METHOD, *_GET,
 
   #ifdef WANT_STATSD_TAGS
     #include "statsd_tags.h"
-    #define STATSD_INCREMENT(name) statsd_inc_with_tags(((ThreadInfo*) ev_userdata(mainloop))->server_info->statsd, \
-                                                        name, \
-                                                        ((ThreadInfo*) ev_userdata(mainloop))->server_info->statsd_tags)
+    #define STATSD_INCREMENT(name) \
+      do { \
+        DBG("statisd.inc: %s", name); \
+        statsd_inc_with_tags(((ThreadInfo*) ev_userdata(mainloop))->server_info->statsd, \
+                             name, \
+                             ((ThreadInfo*) ev_userdata(mainloop))->server_info->statsd_tags); \
+      } while (0)
   #else
-    #define STATSD_INCREMENT(name) statsd_inc(((ThreadInfo*) ev_userdata(mainloop))->server_info->statsd, name, 1.0)
+    #define STATSD_INCREMENT(name) \
+      do { \
+        DBG("statisd.inc: %s", name); \
+        statsd_inc(((ThreadInfo*) ev_userdata(mainloop))->server_info->statsd, name, 1.0); \
+      } while (0)
   #endif
 #else
   #define STATSD_INCREMENT(name) DBG("statsd.inc: %s", name)

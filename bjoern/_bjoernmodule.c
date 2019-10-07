@@ -69,11 +69,16 @@ run(PyObject* self, PyObject* args)
       } else {
         info.statsd = statsd_init_with_namespace(statsd_host, statsd_port, statsd_ns);
       }
+#ifdef WANT_STATSD_TAGS
+      info.statsd_tags = statsd_tags;
+      DBG("Statsd: host=%s, port=%d, ns=%s, tags=%s", statsd_host, statsd_port, statsd_ns, statsd_tags);
+#else
+      DBG("Statsd: host=%s, port=%d, ns=%s", statsd_host, statsd_port, statsd_ns);
+#endif
+  } else {
+      DBG("Statsd disabled");
   }
 
-#ifdef WANT_STATSD_TAGS
-  info.statsd_tags = statsd_tags;
-#endif
 
 #endif
 
@@ -154,14 +159,14 @@ PyMODINIT_FUNC INIT_BJOERN(void)
   if (bjoern_module == NULL) {
     return NULL;
   }
-
-  PyModule_AddObject(bjoern_module, "features", features);
-  PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(iii)", 3, 0, 1));
-  return bjoern_module;
 #else
   PyObject* bjoern_module = Py_InitModule("_bjoern", Bjoern_FunctionTable);
-  PyModule_AddObject(bjoern_module, "features", features);
-  PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(iii)", 3, 0, 1));
 #endif
 
+  PyModule_AddObject(bjoern_module, "features", features);
+  PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(iii)", 3, 0, 1));
+
+#if PY_MAJOR_VERSION >= 3
+  return bjoern_module;
+#endif
 }
