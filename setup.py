@@ -2,18 +2,36 @@ import os
 import glob
 from setuptools import setup, Extension
 
+WANT_SIGINT_HANDLING = os.environ.get('BJOERN_WANT_SIGINT_HANDLING', True)
+WANT_SIGNAL_HANDLING = os.environ.get('BJOERN_WANT_SIGNAL_HANDLING', True)
+SIGNAL_CHECK_INTERVAL = os.environ.get('BJOERN_SIGNAL_CHECK_INTERVAL', '0.1')
+WANT_STATSD = os.environ.get('BJOERN_WANT_STATSD', False)
+WANT_STATSD_TAGS = os.environ.get('BJOERN_WANT_STATSD_TAGS', False)
+
+compile_flags = [('SIGNAL_CHECK_INTERVAL', SIGNAL_CHECK_INTERVAL)]
+if WANT_SIGNAL_HANDLING:
+    compile_flags.append(('WANT_SIGNAL_HANDLING', 'yes'))
+if WANT_SIGINT_HANDLING:
+    compile_flags.append(('WANT_SIGINT_HANDLING', 'yes'))
+if WANT_STATSD:
+    compile_flags.append(('WANT_STATSD', 'yes'))
+    if WANT_STATSD_TAGS:
+        compile_flags.append(('WANT_STATSD_TAGS', 'yes'))
+
 SOURCE_FILES = [os.path.join('http-parser', 'http_parser.c')] + \
+               [os.path.join('statsd-c-client', 'statsd-client.c')] + \
                sorted(glob.glob(os.path.join('bjoern', '*.c')))
+
+if not WANT_STATSD:
+    SOURCE_FILES.remove('statsd-c-client/statsd-client.c')
+    SOURCE_FILES.remove('bjoern/statsd_tags.c')
 
 bjoern_extension = Extension(
     '_bjoern',
     sources       = SOURCE_FILES,
     libraries     = ['ev'],
-    include_dirs  = ['http-parser', '/usr/include/libev', '/opt/local/include'],
-    define_macros = [('WANT_SENDFILE', '1'),
-                     ('WANT_SIGINT_HANDLING', '1'),
-                     ('WANT_SIGNAL_HANDLING', '1'),
-                     ('SIGNAL_CHECK_INTERVAL', '0.1')],
+    include_dirs  = ['http-parser', 'statsd-c-client', '/usr/include/libev', '/opt/local/include'],
+    define_macros = compile_flags,
     extra_compile_args = ['-std=c99', '-fno-strict-aliasing', '-fcommon',
                           '-fPIC', '-Wall', '-Wextra', '-Wno-unused-parameter',
                           '-Wno-missing-field-initializers', '-g']

@@ -17,8 +17,11 @@
 #include "common.h"
 #include "wsgi.h"
 #include "server.h"
-
 #include "py2py3.h"
+
+#ifdef WANT_STATSD
+#include "statsd-client.h"
+#endif
 
 #define READ_BUFFER_SIZE 64*1024
 #define Py_XCLEAR(obj) do { if(obj) { Py_DECREF(obj); obj = NULL; } } while(0)
@@ -51,12 +54,12 @@ typedef struct {
 
 typedef void ev_io_callback(struct ev_loop*, ev_io*, const int);
 
-#if WANT_SIGINT_HANDLING
+#ifdef WANT_SIGINT_HANDLING
 typedef void ev_signal_callback(struct ev_loop*, ev_signal*, const int);
 static ev_signal_callback ev_signal_on_sigint;
 #endif
 
-#if WANT_SIGINT_HANDLING
+#ifdef WANT_SIGNAL_HANDLING
 typedef void ev_timer_callback(struct ev_loop*, ev_timer*, const int);
 static ev_timer_callback ev_timer_ontick;
 ev_timer timeout_watcher;
@@ -79,12 +82,13 @@ void server_run(ServerInfo* server_info)
 
   ThreadInfo thread_info;
   thread_info.server_info = server_info;
+
   ev_set_userdata(mainloop, &thread_info);
 
   ev_io_init(&thread_info.accept_watcher, ev_io_on_request, server_info->sockfd, EV_READ);
   ev_io_start(mainloop, &thread_info.accept_watcher);
 
-#if WANT_SIGINT_HANDLING
+#ifdef WANT_SIGINT_HANDLING
   ev_signal sigint_watcher;
   ev_signal_init(&sigint_watcher, ev_signal_on_sigint, SIGINT);
   ev_signal_start(mainloop, &sigint_watcher);
@@ -103,7 +107,7 @@ void server_run(ServerInfo* server_info)
   Py_END_ALLOW_THREADS
 }
 
-#if WANT_SIGINT_HANDLING
+#ifdef WANT_SIGINT_HANDLING
 static void
 pyerr_set_interrupt(struct ev_loop* mainloop, struct ev_cleanup* watcher, const int events)
 {
@@ -128,7 +132,7 @@ ev_signal_on_sigint(struct ev_loop* mainloop, ev_signal* watcher, const int even
 }
 #endif
 
-#if WANT_SIGNAL_HANDLING
+#ifdef WANT_SIGNAL_HANDLING
 static void
 ev_timer_ontick(struct ev_loop* mainloop, ev_timer* watcher, const int events)
 {
@@ -149,11 +153,13 @@ ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
   client_fd = accept(watcher->fd, (struct sockaddr*)&sockaddr, &addrlen);
   if(client_fd < 0) {
     DBG("Could not accept() client: errno %d", errno);
+    STATSD_INCREMENT("conn.accept.error");
     return;
   }
 
   int flags = fcntl(client_fd, F_GETFL, 0);
   if(fcntl(client_fd, F_SETFL, (flags < 0 ? 0 : flags) | O_NONBLOCK) == -1) {
+    STATSD_INCREMENT("conn.accept.error");
     DBG("Could not set_nonblocking() client %d: errno %d", client_fd, errno);
     return;
   }
@@ -167,6 +173,8 @@ ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
   );
 
   GIL_UNLOCK(0);
+
+  STATSD_INCREMENT("conn.accept.success");
 
   DBG_REQ(request, "Accepted client %s:%d on fd %d",
           inet_ntoa(sockaddr.sin_addr), ntohs(sockaddr.sin_port), client_fd);
@@ -213,6 +221,7 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
     /* Client disconnected */
     read_state = aborted;
     DBG_REQ(request, "Client disconnected");
+    STATSD_INCREMENT("req.error.client_disconnected");
   } else if (read_bytes < 0) {
     /* Would block or error */
     if(errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -220,6 +229,7 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
     } else {
       read_state = aborted;
       DBG_REQ(request, "Hit errno %d while read()ing", errno);
+      STATSD_INCREMENT("req.error.read");
     }
   } else {
     /* OK, either expect more data or done reading */
@@ -228,6 +238,7 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
       /* HTTP parse error */
       read_state = done;
       DBG_REQ(request, "Parse error");
+      STATSD_INCREMENT("req.error.parse");
       request->current_chunk = _PEP3333_Bytes_FromString(
         http_error_messages[request->state.error_code]);
       assert(request->iterator == NULL);
@@ -235,6 +246,8 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
       /* HTTP parse successful, meaning we have the entire
        * request (the header _and_ the body). */
       read_state = done;
+
+      STATSD_INCREMENT("req.success.read");
 
       if (!wsgi_call_application(request)) {
         /* Response is "HTTP 500 Internal Server Error" */
@@ -245,6 +258,7 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
         Py_XCLEAR(request->iterator);
         request->current_chunk = _PEP3333_Bytes_FromString(
           http_error_messages[HTTP_SERVER_ERROR]);
+        STATSD_INCREMENT("req.error.internal");
       }
     } else if (request->state.expect_continue) {
       /*
@@ -261,6 +275,7 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
 
   switch (read_state) {
   case not_yet_done:
+    STATSD_INCREMENT("req.active");
     break;
   case expect_continue:
     DBG_REQ(request, "pause read, write 100-continue");
@@ -272,9 +287,11 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
     DBG_REQ(request, "Stop read watcher, start write watcher");
     ev_io_stop(mainloop, &request->ev_watcher);
     start_writing(mainloop, request);
+    STATSD_INCREMENT("req.done");
     break;
   case aborted:
     close_connection(mainloop, request);
+    STATSD_INCREMENT("req.aborted");
     break;
   }
 
@@ -317,10 +334,13 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
 
   switch(write_state) {
   case not_yet_done:
+    STATSD_INCREMENT("resp.active");
     break;
   case done:
+    STATSD_INCREMENT("resp.done");
     if(request->state.keep_alive) {
       DBG_REQ(request, "done, keep-alive");
+      STATSD_INCREMENT("resp.done.keepalive");
       ev_io_stop(mainloop, &request->ev_watcher);
 
       Request_clean(request);
@@ -329,6 +349,7 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
       start_reading(mainloop, request);
     } else {
       DBG_REQ(request, "done, close");
+      STATSD_INCREMENT("resp.conn.close");
       close_connection(mainloop, request);
     }
     break;
@@ -343,6 +364,7 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
     /* Response was aborted due to an error. We can't do anything graceful here
      * because at least one chunk is already sent... just close the connection. */
     close_connection(mainloop, request);
+    STATSD_INCREMENT("resp.aborted");
     break;
   }
 

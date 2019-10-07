@@ -6,7 +6,6 @@ import _bjoern
 _default_instance = None
 DEFAULT_LISTEN_BACKLOG = 1024
 
-
 def bind_and_listen(host, port=None, reuse_port=False,
                     listen_backlog=DEFAULT_LISTEN_BACKLOG):
     if host.startswith("unix:@"):
@@ -35,11 +34,18 @@ def bind_and_listen(host, port=None, reuse_port=False,
     return sock
 
 
-def server_run(sock, wsgi_app):
-    _bjoern.server_run(sock, wsgi_app)
+def server_run(sock, wsgi_app, statsd=None):
+    args = [sock, wsgi_app]
+
+    if _bjoern.features.get('has_statsd'):
+        if statsd:
+            args.extend([int(statsd['enable']), statsd['host'], statsd['port'], statsd['ns'], statsd.get('tags')])
+        else:
+            args.extend([0, None, 0, None, None])
+
+    _bjoern.server_run(*args)
 
 
-# Backwards compatibility API
 def listen(wsgi_app, host, port=None, reuse_port=False,
            listen_backlog=DEFAULT_LISTEN_BACKLOG):
     """
@@ -70,6 +76,8 @@ def run(*args, **kwargs):
     """
     global _default_instance
 
+    statsd = kwargs.pop('statsd', None)
+
     if args or kwargs:
         # Called as `bjoern.run(wsgi_app, host, ...)`
         listen(*args, **kwargs)
@@ -82,7 +90,7 @@ def run(*args, **kwargs):
 
     sock, wsgi_app = _default_instance
     try:
-        server_run(sock, wsgi_app)
+        server_run(sock, wsgi_app, statsd)
     finally:
         if sock.family == socket.AF_UNIX:
             filename = sock.getsockname()
