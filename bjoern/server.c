@@ -179,6 +179,8 @@ ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
   DBG_REQ(request, "Accepted client %s:%d on fd %d",
           inet_ntoa(sockaddr.sin_addr), ntohs(sockaddr.sin_port), client_fd);
 
+  /* Stop the accept watcher */
+  ev_io_stop(mainloop, &((ThreadInfo*)ev_userdata(mainloop))->accept_watcher);
   ev_io_init(&request->ev_watcher, &ev_io_on_read,
              client_fd, EV_READ);
   ev_io_start(mainloop, &request->ev_watcher);
@@ -535,4 +537,9 @@ close_connection(struct ev_loop *mainloop, Request* request)
   ev_io_stop(mainloop, &request->ev_watcher);
   close(request->client_fd);
   Request_free(request);
+
+  /* Resume accepting new clients */
+  ThreadInfo* thread_info = (ThreadInfo*)ev_userdata(mainloop);
+  ev_io_init(&thread_info->accept_watcher, ev_io_on_request, thread_info->server_info->sockfd, EV_READ);
+  ev_io_start(mainloop, &thread_info->accept_watcher);
 }
