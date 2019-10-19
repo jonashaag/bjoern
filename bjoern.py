@@ -29,6 +29,8 @@ def bind_and_listen(host, port=None, reuse_port=False,
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         sock.bind((host, port))
 
+    sock.setblocking(False)
+
     sock.listen(listen_backlog)
 
     return sock
