@@ -35,6 +35,9 @@ endif
 
 ifeq ($(WANT_STATSD), yes)
 FEATURES	+= -D WANT_STATSD
+else
+filter_out	= $(foreach v,$(2),$(if $(findstring $(1),$(v)),,$(v)))
+objects		:= $(call filter_out,statsd,$(objects))
 endif
 
 ifeq ($(WANT_STATSD_TAGS), yes)
