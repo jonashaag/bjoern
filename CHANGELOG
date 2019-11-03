@@ -1,6 +1,10 @@
-3.1.0 TBA
-    - #164 Add support for statsd metrics/events (Mohammad Gufran)
+3.1.1 (TBD)
     - #171 Fix WSGI filewrapper support, close file before deallocate (Mauro Amico)
+
+3.1.0 (Nov 3, 2019)
+    - #169 Fix blocking accept() (Ionut Negru)
+    - #164 Add support for statsd metrics/events (Mohammad Gufran)
+    - #162 Fix Expect: 100-Continue support (Tom Brennan)
 
 3.0.1 (June 6, 2019)
     - Fix #158, #160: Correct string type for WSGI environ
