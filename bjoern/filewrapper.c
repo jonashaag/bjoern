@@ -11,6 +11,9 @@ int FileWrapper_GetFd(PyObject *self)
 void FileWrapper_Done(PyObject *self)
 {
   if (FW_self->fd != -1) {
+    if (PyObject_HasAttrString(FW_self->file, "close")) {
+      PyObject_CallMethod(FW_self->file, "close", NULL);
+    }
     PyFile_DecUseCount((PyFileObject*)FW_self->file);
   }
 }
