@@ -15,6 +15,7 @@
 #define _PEP3333_BytesLatin1_FromUnicode(u) PyUnicode_AsLatin1String(u)
 #define _PEP3333_String_FromUTF8String(data) PyUnicode_FromString(data)
 #define _PEP3333_String_FromLatin1StringAndSize(data, len) PyUnicode_DecodeLatin1(data, len, "replace")
+#define _PEP3333_String_Empty() PyUnicode_FromString("")
 #define _PEP3333_String_FromFormat(...) PyUnicode_FromFormat(__VA_ARGS__)
 #define _PEP3333_String_GET_SIZE(u) PyUnicode_GET_LENGTH(u)
 #define _PEP3333_String_Concat(u1, u2) PyUnicode_Concat(u1, u2)
@@ -31,6 +32,7 @@
 #define _PEP3333_Bytes_Resize(bytes, len) _PyString_Resize(bytes, len)
 #define _PEP3333_BytesLatin1_FromUnicode(u) (Py_INCREF(u),u)
 #define _PEP3333_String_FromUTF8String(data) PyString_FromString(data) // Assume UTF8
+#define _PEP3333_String_Empty() PyString_FromStringAndSize(NULL, 0)
 #define _PEP3333_String_FromFormat(...) PyString_FromFormat(__VA_ARGS__)
 #define _PEP3333_String_GET_SIZE(u) PyString_GET_SIZE(u)
 
