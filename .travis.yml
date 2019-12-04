@@ -3,4 +3,4 @@ python:
   - "2.7"
 before_install:
   - "sudo apt-get -y install libev-dev"
-script: make
+script: python setup.py install
