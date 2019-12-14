@@ -8,13 +8,6 @@ int FileWrapper_GetFd(PyObject *self)
   return FW_self->fd;
 }
 
-void FileWrapper_Done(PyObject *self)
-{
-  if (FW_self->fd != -1) {
-    PyFile_DecUseCount((PyFileObject*)FW_self->file);
-  }
-}
-
 static PyObject*
 FileWrapper_New(PyTypeObject* cls, PyObject* args, PyObject* kwargs)
 {
@@ -67,6 +60,23 @@ void FileWrapper_dealloc(PyObject* self)
   PyObject_FREE(self);
 }
 
+PyObject* FileWrapper_close(PyObject* self)
+{
+  if (PyObject_HasAttr(FW_self->file, _close)) {
+    return PyObject_CallMethodObjArgs(FW_self->file, _close, NULL);
+  } else {
+    Py_RETURN_NONE;
+  }
+  if (FW_self->fd != -1) {
+    PyFile_DecUseCount((PyFileObject*)FW_self->file);
+  }
+}
+
+static PyMethodDef FileWrapper_methods[] = {
+    {"close", (PyCFunction) FileWrapper_close, METH_NOARGS, NULL},
+    {NULL}  /* Sentinel */
+};
+
 PyTypeObject FileWrapper_Type = {
   PyVarObject_HEAD_INIT(NULL, 0)
   "FileWrapper",                    /* tp_name (__name__)                     */
@@ -81,4 +91,5 @@ void _init_filewrapper(void)
   FileWrapper_Type.tp_iter = FileWrapper_Iter;
   FileWrapper_Type.tp_iternext = FileWrapper_IterNext;
   FileWrapper_Type.tp_flags |= Py_TPFLAGS_DEFAULT;
+  FileWrapper_Type.tp_methods = FileWrapper_methods;
 }

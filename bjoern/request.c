@@ -50,7 +50,8 @@ void Request_free(Request* request)
 void Request_clean(Request* request)
 {
   if(request->iterable) {
-    /* Call 'iterable.close()' if available */
+    /* Call 'iterable.close()' if available. This will also call into FileWrapper_close()
+     * if 'iterable' is a FileWrapper object. */
     PyObject* close_method = PyObject_GetAttr(request->iterable, _close);
     if(close_method == NULL) {
       if(PyErr_ExceptionMatches(PyExc_AttributeError))

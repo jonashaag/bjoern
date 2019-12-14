@@ -13,4 +13,3 @@ typedef struct {
 
 void _init_filewrapper(void);
 int FileWrapper_GetFd(PyObject *self);
-void FileWrapper_Done(PyObject *self);

@@ -500,11 +500,9 @@ do_sendfile(Request* request)
     if (handle_nonzero_errno(request)) {
       return true;
     } else {
-      FileWrapper_Done(request->iterable);
       return false;
     }
   case 0:
-    FileWrapper_Done(request->iterable);
     return false;
   default:
     request->current_chunk_p += bytes_sent;
