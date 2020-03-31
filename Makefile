@@ -82,6 +82,9 @@ prepare-build:
 clean:
 	@rm -rf $(BUILD_DIR)/*
 
+distclean:
+	@rm -rf dist/
+
 AB		= ab -c 100 -n 10000
 TEST_URL	= "http://127.0.0.1:8080/a/b/c?k=v&k2=v2"
 
