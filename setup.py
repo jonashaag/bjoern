@@ -25,8 +25,8 @@ SOURCE_FILES = [os.path.join('http-parser', 'http_parser.c')] + \
 print(SOURCE_FILES)
 
 if not WANT_STATSD:
-    SOURCE_FILES.remove(os.path.join('statsd-c-client/statsd-client.c'))
-    SOURCE_FILES.remove(os.path.join('bjoern/statsd_tags.c'))
+    SOURCE_FILES.remove(os.path.join('statsd-c-client', 'statsd-client.c'))
+    SOURCE_FILES.remove(os.path.join('bjoern', 'statsd_tags.c'))
 
 bjoern_extension = Extension(
     '_bjoern',
