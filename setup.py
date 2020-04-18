@@ -28,8 +28,8 @@ if not WANT_STATSD:
 
 is_windows = True if os.name == "nt" else False
 
-DEFAULT_COMPILE_ARGS = ['-std=c99', '-fno-strict-aliasing', '-fcommon', '-fPIC', '-Wno-unused-parameter', '-Wno-missing-field-initializers', '-g']
-COMPILE_ARGS = DEFAULT_COMPILE_ARGS if is_windows else DEFAULT_COMPILE_ARGS + ['-Wall', '-Wextra']
+DEFAULT_COMPILE_ARGS = ['-std=c99', '-fno-strict-aliasing', '-fcommon', '-fPIC', '-g']
+COMPILE_ARGS = DEFAULT_COMPILE_ARGS if is_windows else DEFAULT_COMPILE_ARGS + ['-Wall', '-Wextra', '-Wno-unused-parameter', '-Wno-missing-field-initializers']
 
 bjoern_extension = Extension(
     '_bjoern',
