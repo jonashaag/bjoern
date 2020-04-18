@@ -22,8 +22,6 @@ SOURCE_FILES = [os.path.join('http-parser', 'http_parser.c')] + \
                [os.path.join('statsd-c-client', 'statsd-client.c')] + \
                sorted(glob.glob(os.path.join('bjoern', '*.c')))
 
-print(SOURCE_FILES)
-
 if not WANT_STATSD:
     SOURCE_FILES.remove(os.path.join('statsd-c-client', 'statsd-client.c'))
     SOURCE_FILES.remove(os.path.join('bjoern', 'statsd_tags.c'))
