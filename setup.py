@@ -26,11 +26,16 @@ if not WANT_STATSD:
     SOURCE_FILES.remove(os.path.join('statsd-c-client', 'statsd-client.c'))
     SOURCE_FILES.remove(os.path.join('bjoern', 'statsd_tags.c'))
 
+is_windows = True if os.name == "nt" else False
+
+DEFAULT_COMPILE_ARGS = ['-std=c99', '-fno-strict-aliasing', '-fcommon', '-fPIC', '-Wno-unused-parameter', '-Wno-missing-field-initializers', '-g']
+COMPILE_ARGS = DEFAULT_COMPILE_ARGS if is_windows else DEFAULT_COMPILE_ARGS + ['-Wall', '-Wextra']
+
 bjoern_extension = Extension(
     '_bjoern',
     sources       = SOURCE_FILES,
     libraries     = ['ev'],
-    include_dirs  = ['http-parser', 'statsd-c-client', os.path.join('usr', 'include', 'libev'), os.path.join('opt', 'local', 'include')],
+    include_dirs  = ['http-parser', 'statsd-c-client', '/usr/include/libev', '/opt/local/include')],
     define_macros = compile_flags,
     extra_compile_args = ['-std=c99', '-fno-strict-aliasing', '-fcommon',
                           '-fPIC', '-Wall', '-Wextra', '-Wno-unused-parameter',
