@@ -30,7 +30,7 @@ bjoern_extension = Extension(
     '_bjoern',
     sources       = SOURCE_FILES,
     libraries     = ['ev'],
-    include_dirs  = ['http-parser', 'statsd-c-client', '/usr/include/libev', '/opt/local/include'],
+    include_dirs  = ['http-parser', 'statsd-c-client', os.path.join('usr', 'include', 'libev'), os.path.join('opt', 'local', 'include')],
     define_macros = compile_flags,
     extra_compile_args = ['-std=c99', '-fno-strict-aliasing', '-fcommon',
                           '-fPIC', '-Wall', '-Wextra', '-Wno-unused-parameter',
