@@ -59,8 +59,8 @@ small: clean
 	CFLAGS='-Os' make
 
 _bjoernmodule:
-	@echo ' -> ' $(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(objects) -o $(BUILD_DIR)/_bjoern.so
-	@$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(objects) -o $(BUILD_DIR)/_bjoern.so
+	@echo ' -> ' $(CC) $(CPPFLAGS) $(CFLAGS) $(objects) $(LDFLAGS) -o $(BUILD_DIR)/_bjoern.so
+	@$(CC) $(CPPFLAGS) $(CFLAGS) $(objects) $(LDFLAGS) -o $(BUILD_DIR)/_bjoern.so
 	@PYTHONPATH=$$PYTHONPATH:$(BUILD_DIR) ${PYTHON} -c "import bjoern"
 
 again: clean all
