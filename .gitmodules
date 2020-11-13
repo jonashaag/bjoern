@@ -1,6 +1,6 @@
 [submodule "http-parser"]
   path = http-parser
-  url = git://github.com/joyent/http-parser
+  url = https://github.com/joyent/http-parser
 [submodule "statsd-c-client"]
   path = statsd-c-client
   url = https://github.com/romanbsd/statsd-c-client
