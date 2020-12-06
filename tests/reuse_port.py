@@ -1,9 +1,13 @@
 import os
 import time
 import sys
-import httplib
 import subprocess
 from collections import defaultdict
+
+try:
+    from http import client as httplib
+except ImportError:  # Py 2
+    import httplib
 
 
 N_PROCESSES = 3
