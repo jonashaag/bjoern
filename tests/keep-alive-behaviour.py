@@ -1,10 +1,11 @@
 import os
 import random
-try:
-    import httplib
-except ImportError:
-    import http.client as httplib
 import socket
+
+try:
+    from http import client as httplib
+except ImportError:  # Py 2
+    import httplib
 
 HOST = ('127.0.0.1', 9000)
 

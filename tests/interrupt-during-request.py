@@ -3,7 +3,11 @@ import threading
 import bjoern
 import os
 import signal
-import httplib
+
+try:
+    from http import client as httplib
+except ImportError:  # Py 2
+    import httplib
 
 HOST = ('127.0.0.1', 9000)
 
