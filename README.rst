@@ -32,7 +32,7 @@ Usage
 Flask example
 -------------
 
-::
+.. code-block:: python
 
    from flask import Flask
 
@@ -51,7 +51,7 @@ Flask example
 Advanced usage
 --------------
 
-::
+.. code-block:: python
 
    # Bind to TCP host/port pair:
    bjoern.run(wsgi_application, host, port)
@@ -68,7 +68,9 @@ Advanced usage
    # Enable statsd metrics. See instrumentation.md for details.
    bjoern.run(wsgi_application, host, port, statsd=...)
 
-Alternatively, the mainloop can be run separately::
+Alternatively, the mainloop can be run separately:
+
+.. code-block:: python
 
    bjoern.listen(wsgi_application, host, port)
    bjoern.run()
