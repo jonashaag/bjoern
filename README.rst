@@ -80,7 +80,9 @@ Alternatively, the mainloop can be run separately:
    bjoern.run(statsd=...)
 
 You can also simply pass a Python socket(-like) object. Note that you are responsible
-for initializing and cleaning up the socket in that case. ::
+for initializing and cleaning up the socket in that case.
+
+.. code-block:: python
 
    bjoern.server_run(socket_object, wsgi_application)
    bjoern.server_run(filedescriptor_as_integer, wsgi_application)
