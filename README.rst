@@ -28,6 +28,29 @@ Installation
 
 Usage
 ~~~~~
+
+Flask example
+-------------
+
+::
+
+   from flask import Flask
+
+   app = Flask(__name__)
+
+   @app.route("/")
+   def hello_world():
+       return "Hello, World!"
+
+   if __name__ == "__main__":
+       import bjoern
+
+       bjoern.run(app, "127.0.0.1", 8000)
+
+
+Advanced usage
+--------------
+
 ::
 
    # Bind to TCP host/port pair:
