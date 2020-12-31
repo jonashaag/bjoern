@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import os
 import socket
 import _bjoern
@@ -100,3 +102,48 @@ def run(*args, **kwargs):
                 os.unlink(sock.getsockname())
         sock.close()
         _default_instance = None
+
+
+def main():
+    import argparse
+    import importlib
+    import json
+    import sys
+
+    parser = argparse.ArgumentParser(
+        description="Fast And Ultra-Lightweight HTTP/1.1 WSGI Server"
+    )
+    parser.add_argument('wsgi-app', help=(
+        "Where to find the WSGI application(environ,start_response) callable. "
+        "The pattern is $(module):$(function), $(module) is a a full dotted "
+        "module name and $(function) is the WSGI entry-point that should be "
+        "found inside the module."))
+    parser.add_argument('-a', '--host', metavar="ADDR",
+                        help="bind this ipv4/ipv6 address")
+    parser.add_argument('-p', '--port', type=int,
+                        help="bind this tcp port")
+    parser.add_argument('--uds', metavar="PATH",
+                        help="bind this unix domain socket")
+    parser.add_argument('--reuse-port', action='store_true',
+                        help="create the socket using the SO_REUSEPORT option")
+    parser.add_argument('--statsd', type=json.load, metavar="JSON",
+                        help="configure statsd metrics using this JSON string")
+
+    options, other_args = parser.parse_known_args()
+    options = vars(options)
+    sys.argv = [sys.argv[0]]
+    sys.argv.extend(other_args)
+
+    module_name, variable_name = options.pop('wsgi-app').split(':')
+    app = getattr(importlib.import_module(module_name), variable_name)
+
+    args = [app]
+    for option in ('host', 'port', 'uds'):
+        value = options.pop(option, None)
+        if value is not None:
+            args.append(value)
+
+    run(*args, **options)
+
+if __name__ == '__main__':
+    main()

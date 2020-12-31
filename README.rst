@@ -34,6 +34,8 @@ Flask example
 
 .. code-block:: python
 
+   # flask_example.py
+
    from flask import Flask
 
    app = Flask(__name__)
@@ -46,6 +48,13 @@ Flask example
        import bjoern
 
        bjoern.run(app, "127.0.0.1", 8000)
+
+
+Alternatively, start the application via the CLI:
+
+.. code-block:: bash
+
+   $ python -m bjoern --host 127.0.0.1 --port 8000 flask_example:app
 
 
 Advanced usage
@@ -89,6 +98,29 @@ for initializing and cleaning up the socket in that case.
 
    # This needs manual compilation with `WANT_STATSD=yes`
    bjoern.server_run(socket_object, wsgi_application, enable_statsd=True)
+
+Standalone
+----------
+
+Using the bjoern as a module executable, it only consume a few options, the other unknown options
+are left to the application.
+
+.. code-block:: plain
+
+    usage: python -m bjoern [-a ADDR] [-p PORT] [--uds PATH] [--reuse-port] [--statsd JSON] wsgi-app
+
+    positional arguments:
+      wsgi-app              Where to find the WSGI application(environ, start_response) callable.
+                            The pattern is $(module):$(function), $(module) is a a full dotted module
+                            name and $(function) is the WSGI entry-point that should be found inside
+                            the module.
+
+    optional arguments:
+      -a ADDR, --host ADDR  bind this ipv4/ipv6 address
+      -p PORT, --port PORT  bind this tcp port
+      --uds PATH            bind this unix domain socket
+      --reuse-port          create the socket using the SO_REUSEPORT option
+      --statsd JSON         configure statsd metrics using this JSON string
 
 .. _WSGI:         http://www.python.org/dev/peps/pep-0333/
 .. _libev:        http://software.schmorp.de/pkg/libev.html
