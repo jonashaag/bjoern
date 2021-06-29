@@ -1,0 +1,10 @@
+version: "3"
+
+services:
+  builder:
+    image: ${IMAGE-quay.io/pypa/manylinux2014_x86_64}
+    volumes:
+    - ..:/workspace
+    - ./pip-cache:/root/.cache/pip
+    working_dir: /workspace
+    command: [/workspace/packaging/build_all.sh]

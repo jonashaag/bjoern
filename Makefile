@@ -82,6 +82,9 @@ prepare-build:
 clean:
 	@rm -rf $(BUILD_DIR)/*
 
+distclean:
+	@rm -rf dist/
+
 AB		= ab -c 100 -n 10000
 TEST_URL	= "http://127.0.0.1:8080/a/b/c?k=v&k2=v2"
 
@@ -113,8 +116,12 @@ memwatch:
 	   echo; echo; \
 	   tail -n +25 /proc/$$(pgrep -n ${PYTHON})/smaps'
 
-upload:
-	${PYTHON} setup.py sdist upload
+packages:
+	${PYTHON} setup.py sdist
+	$(MAKE) -C packaging all
+
+upload: packages
+	twine upload dist/*.tar.gz dist/*.whl
 
 $(HTTP_PARSER_OBJ):
 	$(MAKE) -C $(HTTP_PARSER_DIR) http_parser.o CFLAGS_DEBUG_EXTRA=-fPIC CFLAGS_FAST_EXTRA=-fPIC
