@@ -19,7 +19,7 @@ teardown() {
                 chown -R "$uid_gid" "$distdir"
         fi
 }
-trap teardown INT EXIT TERM
+trap 'set +x; teardown' INT EXIT TERM
 
 cd "$top_srcdir"
 
