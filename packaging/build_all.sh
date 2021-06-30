@@ -12,14 +12,14 @@ distdir="${top_srcdir}/dist"
 
 # Ensure to always clean up, even on error.
 teardown() {
-	# Get outer user ID and GID from self.
-	uid_gid="$(stat -c %u:%g "$0")"
-	if [ "${uid_gid}" != "0:0" ] ; then
-		# Ensure dist/ files are owned by user.
-		chown -R "$uid_gid" "$distdir"
-	fi
+        # Get outer user ID and GID from self.
+        uid_gid="$(stat -c %u:%g "$0")"
+        if [ "${uid_gid}" != "0:0" ] && [ -d "$distdir" ]; then
+                # Ensure dist/ files are owned by user.
+                chown -R "$uid_gid" "$distdir"
+        fi
 }
-trap teardown INT EXIT TERM
+trap 'set +x; teardown' INT EXIT TERM
 
 cd "$top_srcdir"
 
