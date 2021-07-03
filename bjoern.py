@@ -16,6 +16,18 @@ def bind_and_listen(host, port=None, reuse_port=False,
         # UNIX socket: "unix:/tmp/foobar.sock"
         sock = socket.socket(socket.AF_UNIX)
         sock.bind(host[5:])
+    elif hasattr(socket, 'AF_INET6') and (len(host) == 0 or ':' in host):
+        #IPv6 socket
+        sock = socket.socket(socket.AF_INET6)
+        # Set SO_REUSEADDR to make the IP address available for reuse
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        if reuse_port:
+            # Enable "receive steering" on FreeBSD and Linux >=3.9. This allows
+            # multiple independent bjoerns to bind to the same port (and ideally
+            # also set their CPU affinity), resulting in more efficient load
+            # distribution.  https://lwn.net/Articles/542629/
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        sock.bind((host, port))
     else:
         # IP socket
         sock = socket.socket(socket.AF_INET)
