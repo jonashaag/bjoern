@@ -70,7 +70,7 @@ static ev_io_callback ev_io_on_read;
 static ev_io_callback ev_io_on_write;
 static write_state on_write_sendfile(struct ev_loop*, Request*);
 static write_state on_write_chunk(struct ev_loop*, Request*);
-static bool do_send_chunk(Request*);
+static write_state do_send_chunk(Request*);
 static bool do_sendfile(Request*);
 static bool handle_nonzero_errno(Request*);
 static void close_connection(struct ev_loop*, Request*);
@@ -380,9 +380,11 @@ on_write_sendfile(struct ev_loop* mainloop, Request* request)
    */
   if(request->current_chunk) {
     /* Phase A) -- current_chunk contains the HTTP headers */
-    do_send_chunk(request);
+    if(do_send_chunk(request) == aborted)
+        return aborted;
     // Either we have headers left to send, or current_chunk has been set to
     // NULL and we'll fall into Phase B) on the next invocation.
+    // Issue #196 there is a connection abort that does not fit into this
     return not_yet_done;
   } else {
     /* Phase B) */
@@ -400,7 +402,7 @@ on_write_sendfile(struct ev_loop* mainloop, Request* request)
 static write_state
 on_write_chunk(struct ev_loop* mainloop, Request* request)
 {
-  if (do_send_chunk(request))
+  if (do_send_chunk(request) == not_yet_done)
     // data left to send in the current chunk
     return not_yet_done;
 
@@ -459,7 +461,7 @@ send_terminator_chunk:
 }
 
 /* Return true if there's data left to send, false if we reached the end of the chunk. */
-static bool
+static write_state
 do_send_chunk(Request* request)
 {
   Py_ssize_t bytes_sent;
@@ -475,15 +477,19 @@ do_send_chunk(Request* request)
   );
 
   if(bytes_sent == -1)
-    return handle_nonzero_errno(request);
-
+    if(handle_nonzero_errno(request)){
+        return not_yet_done;
+    }
+    else{
+        return aborted;
+    }
   request->current_chunk_p += bytes_sent;
   if(request->current_chunk_p == _PEP3333_Bytes_GET_SIZE(request->current_chunk)) {
     Py_CLEAR(request->current_chunk);
     request->current_chunk_p = 0;
-    return false;
+    return done;
   }
-  return true;
+  return not_yet_done;
 }
 
 /* Return true if there's data left to send, false if we reached the end of the file. */
