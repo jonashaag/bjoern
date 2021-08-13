@@ -401,7 +401,7 @@ void _initialize_request_module(ServerInfo* server_info)
       if (server_info->port == Py_None) {
       PyDict_SetItemString(wsgi_base_dict, "SERVER_PORT", _PEP3333_String_Empty());
       } else {
-        PyDict_SetItemString(wsgi_base_dict, "SERVER_PORT", _PEP3333_String_FromFormat("%i", server_info->port));
+        PyDict_SetItemString(wsgi_base_dict, "SERVER_PORT", _PEP3333_String_FromFormat("%S", server_info->port));
       }
      } else {
       /* SERVER_NAME is required, but not usefull with UNIX type sockets */
