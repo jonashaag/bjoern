@@ -24,7 +24,6 @@
 #endif
 
 #define READ_BUFFER_SIZE 64*1024
-#define Py_XCLEAR(obj) do { if(obj) { Py_DECREF(obj); obj = NULL; } } while(0)
 #define GIL_LOCK(n) PyGILState_STATE _gilstate_##n = PyGILState_Ensure()
 #define GIL_UNLOCK(n) PyGILState_Release(_gilstate_##n)
 
@@ -255,7 +254,7 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
         assert(PyErr_Occurred());
         PyErr_Print();
         assert(!request->state.chunked_response);
-        Py_XCLEAR(request->iterator);
+        Py_CLEAR(request->iterator);
         request->current_chunk = _PEP3333_Bytes_FromString(
           http_error_messages[HTTP_SERVER_ERROR]);
         STATSD_INCREMENT("req.error.internal");
@@ -380,9 +379,16 @@ on_write_sendfile(struct ev_loop* mainloop, Request* request)
    */
   if(request->current_chunk) {
     /* Phase A) -- current_chunk contains the HTTP headers */
-    do_send_chunk(request);
-    // Either we have headers left to send, or current_chunk has been set to
-    // NULL and we'll fall into Phase B) on the next invocation.
+    if (do_send_chunk(request)) {
+        /* Headers left to send */
+    } else {
+      /* Done with headers, current_chunk has been set to NULL
+       * and we'll fall into Phase B) on the next invocation. */
+      request->current_chunk_p = lseek(FileWrapper_GetFd(request->iterable), 0, SEEK_CUR);
+      if (request->current_chunk_p == -1) {
+        return aborted;
+      }
+    }
     return not_yet_done;
   } else {
     /* Phase B) */
@@ -520,7 +526,7 @@ handle_nonzero_errno(Request* request)
     /* Serious transmission failure. Hang up. */
     fprintf(stderr, "Client %d hit errno %d\n", request->client_fd, errno);
     Py_XDECREF(request->current_chunk);
-    Py_XCLEAR(request->iterator);
+    Py_CLEAR(request->iterator);
     request->state.keep_alive = false;
     return false;
   }

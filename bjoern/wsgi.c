@@ -182,22 +182,32 @@ out:
   return true;
 }
 
-static inline bool
-inspect_headers(Request* request)
+static inline PyObject*
+clean_headers(PyObject* headers, bool* found_content_length)
 {
-  Py_ssize_t i;
-  PyObject* tuple;
 
-  if(!PyList_Check(request->headers)) {
-    TYPE_ERROR("start response argument 2", "a list of 2-tuples", request->headers);
+  if(!PyList_Check(headers)) {
+    TYPE_ERROR("start response argument 2", "a list of 2-tuples", headers);
     return NULL;
   }
 
-  for(i=0; i<PyList_GET_SIZE(request->headers); ++i) {
-    tuple = PyList_GET_ITEM(request->headers, i);
+  for(Py_ssize_t i=0; i<PyList_GET_SIZE(headers); ++i) {
+    PyObject* tuple = PyList_GET_ITEM(headers, i);
+    if(!PyTuple_Check(tuple) || PyTuple_GET_SIZE(tuple) != 2) {
+      TYPE_ERROR_INNER("start_response argument 2", "a list of 2-tuples (field: str, value: str)",
+        "(found invalid '%.200s' object at position %zd)", Py_TYPE(tuple)->tp_name, i);
+      return NULL;
+    }
+  }
 
-    if(!PyTuple_Check(tuple) || PyTuple_GET_SIZE(tuple) != 2)
-      goto err;
+  /* Create copy of headers list that we may modify */
+  PyObject* new_headers = PyList_New(PyList_GET_SIZE(headers));
+  if (new_headers == NULL) {
+    return NULL;
+  }
+
+  for(Py_ssize_t i=0; i<PyList_GET_SIZE(headers); ++i) {
+    PyObject* tuple = PyList_GET_ITEM(headers, i);
 
     PyObject* unicode_field = PyTuple_GET_ITEM(tuple, 0);
     PyObject* unicode_value = PyTuple_GET_ITEM(tuple, 1);
@@ -206,26 +216,23 @@ inspect_headers(Request* request)
     PyObject* bytes_value = _PEP3333_BytesLatin1_FromUnicode(unicode_value);
 
     if (bytes_field == NULL || bytes_value == NULL) {
+      TYPE_ERROR_INNER("start_response argument 2", "a list of 2-tuples (field: str, value: str)",
+        "(found invalid ('%.200s', '%.200s') tuple at position %zd)", Py_TYPE(unicode_field)->tp_name, Py_TYPE(unicode_value)->tp_name, i);
+      Py_DECREF(new_headers);
       Py_XDECREF(bytes_field);
       Py_XDECREF(bytes_value);
-      goto err;
+      return NULL;
     }
 
-    PyList_SET_ITEM(request->headers, i, PyTuple_Pack(2, bytes_field, bytes_value));
-    Py_DECREF(tuple);
+    PyList_SET_ITEM(new_headers, i, PyTuple_Pack(2, bytes_field, bytes_value));
 
     if(!strncasecmp(_PEP3333_Bytes_AS_DATA(bytes_field), "Content-Length", _PEP3333_Bytes_GET_SIZE(bytes_field)))
-      request->state.response_length_unknown = false;
+      *found_content_length = true;
 
     Py_DECREF(bytes_field);
     Py_DECREF(bytes_value);
   }
-  return true;
-
-err:
-  TYPE_ERROR_INNER("start_response argument 2", "a list of 2-tuples (field: str, value: str)",
-    "(found invalid '%.200s' object at position %zd)", Py_TYPE(tuple)->tp_name, i);
-  return false;
+  return new_headers;
 }
 
 
@@ -336,7 +343,8 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
 
   PyObject* exc_info = NULL;
   PyObject* status_unicode = NULL;
-  if(!PyArg_UnpackTuple(args, "start_response", 2, 3, &status_unicode, &request->headers, &exc_info))
+  PyObject* headers = NULL;
+  if(!PyArg_UnpackTuple(args, "start_response", 2, 3, &status_unicode, &headers, &exc_info))
     return NULL;
 
   if(exc_info && exc_info != Py_None) {
@@ -372,13 +380,14 @@ start_response(PyObject* self, PyObject* args, PyObject* kwargs)
     return NULL;
   }
 
-  if(!inspect_headers(request)) {
-    request->headers = NULL;
+
+  bool found_content_length = false;
+  request->headers = clean_headers(headers, &found_content_length);
+  if (request->headers == NULL) {
     return NULL;
   }
 
-  Py_INCREF(request->headers);
-
+  request->state.response_length_unknown = !found_content_length;
   request->state.start_response_called = true;
 
   Py_RETURN_NONE;
