@@ -1,3 +1,6 @@
+3.2.1 (Feb 14, 2022)
+    - Fix release
+
 3.2.0 (Feb 13, 2022)
     - #173 Fix segfault with old interpreters (Goldstein)
     - #171 Implement FileWrapper.close()

@@ -164,7 +164,7 @@ PyMODINIT_FUNC INIT_BJOERN(void)
 #endif
 
   PyModule_AddObject(bjoern_module, "features", features);
-  PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(iii)", 3, 1, 0));
+  PyModule_AddObject(bjoern_module, "version", Py_BuildValue("(iii)", 3, 2, 1));
 
 #if PY_MAJOR_VERSION >= 3
   return bjoern_module;
