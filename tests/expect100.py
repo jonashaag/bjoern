@@ -1,5 +1,5 @@
 from __future__ import print_function
-import bjoern, socket, threading, time, json, sys, requests, logging
+import bjoern, socket, threading, time, json, sys, logging
 
 
 def app(e, s):
