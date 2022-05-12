@@ -19,7 +19,7 @@ def cmd_test():
     processes = [subprocess.Popen([sys.executable, __file__, "app"])
                 for _ in range(N_PROCESSES)]
 
-    time.sleep(0.2 * N_PROCESSES)
+    time.sleep(1 * N_PROCESSES)
 
 
     responder_count = defaultdict(int)
