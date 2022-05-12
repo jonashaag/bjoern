@@ -20,7 +20,8 @@ def cmd_test():
     processes = [subprocess.Popen([sys.executable, __file__, "app"])
                 for _ in range(N_PROCESSES)]
 
-    time.sleep(1 * N_PROCESSES)
+    sleep_secs = 5 if os.getenv("CI") else 0.2
+    time.sleep(sleep_secs * N_PROCESSES)
 
 
     responder_count = defaultdict(int)
