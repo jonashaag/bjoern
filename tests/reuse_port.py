@@ -2,6 +2,7 @@ import os
 import time
 import sys
 import subprocess
+import multiprocessing
 from collections import defaultdict
 
 try:
@@ -10,7 +11,7 @@ except ImportError:  # Py 2
     import httplib
 
 
-N_PROCESSES = 3
+N_PROCESSES = min(3, multiprocessing.cpu_count())
 N_REQUESTS_PER_PROCESS = 100
 N_REQUESTS = N_REQUESTS_PER_PROCESS * N_PROCESSES
 
@@ -34,6 +35,7 @@ def cmd_test():
     for proc in processes:
         proc.terminate()
 
+    print(responder_count)
     for responder, count in responder_count.items():
         assert (count > N_REQUESTS_PER_PROCESS * 0.8 and
                 count < N_REQUESTS_PER_PROCESS * 1.2), \
