@@ -32,10 +32,11 @@ bjoern_extension = Extension(
     libraries     = ['ev'],
     include_dirs  = ['http-parser', 'statsd-c-client', '/usr/include/libev',
                      '/opt/local/include', '/opt/homebrew/include'],
+    library_dirs  = ['/opt/homebrew/lib/'],
     define_macros = compile_flags,
     extra_compile_args = ['-std=c99', '-fno-strict-aliasing', '-fcommon',
                           '-fPIC', '-Wall', '-Wextra', '-Wno-unused-parameter',
-                          '-Wno-missing-field-initializers', '-g']
+                          '-Wno-missing-field-initializers', '-g'],
 )
 
 setup(
