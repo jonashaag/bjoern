@@ -28,6 +28,7 @@ jobs:
         shell: bash -ex {0}
       - name: Run tests
         run: |
+          pip install requests
           python tests/interrupt-during-request.py
           python tests/keep-alive-behaviour.py
           python tests/test_wsgi_compliance.py
