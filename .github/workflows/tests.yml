@@ -32,7 +32,6 @@ jobs:
           python tests/interrupt-during-request.py
           python tests/keep-alive-behaviour.py
           python tests/test_wsgi_compliance.py
-          python tests/reuse_port.py
           python tests/expect100.py
         shell: bash -ex {0}
 
