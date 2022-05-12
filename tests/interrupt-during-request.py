@@ -26,7 +26,7 @@ def application(environ, start_response):
 def requester():
     conn = httplib.HTTPConnection(*HOST)
     conn.request("GET", "/")
-    conn.getresponse()
+    print(conn.getresponse().read())
 
 
 threading.Thread(target=requester).start()

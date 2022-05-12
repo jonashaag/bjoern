@@ -1,0 +1,37 @@
+name: Tests
+on: push
+
+jobs:
+  tests:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["2.7", "3.5", "3.10"]
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: sudo apt-get update && sudo apt-get install -y libev-dev
+        if: matrix.os == 'ubuntu-latest'
+      - run: brew install libev
+        if: matrix.os == 'macos-latest'
+      - name: Build
+        run: |
+          python setup.py install
+          cd /tmp
+          python -c "import bjoern"
+        shell: bash -ex {0}
+      - name: Run tests
+        run: |
+          pip install requests
+          python tests/interrupt-during-request.py
+          python tests/keep-alive-behaviour.py
+          python tests/test_wsgi_compliance.py
+          python tests/expect100.py
+        shell: bash -ex {0}
+
