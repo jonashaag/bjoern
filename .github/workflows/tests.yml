@@ -8,9 +8,11 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python-version: ["2.7", "3.10"]
+        python-version: ["2.7"] #, "3.3", "3.10"]
     steps:
       - uses: actions/checkout@v3
+        with:
+          submodules: true
       - uses: actions/setup-python@v3
         with:
           python-version: ${{ matrix.python-version }}
