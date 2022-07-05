@@ -350,6 +350,16 @@ void _initialize_request_module(ServerInfo* server_info)
       PyTuple_Pack(2, _FromLong(1), _FromLong(0))
     );
 
+    /* dct['wsgi.input_terminated'] = True
+     * (Tell Flask/other WSGI apps that the input has been terminated, so that chunked
+     * transfer-encoding can be used in requests. This can be hard coded as bjoern
+     * provides the body as a BytesIO object.) */
+    PyDict_SetItemString(
+      wsgi_base_dict,
+      "wsgi.input_terminated",
+      Py_True
+    );
+
     /* dct['wsgi.url_scheme'] = 'http'
      * (This can be hard-coded as there is no TLS support in bjoern.) */
     Py_INCREF(_http);
