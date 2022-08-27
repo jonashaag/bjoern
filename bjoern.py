@@ -1,3 +1,4 @@
+import errno
 import os
 import socket
 import _bjoern
@@ -98,5 +99,10 @@ def run(*args, **kwargs):
             filename = sock.getsockname()
             if filename[0] != '\0':
                 os.unlink(sock.getsockname())
-        sock.close()
+        try:
+            sock.close()
+        except OSError as e:
+            # the socket should already be closed from server.c
+            if e.errno != errno.EBADF:
+                raise
         _default_instance = None

@@ -16,6 +16,10 @@ typedef struct {
   char* statsd_tags;
 # endif
 #endif
+#ifdef WANT_GRACEFUL_SHUTDOWN
+  int active_connections;
+  unsigned shutting_down : 1;
+#endif
 } ServerInfo;
 
 void server_run(ServerInfo*);

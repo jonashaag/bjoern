@@ -112,6 +112,10 @@ on_message_begin(http_parser* parser)
 {
   assert(PARSER->field == NULL);
   REQUEST->headers = PyDict_New();
+#ifdef WANT_GRACEFUL_SHUTDOWN
+  REQUEST->server_info->active_connections++;
+  DBG("active connections=%d", REQUEST->server_info->active_connections);
+#endif
   return 0;
 }
 
