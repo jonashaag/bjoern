@@ -88,6 +88,9 @@ static bool do_sendfile(Request*);
 static bool handle_nonzero_errno(Request*);
 static void close_connection(struct ev_loop*, Request*);
 
+#define THREAD_INFO ((ThreadInfo*)ev_userdata(mainloop))
+
+
 
 void server_run(ServerInfo* server_info)
 {
@@ -141,15 +144,13 @@ ev_signal_on_sigint(struct ev_loop* mainloop, ev_signal* watcher, const int even
   ev_cleanup_init(cleanup_watcher, pyerr_set_interrupt);
   ev_cleanup_start(mainloop, cleanup_watcher);
 
-  ThreadInfo *thread_info = (ThreadInfo*)ev_userdata(mainloop);
-
-  ev_io_stop(mainloop, &thread_info->accept_watcher);
+  ev_io_stop(mainloop, &THREAD_INFO->accept_watcher);
   ev_signal_stop(mainloop, watcher);
 #ifdef WANT_SIGNAL_HANDLING
   ev_timer_stop(mainloop, &timeout_watcher);
 #endif
 #ifdef WANT_GRACEFUL_SHUTDOWN
-  ev_signal_stop(mainloop, &thread_info->sigterm_watcher);
+  ev_signal_stop(mainloop, &THREAD_INFO->sigterm_watcher);
   ev_timer_stop(mainloop, &timeout_watcher);
 #endif
 }
@@ -159,13 +160,12 @@ ev_signal_on_sigint(struct ev_loop* mainloop, ev_signal* watcher, const int even
 static void
 ev_signal_on_sigterm(struct ev_loop* mainloop, ev_signal* watcher, const int events)
 {
-  ThreadInfo *thread_info = (ThreadInfo*)ev_userdata(mainloop);
 
-  ev_io_stop(mainloop, &thread_info->accept_watcher);
+  ev_io_stop(mainloop, &THREAD_INFO->accept_watcher);
   // Drain the accept queue before we close to try and minimize connection resets
-  ev_io_on_request(mainloop, &thread_info->accept_watcher, 0);
+  ev_io_on_request(mainloop, &THREAD_INFO->accept_watcher, 0);
   // Close the socket now to ensure no more clients can talk to us
-  close(thread_info->server_info->sockfd);
+  close(THREAD_INFO->server_info->sockfd);
 
   ev_signal_stop(mainloop, watcher);
   ev_timer_stop(mainloop, &timeout_watcher);
@@ -174,9 +174,9 @@ ev_signal_on_sigterm(struct ev_loop* mainloop, ev_signal* watcher, const int eve
   // That gives any of the new connections we recently accepted a good chance to start
   // sending us data so we can mark them active.
 
-  DBG("SIGTERM received, %d active connections", thread_info->server_info->active_connections);
+  DBG("SIGTERM received, %d active connections", THREAD_INFO->server_info->active_connections);
   // stop processing any more keep-alives
-  thread_info->server_info->shutting_down = true;
+  THREAD_INFO->server_info->shutting_down = true;
   ev_timer_init(&shutdown_watcher, ev_shutdown_ontick, 0., SHUTDOWN_CHECK_INTERVAL);
   ev_timer_init(&shutdown_timeout_watcher, ev_shutdown_timeout_ontick, SHUTDOWN_TIMEOUT, 0.);
   ev_timer_start(mainloop, &shutdown_watcher);
@@ -200,35 +200,32 @@ ev_timer_ontick(struct ev_loop* mainloop, ev_timer* watcher, const int events)
 static void
 ev_shutdown_ontick(struct ev_loop* mainloop, ev_timer* watcher, const int events)
 {
-  ThreadInfo *thread_info = (ThreadInfo*)ev_userdata(mainloop);
-  DBG("ev_shutdown_ontick %d", thread_info->server_info->active_connections);
+  DBG("ev_shutdown_ontick %d", THREAD_INFO->server_info->active_connections);
 
-  if (thread_info->server_info->active_connections == 0) {
+  if (THREAD_INFO->server_info->active_connections == 0) {
     DBG("No more active connections, shutting down");
 
     ev_timer_stop(mainloop, &shutdown_watcher);
     ev_timer_stop(mainloop, &shutdown_timeout_watcher);
 
 #ifdef WANT_SIGINT_HANDLING
-    ev_signal_stop(mainloop, &thread_info->sigint_watcher);
+    ev_signal_stop(mainloop, &THREAD_INFO->sigint_watcher);
 #endif
   } else {
-    DBG("Still have active connections %d", thread_info->server_info->active_connections);
+    DBG("Still have active connections %d", THREAD_INFO->server_info->active_connections);
   }
 }
 
 static void
 ev_shutdown_timeout_ontick(struct ev_loop* mainloop, ev_timer* watcher, const int events)
 {
-  ThreadInfo *thread_info = (ThreadInfo*)ev_userdata(mainloop);
-
   GIL_LOCK(0);
   ev_timer_stop(mainloop, &shutdown_watcher);
   ev_timer_stop(mainloop, &shutdown_timeout_watcher);
   // break because we've exceeded the timeout and want to just stop where we are,
   // regardless of where the other watchers are
   ev_break(mainloop, EVBREAK_ALL);
-  DBG("Shutdown took too long, %d active connections", thread_info->server_info->active_connections);
+  DBG("Shutdown took too long, %d active connections", THREAD_INFO->server_info->active_connections);
   GIL_UNLOCK(0);
 }
 #endif
