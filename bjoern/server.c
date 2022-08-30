@@ -205,7 +205,6 @@ ev_shutdown_ontick(struct ev_loop* mainloop, ev_timer* watcher, const int events
 
   if (thread_info->server_info->active_connections == 0) {
     DBG("No more active connections, shutting down");
-    GIL_LOCK(0);
 
     ev_timer_stop(mainloop, &shutdown_watcher);
     ev_timer_stop(mainloop, &shutdown_timeout_watcher);
@@ -213,8 +212,6 @@ ev_shutdown_ontick(struct ev_loop* mainloop, ev_timer* watcher, const int events
 #ifdef WANT_SIGINT_HANDLING
     ev_signal_stop(mainloop, &thread_info->sigint_watcher);
 #endif
-
-    GIL_UNLOCK(0);
   } else {
     DBG("Still have active connections %d", thread_info->server_info->active_connections);
   }
