@@ -237,6 +237,9 @@ ev_io_on_requests(struct ev_loop* mainloop, ev_io* watcher, const int events)
   struct sockaddr_in sockaddr;
   socklen_t addrlen;
   addrlen = sizeof(struct sockaddr_in);
+
+  GIL_LOCK(0);
+
   while ((client_fd = accept(watcher->fd, (struct sockaddr*)&sockaddr, &addrlen)) > 0) {
     DBG("Accepted %d", client_fd);
     int flags = fcntl(client_fd, F_GETFL, 0);
@@ -246,15 +249,11 @@ ev_io_on_requests(struct ev_loop* mainloop, ev_io* watcher, const int events)
       return;
     }
 
-    GIL_LOCK(0);
-
     Request* request = Request_new(
       ((ThreadInfo*)ev_userdata(mainloop))->server_info,
       client_fd,
       inet_ntoa(sockaddr.sin_addr)
     );
-
-    GIL_UNLOCK(0);
 
     STATSD_INCREMENT("conn.accept.success");
 
@@ -265,6 +264,8 @@ ev_io_on_requests(struct ev_loop* mainloop, ev_io* watcher, const int events)
                client_fd, EV_READ);
     ev_io_start(mainloop, &request->ev_watcher);
   }
+
+  GIL_UNLOCK(0);
 }
 
 
