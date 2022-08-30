@@ -374,6 +374,9 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
     STATSD_INCREMENT("req.done");
     break;
   case aborted:
+#ifdef WANT_GRACEFUL_SHUTDOWN
+    request->server_info->active_connections--;
+#endif
     close_connection(mainloop, request);
     STATSD_INCREMENT("req.aborted");
     break;
@@ -450,6 +453,9 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
     start_reading(mainloop, request);
     break;
   case aborted:
+#ifdef WANT_GRACEFUL_SHUTDOWN
+    request->server_info->active_connections--;
+#endif
     /* Response was aborted due to an error. We can't do anything graceful here
      * because at least one chunk is already sent... just close the connection. */
     close_connection(mainloop, request);
