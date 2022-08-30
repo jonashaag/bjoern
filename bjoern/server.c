@@ -78,7 +78,7 @@ static ev_shutdown_callback ev_shutdown_ontick, ev_shutdown_timeout_ontick;
 ev_timer shutdown_watcher, shutdown_timeout_watcher;
 #endif
 
-static ev_io_callback ev_io_on_request;
+static ev_io_callback ev_io_on_requests;
 static ev_io_callback ev_io_on_read;
 static ev_io_callback ev_io_on_write;
 static write_state on_write_sendfile(struct ev_loop*, Request*);
@@ -101,7 +101,7 @@ void server_run(ServerInfo* server_info)
 
   ev_set_userdata(mainloop, &thread_info);
 
-  ev_io_init(&thread_info.accept_watcher, ev_io_on_request, server_info->sockfd, EV_READ);
+  ev_io_init(&thread_info.accept_watcher, ev_io_on_requests, server_info->sockfd, EV_READ);
   ev_io_start(mainloop, &thread_info.accept_watcher);
 
 #ifdef WANT_SIGINT_HANDLING
@@ -163,7 +163,7 @@ ev_signal_on_sigterm(struct ev_loop* mainloop, ev_signal* watcher, const int eve
 
   ev_io_stop(mainloop, &THREAD_INFO->accept_watcher);
   // Drain the accept queue before we close to try and minimize connection resets
-  ev_io_on_request(mainloop, &THREAD_INFO->accept_watcher, 0);
+  ev_io_on_requests(mainloop, &THREAD_INFO->accept_watcher, 0);
   // Close the socket now to ensure no more clients can talk to us
   close(THREAD_INFO->server_info->sockfd);
 
@@ -231,7 +231,7 @@ ev_shutdown_timeout_ontick(struct ev_loop* mainloop, ev_timer* watcher, const in
 #endif
 
 static void
-ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
+ev_io_on_requests(struct ev_loop* mainloop, ev_io* watcher, const int events)
 {
   int client_fd;
   struct sockaddr_in sockaddr;
