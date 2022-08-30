@@ -138,6 +138,10 @@ pyerr_set_interrupt(struct ev_loop* mainloop, struct ev_cleanup* watcher, const 
 static void
 ev_signal_on_sigint(struct ev_loop* mainloop, ev_signal* watcher, const int events)
 {
+#if defined(WANT_SIGNAL_HANDLING) || defined(WANT_GRACEFUL_SHUTDOWN)
+  ev_timer_stop(mainloop, &timeout_watcher);
+#endif
+
   /* Clean up and shut down this thread.
    * (Shuts down the Python interpreter if this is the main thread) */
   ev_cleanup* cleanup_watcher = malloc(sizeof(ev_cleanup));
@@ -146,12 +150,8 @@ ev_signal_on_sigint(struct ev_loop* mainloop, ev_signal* watcher, const int even
 
   ev_io_stop(mainloop, &THREAD_INFO->accept_watcher);
   ev_signal_stop(mainloop, watcher);
-#ifdef WANT_SIGNAL_HANDLING
-  ev_timer_stop(mainloop, &timeout_watcher);
-#endif
 #ifdef WANT_GRACEFUL_SHUTDOWN
   ev_signal_stop(mainloop, &THREAD_INFO->sigterm_watcher);
-  ev_timer_stop(mainloop, &timeout_watcher);
 #endif
 }
 #endif
