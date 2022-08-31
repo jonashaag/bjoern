@@ -246,7 +246,7 @@ ev_io_on_requests(struct ev_loop* mainloop, ev_io* watcher, const int events)
     if(fcntl(client_fd, F_SETFL, (flags < 0 ? 0 : flags) | O_NONBLOCK) == -1) {
       STATSD_INCREMENT("conn.accept.error");
       DBG("Could not set_nonblocking() client %d: errno %d", client_fd, errno);
-      return;
+      goto out;
     }
 
     Request* request = Request_new(
@@ -264,7 +264,7 @@ ev_io_on_requests(struct ev_loop* mainloop, ev_io* watcher, const int events)
                client_fd, EV_READ);
     ev_io_start(mainloop, &request->ev_watcher);
   }
-
+out:
   GIL_UNLOCK(0);
 }
 
