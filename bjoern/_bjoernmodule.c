@@ -11,6 +11,10 @@ static PyObject*
 run(PyObject* self, PyObject* args)
 {
   ServerInfo info;
+#ifdef WANT_GRACEFUL_SHUTDOWN
+  info.active_connections = 0;
+  info.shutting_down = false;
+#endif
 
   PyObject* socket;
 
@@ -152,6 +156,12 @@ PyMODINIT_FUNC INIT_BJOERN(void)
   PyDict_SetItemString(features, "has_statsd_tags", Py_True);
 #else
   PyDict_SetItemString(features, "has_statsd_tags", Py_False);
+#endif
+
+#ifdef WANT_GRACEFUL_SHUTDOWN
+  PyDict_SetItemString(features, "has_graceful_shutdown", Py_True);
+#else
+  PyDict_SetItemString(features, "has_graceful_shutdown", Py_False);
 #endif
 
 #if PY_MAJOR_VERSION >= 3

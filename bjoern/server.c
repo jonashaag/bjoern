@@ -49,12 +49,19 @@ typedef enum _rw_state write_state;
 typedef struct {
   ServerInfo* server_info;
   ev_io accept_watcher;
+#ifdef WANT_SIGINT_HANDLING
+  ev_signal sigint_watcher;
+#endif
+#ifdef WANT_GRACEFUL_SHUTDOWN
+  ev_signal sigterm_watcher;
+#endif
 } ThreadInfo;
 
 typedef void ev_io_callback(struct ev_loop*, ev_io*, const int);
 
-#ifdef WANT_SIGINT_HANDLING
 typedef void ev_signal_callback(struct ev_loop*, ev_signal*, const int);
+
+#ifdef WANT_SIGINT_HANDLING
 static ev_signal_callback ev_signal_on_sigint;
 #endif
 
@@ -64,7 +71,14 @@ static ev_timer_callback ev_timer_ontick;
 ev_timer timeout_watcher;
 #endif
 
-static ev_io_callback ev_io_on_request;
+#ifdef WANT_GRACEFUL_SHUTDOWN
+static ev_signal_callback ev_signal_on_sigterm;
+typedef void ev_shutdown_callback(struct ev_loop*, ev_timer*, const int);
+static ev_shutdown_callback ev_shutdown_ontick, ev_shutdown_timeout_ontick;
+ev_timer shutdown_watcher, shutdown_timeout_watcher;
+#endif
+
+static ev_io_callback ev_io_on_requests;
 static ev_io_callback ev_io_on_read;
 static ev_io_callback ev_io_on_write;
 static write_state on_write_sendfile(struct ev_loop*, Request*);
@@ -73,6 +87,9 @@ static bool do_send_chunk(Request*);
 static bool do_sendfile(Request*);
 static bool handle_nonzero_errno(Request*);
 static void close_connection(struct ev_loop*, Request*);
+
+#define THREAD_INFO ((ThreadInfo*)ev_userdata(mainloop))
+
 
 
 void server_run(ServerInfo* server_info)
@@ -84,13 +101,17 @@ void server_run(ServerInfo* server_info)
 
   ev_set_userdata(mainloop, &thread_info);
 
-  ev_io_init(&thread_info.accept_watcher, ev_io_on_request, server_info->sockfd, EV_READ);
+  ev_io_init(&thread_info.accept_watcher, ev_io_on_requests, server_info->sockfd, EV_READ);
   ev_io_start(mainloop, &thread_info.accept_watcher);
 
 #ifdef WANT_SIGINT_HANDLING
-  ev_signal sigint_watcher;
-  ev_signal_init(&sigint_watcher, ev_signal_on_sigint, SIGINT);
-  ev_signal_start(mainloop, &sigint_watcher);
+  ev_signal_init(&thread_info.sigint_watcher, ev_signal_on_sigint, SIGINT);
+  ev_signal_start(mainloop, &thread_info.sigint_watcher);
+#endif
+
+#ifdef WANT_GRACEFUL_SHUTDOWN
+  ev_signal_init(&thread_info.sigterm_watcher, ev_signal_on_sigterm, SIGTERM);
+  ev_signal_start(mainloop, &thread_info.sigterm_watcher);
 #endif
 
 #ifdef WANT_SIGNAL_HANDLING
@@ -117,19 +138,53 @@ pyerr_set_interrupt(struct ev_loop* mainloop, struct ev_cleanup* watcher, const 
 static void
 ev_signal_on_sigint(struct ev_loop* mainloop, ev_signal* watcher, const int events)
 {
+#if defined(WANT_SIGNAL_HANDLING) || defined(WANT_GRACEFUL_SHUTDOWN)
+  ev_timer_stop(mainloop, &timeout_watcher);
+#endif
+
   /* Clean up and shut down this thread.
    * (Shuts down the Python interpreter if this is the main thread) */
   ev_cleanup* cleanup_watcher = malloc(sizeof(ev_cleanup));
   ev_cleanup_init(cleanup_watcher, pyerr_set_interrupt);
   ev_cleanup_start(mainloop, cleanup_watcher);
 
-  ev_io_stop(mainloop, &((ThreadInfo*)ev_userdata(mainloop))->accept_watcher);
+  ev_io_stop(mainloop, &THREAD_INFO->accept_watcher);
   ev_signal_stop(mainloop, watcher);
-#ifdef WANT_SIGNAL_HANDLING
-  ev_timer_stop(mainloop, &timeout_watcher);
+#ifdef WANT_GRACEFUL_SHUTDOWN
+  ev_signal_stop(mainloop, &THREAD_INFO->sigterm_watcher);
 #endif
 }
 #endif
+
+#ifdef WANT_GRACEFUL_SHUTDOWN
+static void
+ev_signal_on_sigterm(struct ev_loop* mainloop, ev_signal* watcher, const int events)
+{
+
+  ev_io_stop(mainloop, &THREAD_INFO->accept_watcher);
+  ev_signal_stop(mainloop, watcher);
+  ev_timer_stop(mainloop, &timeout_watcher);
+
+  // Drain the accept queue before we close to try and minimize connection resets
+  ev_io_on_requests(mainloop, &THREAD_INFO->accept_watcher, 0);
+  // Close the socket now to ensure no more clients can talk to us
+  close(THREAD_INFO->server_info->sockfd);
+
+  // don't shutdown immediately, but start a timer to check if we can shutdown in 100ms.
+  // That gives any of the new connections we recently accepted a good chance to start
+  // sending us data so we can mark them active.
+
+  DBG("SIGTERM received, %d active connections", THREAD_INFO->server_info->active_connections);
+  // stop processing any more keep-alives
+  THREAD_INFO->server_info->shutting_down = true;
+  ev_timer_init(&shutdown_watcher, ev_shutdown_ontick, 0., SHUTDOWN_CHECK_INTERVAL);
+  ev_timer_init(&shutdown_timeout_watcher, ev_shutdown_timeout_ontick, SHUTDOWN_TIMEOUT, 0.);
+  ev_timer_start(mainloop, &shutdown_watcher);
+  ev_timer_start(mainloop, &shutdown_timeout_watcher);
+  ev_set_priority(&shutdown_watcher, EV_MINPRI);
+  ev_set_priority(&shutdown_timeout_watcher, EV_MINPRI);
+#endif
+}
 
 #ifdef WANT_SIGNAL_HANDLING
 static void
@@ -141,46 +196,76 @@ ev_timer_ontick(struct ev_loop* mainloop, ev_timer* watcher, const int events)
 }
 #endif
 
+#ifdef WANT_GRACEFUL_SHUTDOWN
 static void
-ev_io_on_request(struct ev_loop* mainloop, ev_io* watcher, const int events)
+ev_shutdown_ontick(struct ev_loop* mainloop, ev_timer* watcher, const int events)
+{
+  DBG("ev_shutdown_ontick %d", THREAD_INFO->server_info->active_connections);
+
+  if (THREAD_INFO->server_info->active_connections == 0) {
+    DBG("No more active connections, shutting down");
+
+    ev_timer_stop(mainloop, &shutdown_watcher);
+    ev_timer_stop(mainloop, &shutdown_timeout_watcher);
+
+#ifdef WANT_SIGINT_HANDLING
+    ev_signal_stop(mainloop, &THREAD_INFO->sigint_watcher);
+#endif
+  } else {
+    DBG("Still have active connections %d", THREAD_INFO->server_info->active_connections);
+  }
+}
+
+static void
+ev_shutdown_timeout_ontick(struct ev_loop* mainloop, ev_timer* watcher, const int events)
+{
+  GIL_LOCK(0);
+  ev_timer_stop(mainloop, &shutdown_watcher);
+  ev_timer_stop(mainloop, &shutdown_timeout_watcher);
+  // break because we've exceeded the timeout and want to just stop where we are,
+  // regardless of where the other watchers are
+  ev_break(mainloop, EVBREAK_ALL);
+  DBG("Shutdown took too long, %d active connections", THREAD_INFO->server_info->active_connections);
+  GIL_UNLOCK(0);
+}
+#endif
+
+static void
+ev_io_on_requests(struct ev_loop* mainloop, ev_io* watcher, const int events)
 {
   int client_fd;
   struct sockaddr_in sockaddr;
   socklen_t addrlen;
-
   addrlen = sizeof(struct sockaddr_in);
-  client_fd = accept(watcher->fd, (struct sockaddr*)&sockaddr, &addrlen);
-  if(client_fd < 0) {
-    DBG("Could not accept() client: errno %d", errno);
-    STATSD_INCREMENT("conn.accept.error");
-    return;
-  }
-
-  int flags = fcntl(client_fd, F_GETFL, 0);
-  if(fcntl(client_fd, F_SETFL, (flags < 0 ? 0 : flags) | O_NONBLOCK) == -1) {
-    STATSD_INCREMENT("conn.accept.error");
-    DBG("Could not set_nonblocking() client %d: errno %d", client_fd, errno);
-    return;
-  }
 
   GIL_LOCK(0);
 
-  Request* request = Request_new(
-    ((ThreadInfo*)ev_userdata(mainloop))->server_info,
-    client_fd,
-    inet_ntoa(sockaddr.sin_addr)
-  );
+  while ((client_fd = accept(watcher->fd, (struct sockaddr*)&sockaddr, &addrlen)) > 0) {
+    DBG("Accepted %d", client_fd);
+    int flags = fcntl(client_fd, F_GETFL, 0);
+    if(fcntl(client_fd, F_SETFL, (flags < 0 ? 0 : flags) | O_NONBLOCK) == -1) {
+      STATSD_INCREMENT("conn.accept.error");
+      DBG("Could not set_nonblocking() client %d: errno %d", client_fd, errno);
+      goto out;
+    }
 
+    Request* request = Request_new(
+      ((ThreadInfo*)ev_userdata(mainloop))->server_info,
+      client_fd,
+      inet_ntoa(sockaddr.sin_addr)
+    );
+
+    STATSD_INCREMENT("conn.accept.success");
+
+    DBG_REQ(request, "Accepted client %s:%d on fd %d",
+            inet_ntoa(sockaddr.sin_addr), ntohs(sockaddr.sin_port), client_fd);
+
+    ev_io_init(&request->ev_watcher, &ev_io_on_read,
+               client_fd, EV_READ);
+    ev_io_start(mainloop, &request->ev_watcher);
+  }
+out:
   GIL_UNLOCK(0);
-
-  STATSD_INCREMENT("conn.accept.success");
-
-  DBG_REQ(request, "Accepted client %s:%d on fd %d",
-          inet_ntoa(sockaddr.sin_addr), ntohs(sockaddr.sin_port), client_fd);
-
-  ev_io_init(&request->ev_watcher, &ev_io_on_read,
-             client_fd, EV_READ);
-  ev_io_start(mainloop, &request->ev_watcher);
 }
 
 
@@ -289,6 +374,9 @@ ev_io_on_read(struct ev_loop* mainloop, ev_io* watcher, const int events)
     STATSD_INCREMENT("req.done");
     break;
   case aborted:
+#ifdef WANT_GRACEFUL_SHUTDOWN
+    request->server_info->active_connections--;
+#endif
     close_connection(mainloop, request);
     STATSD_INCREMENT("req.aborted");
     break;
@@ -337,7 +425,12 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
     break;
   case done:
     STATSD_INCREMENT("resp.done");
+#ifdef WANT_GRACEFUL_SHUTDOWN
+    request->server_info->active_connections--;
+    if(request->state.keep_alive && !request->server_info->shutting_down) {
+#else
     if(request->state.keep_alive) {
+#endif
       DBG_REQ(request, "done, keep-alive");
       STATSD_INCREMENT("resp.done.keepalive");
       ev_io_stop(mainloop, &request->ev_watcher);
@@ -360,6 +453,9 @@ ev_io_on_write(struct ev_loop* mainloop, ev_io* watcher, const int events)
     start_reading(mainloop, request);
     break;
   case aborted:
+#ifdef WANT_GRACEFUL_SHUTDOWN
+    request->server_info->active_connections--;
+#endif
     /* Response was aborted due to an error. We can't do anything graceful here
      * because at least one chunk is already sent... just close the connection. */
     close_connection(mainloop, request);
