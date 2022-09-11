@@ -1,3 +1,8 @@
+3.2.2 (Sep 11, 2022)
+    - #228, 235 Fix libev paths (Ian Swanson, Nicolas Damgaard Larsen)
+    - #234 Set ``wsgi.input_terminated`` (Nathan Hoad)
+    - Update PyPI description
+
 3.2.1 (Feb 14, 2022)
     - Fix release
 

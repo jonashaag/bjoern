@@ -2,6 +2,8 @@ import os
 import glob
 from setuptools import setup, Extension
 
+long_description = open(os.path.join(os.path.dirname(__file__), "README.rst")).read()
+
 WANT_SIGINT_HANDLING = os.environ.get('BJOERN_WANT_SIGINT_HANDLING', True)
 WANT_SIGNAL_HANDLING = os.environ.get('BJOERN_WANT_SIGNAL_HANDLING', True)
 SIGNAL_CHECK_INTERVAL = os.environ.get('BJOERN_SIGNAL_CHECK_INTERVAL', '0.1')
@@ -46,7 +48,8 @@ setup(
     license      = '2-clause BSD',
     url          = 'https://github.com/jonashaag/bjoern',
     description  = 'A screamingly fast Python 2 + 3 WSGI server written in C.',
-    version      = '3.2.1',
+    version      = '3.2.2',
+    long_description = long_description,
     classifiers  = ['Development Status :: 4 - Beta',
                     'License :: OSI Approved :: BSD License',
                     'Programming Language :: C',
