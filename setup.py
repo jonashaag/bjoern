@@ -37,8 +37,7 @@ bjoern_extension = Extension(
     library_dirs  = ['/opt/homebrew/lib/', '/usr/local/lib'],
     define_macros = compile_flags,
     extra_compile_args = ['-std=c99', '-fno-strict-aliasing', '-fcommon',
-                          '-fPIC', '-Wall', '-Wextra', '-Wno-unused-parameter',
-                          '-Wno-missing-field-initializers', '-g'],
+                          '-fPIC', '-g'],
 )
 
 setup(
