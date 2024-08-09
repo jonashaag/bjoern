@@ -95,8 +95,8 @@ void server_run(ServerInfo* server_info)
 
 #ifdef WANT_SIGNAL_HANDLING
   ev_timer_init(&timeout_watcher, ev_timer_ontick, 0., SIGNAL_CHECK_INTERVAL);
-  ev_timer_start(mainloop, &timeout_watcher);
   ev_set_priority(&timeout_watcher, EV_MINPRI);
+  ev_timer_start(mainloop, &timeout_watcher);
 #endif
 
   /* This is the program main loop */

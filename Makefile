@@ -1,6 +1,6 @@
 SOURCE_DIR	= bjoern
 BUILD_DIR	= build
-PYTHON	?= python2
+PYTHON	?= python3
 
 PYTHON_INCLUDE	= $(shell ${PYTHON}-config --includes)
 PYTHON_LDFLAGS	= $(shell ${PYTHON}-config --ldflags)

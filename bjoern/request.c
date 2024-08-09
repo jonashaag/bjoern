@@ -33,6 +33,7 @@ void Request_reset(Request* request)
 {
   memset(&request->state, 0, sizeof(Request) - (size_t)&((Request*)NULL)->state);
   request->state.response_length_unknown = true;
+  request->content_length = -1;
   request->parser.last_call_was_header_value = true;
   request->parser.invalid_header = false;
   request->parser.field = NULL;

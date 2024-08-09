@@ -38,6 +38,7 @@ typedef struct {
   PyObject* client_addr;
 
   request_state state;
+  ssize_t content_length;
 
   PyObject* status;
   PyObject* headers;
