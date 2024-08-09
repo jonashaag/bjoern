@@ -88,6 +88,10 @@ wsgi_call_application(Request* request)
       Py_DECREF(retval);
       first_chunk = NULL;
     }
+    if (request->state.response_length_unknown) {
+      request->state.response_length_unknown = false;
+      request->content_length = _PEP3333_Bytes_GET_SIZE(retval);
+    }
   } else if(!request->state.response_length_unknown && FileWrapper_CheckExact(retval) && FileWrapper_GetFd(retval) != -1) {
     DBG_REQ(request, "WSGI iterable is wsgi.file_wrapper instance and Content-Length is known");
     request->iterable = retval;
@@ -123,9 +127,9 @@ wsgi_call_application(Request* request)
       !strncmp(_PEP3333_Bytes_AS_DATA(request->status), "304", 3)) {
     request->state.response_length_unknown = false;
   }
-  
+
   /* keep-alive cruft */
-  if(http_should_keep_alive(&request->parser.parser)) { 
+  if(http_should_keep_alive(&request->parser.parser)) {
     if(request->state.response_length_unknown) {
       if(request->parser.parser.http_major > 0 && request->parser.parser.http_minor > 0) {
         /* On HTTP 1.1, we can use Transfer-Encoding: chunked. */
@@ -239,7 +243,7 @@ clean_headers(PyObject* headers, bool* found_content_length)
 static void
 wsgi_getheaders(Request* request, PyObject** buf, Py_ssize_t *length)
 {
-  Py_ssize_t length_upperbound = strlen("HTTP/1.1 ") + _PEP3333_Bytes_GET_SIZE(request->status) + strlen("\r\nConnection: Keep-Alive") + strlen("\r\nTransfer-Encoding: chunked") + strlen("\r\n\r\n");
+  Py_ssize_t length_upperbound = strlen("HTTP/1.1 ") + _PEP3333_Bytes_GET_SIZE(request->status) + strlen("\r\nConnection: Keep-Alive") + strlen("\r\nTransfer-Encoding: chunked") + strlen("\r\nContent-Length: 999999999999999") + strlen("\r\n\r\n");
   for(Py_ssize_t i=0; i<PyList_GET_SIZE(request->headers); ++i) {
     PyObject* tuple = PyList_GET_ITEM(request->headers, i);
     PyObject* field = PyTuple_GET_ITEM(tuple, 0);
@@ -282,6 +286,10 @@ wsgi_getheaders(Request* request, PyObject** buf, Py_ssize_t *length)
     buf_write2("\r\nConnection: Keep-Alive");
     if(request->state.chunked_response) {
       buf_write2("\r\nTransfer-Encoding: chunked");
+    }else if(request->content_length>=0) {
+      char buf[100];
+      sprintf(buf, "\r\nContent-Length: %ld", request->content_length);
+      buf_write2(buf);
     }
   } else {
     buf_write2("\r\nConnection: close");
