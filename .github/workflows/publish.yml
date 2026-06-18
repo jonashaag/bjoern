@@ -1,0 +1,159 @@
+name: Build and Publish to PyPI
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build_wheels:
+    name: Build wheels (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            archs: x86_64 aarch64
+          - os: macos-15-intel
+            archs: x86_64
+          - os: macos-latest
+            archs: arm64
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+          persist-credentials: false
+
+      - name: Set up QEMU for Linux ARM64 emulation
+        if: matrix.os == 'ubuntu-latest'
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: aarch64
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v4.1.0
+        env:
+          CIBW_ARCHS: ${{ matrix.archs }}
+          CIBW_BUILD: cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*
+          CIBW_SKIP: "*-musllinux* *-manylinux_i686"
+          # Install libev inside manylinux containers; fall back to building
+          # from source if libev-devel is not in the package repos (e.g. manylinux1).
+          CIBW_BEFORE_ALL_LINUX: >
+            yum install -y libev-devel ||
+            (LIBEV_VERSION=4.33 &&
+             curl -fsSL http://dist.schmorp.de/libev/Attic/libev-${LIBEV_VERSION}.tar.gz
+               -o /tmp/libev.tar.gz &&
+             tar xf /tmp/libev.tar.gz -C /tmp/ &&
+             cd /tmp/libev-${LIBEV_VERSION} && ./configure && make && make install)
+          CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET=11.0
+          CIBW_BEFORE_ALL_MACOS: >
+            LIBEV_VERSION=4.33 &&
+            curl -fsSL http://dist.schmorp.de/libev/Attic/libev-${LIBEV_VERSION}.tar.gz -o /tmp/libev.tar.gz &&
+            tar xf /tmp/libev.tar.gz -C /tmp/ &&
+            cd /tmp/libev-${LIBEV_VERSION} &&
+            MACOSX_DEPLOYMENT_TARGET=11.0 ./configure --prefix=/usr/local CFLAGS="-mmacosx-version-min=11.0" LDFLAGS="-mmacosx-version-min=11.0" &&
+            MACOSX_DEPLOYMENT_TARGET=11.0 make &&
+            sudo make install
+          # auditwheel (Linux) and delocate (macOS) are run automatically by
+          # cibuildwheel to bundle libev.so / libev.dylib into the wheel.
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.archs }}
+          path: ./wheelhouse/*.whl
+
+  build_sdist:
+    name: Build source distribution
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+          persist-credentials: false
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - run: pip install build
+      - run: python -m build --sdist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  publish-to-pypi:
+    name: Publish to PyPI
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/bjoern
+    permissions:
+      id-token: write  # required for trusted publishing (OIDC)
+
+    steps:
+      - name: Download wheels
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist/
+
+      - name: Download sdist
+        uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    name: Create GitHub Release
+    needs: [publish-to-pypi]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write  # required for sigstore signing
+
+    steps:
+      - name: Download wheels
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist/
+
+      - name: Download sdist
+        uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist/
+
+      - name: Sign with Sigstore
+        uses: sigstore/gh-action-sigstore-python@v3.3.0
+        with:
+          inputs: >-
+            ./dist/*.tar.gz
+            ./dist/*.whl
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create
+          "$GITHUB_REF_NAME"
+          --repo "$GITHUB_REPOSITORY"
+          --notes ""
+
+      - name: Upload artifacts to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          gh release upload
+          "$GITHUB_REF_NAME" dist/**
+          --repo "$GITHUB_REPOSITORY"

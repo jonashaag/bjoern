@@ -1,1 +1,2 @@
 requests
+setuptools; python_version >= "3.12"
